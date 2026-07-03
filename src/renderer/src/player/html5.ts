@@ -15,8 +15,12 @@ export class Html5Engine implements PlaybackEngine {
   }
 
   constructor(private video: HTMLVideoElement) {
+    // external VTT tracks are cross-origin (Jellyfin server) — without this the
+    // browser silently refuses to fetch/render them
+    video.crossOrigin = 'anonymous'
     video.addEventListener('timeupdate', this.onTime)
     video.addEventListener('play', this.onPlay)
+    video.addEventListener('playing', this.onPlay)
     video.addEventListener('pause', this.onPause)
     video.addEventListener('waiting', this.onWaiting)
     video.addEventListener('ended', this.onEnded)
@@ -143,6 +147,7 @@ export class Html5Engine implements PlaybackEngine {
     this.hls?.destroy()
     this.video.removeEventListener('timeupdate', this.onTime)
     this.video.removeEventListener('play', this.onPlay)
+    this.video.removeEventListener('playing', this.onPlay)
     this.video.removeEventListener('pause', this.onPause)
     this.video.removeEventListener('waiting', this.onWaiting)
     this.video.removeEventListener('ended', this.onEnded)
