@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { Card } from './Card'
 import type { BaseItem } from '../lib/jellyfin'
+import styles from './Row.module.css'
 
 export function Row({
   title,
@@ -15,17 +16,17 @@ export function Row({
 }): React.JSX.Element | null {
   if (!items?.length) return null
   return (
-    <section className="mb-8">
-      <h2 className="mb-3 px-8 text-base font-medium text-neutral-300">
+    <section className={styles.section}>
+      <h2 className={styles.heading}>
         {to ? (
-          <Link to={to} className="group inline-flex items-center gap-1 hover:text-white">
+          <Link to={to} className={styles.headingLink}>
             {title}
             <svg
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
               strokeWidth="2"
-              className="size-4 opacity-0 transition-opacity group-hover:opacity-100"
+              className={styles.chevron}
             >
               <path d="M9 6l6 6-6 6" />
             </svg>
@@ -34,7 +35,7 @@ export function Row({
           title
         )}
       </h2>
-      <div className="flex gap-4 overflow-x-auto px-8 pb-2">
+      <div className={styles.track}>
         {items.map((item) => (
           <Card key={item.Id} item={item} wide={wide} />
         ))}

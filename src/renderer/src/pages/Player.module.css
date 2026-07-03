@@ -1,0 +1,55 @@
+.stage {
+  position: relative;
+  overflow: hidden;
+  block-size: 100%;
+  background: black;
+}
+
+.video {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+.toast {
+  position: absolute;
+  inset-block-start: 1.5rem;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  padding-block: 0.5rem;
+  padding-inline: 1rem;
+  border-radius: var(--radius-s);
+  background: color-mix(in oklch, black 80%, transparent);
+  font-size: 0.875rem;
+  color: white;
+}
+
+.errorLayer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background: color-mix(in oklch, black 80%, transparent);
+}
+
+.errorText {
+  color: var(--player-fg-muted);
+}
+
+.errorRetry {
+  padding-block: 0.6rem;
+  padding-inline: 1.1rem;
+  border-radius: var(--radius-s);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-size: 0.875rem;
+}
+
+.errorBack {
+  font-size: 0.875rem;
+  color: color-mix(in oklch, white 45%, transparent);
+}

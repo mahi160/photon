@@ -4,6 +4,7 @@ import { searchIndexQuery, episodeSearchQuery } from '../lib/queries'
 import { Card } from '../components/Card'
 import { filterLocal } from '../lib/search'
 import type { BaseItem } from '../lib/jellyfin'
+import styles from './Search.module.css'
 
 function useDebounced<T>(value: T, ms: number): T {
   const [v, setV] = useState(value)
@@ -17,9 +18,9 @@ function useDebounced<T>(value: T, ms: number): T {
 function Group({ title, items }: { title: string; items: BaseItem[] }): React.JSX.Element | null {
   if (!items.length) return null
   return (
-    <section className="mb-8">
-      <h2 className="mb-3 text-base font-medium text-neutral-300">{title}</h2>
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-x-4 gap-y-6">
+    <section className={styles.group}>
+      <h2 className={styles.groupTitle}>{title}</h2>
+      <div className={styles.grid}>
         {items.map((item) => (
           <Card key={item.Id} item={item} />
         ))}
@@ -45,13 +46,13 @@ export function Search(): React.JSX.Element {
   const episodes = useQuery(episodeSearchQuery(debounced))
 
   return (
-    <div className="px-8 py-8">
+    <div className={styles.page}>
       <input
         autoFocus
         value={term}
         onChange={(e) => setTerm(e.target.value)}
         placeholder="Search movies, shows, episodes…"
-        className="mb-8 w-full max-w-xl rounded-xl bg-surface-2 px-4 py-3 text-base outline-none ring-accent/60 placeholder:text-neutral-500 focus:ring-2"
+        className={styles.input}
         aria-label="Search"
       />
       <Group title="Movies" items={movies} />
@@ -61,7 +62,7 @@ export function Search(): React.JSX.Element {
         !movies.length &&
         !shows.length &&
         !episodes.data?.length &&
-        !episodes.isFetching && <div className="text-neutral-500">No results.</div>}
+        !episodes.isFetching && <div className={styles.empty}>No results.</div>}
     </div>
   )
 }

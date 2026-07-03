@@ -3,6 +3,9 @@ import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSession } from '../stores/session'
 import { useSettings } from '../stores/settings'
+import { colorSchemes, schemePrimitives, type ColorScheme } from '../lib/colorSchemes'
+import { resolvedDark } from '../lib/theme'
+import styles from './Settings.module.css'
 
 function Section({
   title,
@@ -12,9 +15,9 @@ function Section({
   children: React.ReactNode
 }): React.JSX.Element {
   return (
-    <section className="mb-10">
-      <h2 className="mb-4 text-base font-medium text-neutral-300">{title}</h2>
-      <div className="space-y-4">{children}</div>
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>{title}</h2>
+      <div className={styles.rows}>{children}</div>
     </section>
   )
 }
@@ -29,10 +32,10 @@ function Row({
   hint?: string
 }): React.JSX.Element {
   return (
-    <div className="flex items-center justify-between gap-8">
+    <div className={styles.row}>
       <div>
-        <div className="text-sm text-neutral-200">{label}</div>
-        {hint && <div className="text-xs text-neutral-500">{hint}</div>}
+        <div className={styles.label}>{label}</div>
+        {hint && <div className={styles.hint}>{hint}</div>}
       </div>
       {children}
     </div>
@@ -54,16 +57,104 @@ function Toggle({
       aria-checked={checked}
       aria-label={label}
       onClick={() => onChange(!checked)}
-      className={`h-6 w-10 shrink-0 rounded-full p-0.5 transition-colors ${checked ? 'bg-accent' : 'bg-surface-3'}`}
+      className={`${styles.toggle} ${checked ? styles.toggleOn : ''}`}
     >
-      <span
-        className={`block size-5 rounded-full bg-white transition-transform ${checked ? 'translate-x-4' : ''}`}
-      />
+      <span className={styles.toggleThumb} />
     </button>
   )
 }
 
-const select = 'rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none'
+const themeOptions: { key: 'dark' | 'light' | 'system'; label: string }[] = [
+  { key: 'dark', label: 'Dark' },
+  { key: 'light', label: 'Light' },
+  { key: 'system', label: 'System' }
+]
+
+function ThemeSlabs(): React.JSX.Element {
+  const theme = useSettings((s) => s.theme)
+  const set = useSettings((s) => s.set)
+  return (
+    <div className={styles.slabRow}>
+      {themeOptions.map((o) => (
+        <button
+          key={o.key}
+          className={`${styles.slab} ${theme === o.key ? styles.slabActive : ''}`}
+          onClick={() => set({ theme: o.key })}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ColorSchemeSlabs(): React.JSX.Element {
+  const scheme = useSettings((s) => s.colorScheme)
+  const theme = useSettings((s) => s.theme)
+  const set = useSettings((s) => s.set)
+  const dark = resolvedDark(theme)
+  return (
+    <div className={styles.schemeGrid}>
+      {colorSchemes.map((s) => {
+        const p = schemePrimitives[s.key][dark ? 'dark' : 'light']
+        return (
+          <button
+            key={s.key}
+            className={`${styles.schemeSlab} ${scheme === s.key ? styles.schemeSlabActive : ''}`}
+            style={{ background: p.bg, color: p.fg }}
+            onClick={() => set({ colorScheme: s.key })}
+          >
+            <span className={styles.schemeDots}>
+              <i style={{ background: p.accent }} />
+              <i style={{ background: p.accent2 }} />
+              <i style={{ background: p.accent3 }} />
+              <i style={{ background: p.accent4 }} />
+            </span>
+            <span className={styles.schemeLabel}>{s.label}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function subtitleSwatches(scheme: ColorScheme, dark: boolean): { label: string; value: string }[] {
+  const p = schemePrimitives[scheme][dark ? 'dark' : 'light']
+  return [
+    { label: 'White', value: '#ffffff' },
+    { label: 'Yellow', value: '#f6e05e' },
+    { label: 'Accent', value: p.accent },
+    { label: 'Accent 2', value: p.accent2 },
+    { label: 'Accent 3', value: p.accent3 },
+    { label: 'Accent 4', value: p.accent4 }
+  ]
+}
+
+function SubtitleColorSwatches({
+  value,
+  onChange
+}: {
+  value: string
+  onChange: (v: string) => void
+}): React.JSX.Element {
+  const scheme = useSettings((s) => s.colorScheme)
+  const theme = useSettings((s) => s.theme)
+  const swatches = subtitleSwatches(scheme, resolvedDark(theme))
+  return (
+    <div className={styles.swatchRow}>
+      {swatches.map((sw) => (
+        <button
+          key={sw.label}
+          aria-label={sw.label}
+          title={sw.label}
+          className={`${styles.swatch} ${value.toLowerCase() === sw.value.toLowerCase() ? styles.swatchActive : ''}`}
+          style={{ background: sw.value }}
+          onClick={() => onChange(sw.value)}
+        />
+      ))}
+    </div>
+  )
+}
 
 const bitrates = [
   { value: 0, label: 'Auto' },
@@ -92,8 +183,17 @@ export function Settings(): React.JSX.Element {
   const s = settings.subtitleStyle
 
   return (
-    <div className="max-w-xl px-8 py-8">
-      <h1 className="mb-8 text-xl font-semibold tracking-tight">Settings</h1>
+    <div className={styles.page}>
+      <h1 className={styles.pageTitle}>Settings</h1>
+
+      <Section title="Appearance">
+        <Row label="Theme">
+          <ThemeSlabs />
+        </Row>
+        <Row label="Color scheme">
+          <ColorSchemeSlabs />
+        </Row>
+      </Section>
 
       <Section title="General">
         <Row label="Launch at startup">
@@ -106,24 +206,12 @@ export function Settings(): React.JSX.Element {
             }}
           />
         </Row>
-        <Row label="Theme">
-          <select
-            className={select}
-            value={settings.theme}
-            onChange={(e) => settings.set({ theme: e.target.value as 'dark' | 'light' | 'system' })}
-            aria-label="Theme"
-          >
-            <option value="dark">Dark</option>
-            <option value="light">Light</option>
-            <option value="system">System</option>
-          </select>
-        </Row>
       </Section>
 
       <Section title="Playback">
         <Row label="Preferred quality" hint="Maximum streaming bitrate">
           <select
-            className={select}
+            className={styles.select}
             value={settings.maxBitrate}
             onChange={(e) => settings.set({ maxBitrate: Number(e.target.value) })}
             aria-label="Preferred quality"
@@ -171,7 +259,7 @@ export function Settings(): React.JSX.Element {
         </Row>
         <Row label="Preferred language" hint="ISO code, e.g. eng">
           <input
-            className={`${select} w-24`}
+            className={`${styles.select} ${styles.textInput}`}
             value={settings.preferredSubtitleLanguage}
             onChange={(e) => settings.set({ preferredSubtitleLanguage: e.target.value })}
             aria-label="Preferred subtitle language"
@@ -187,20 +275,19 @@ export function Settings(): React.JSX.Element {
             onChange={(e) =>
               settings.set({ subtitleStyle: { ...s, fontSize: Number(e.target.value) } })
             }
+            className={styles.slider}
             aria-label="Subtitle size"
           />
         </Row>
         <Row label="Color">
-          <input
-            type="color"
+          <SubtitleColorSwatches
             value={s.color}
-            onChange={(e) => settings.set({ subtitleStyle: { ...s, color: e.target.value } })}
-            aria-label="Subtitle color"
+            onChange={(color) => settings.set({ subtitleStyle: { ...s, color } })}
           />
         </Row>
         <Row label="Background">
           <select
-            className={select}
+            className={styles.select}
             value={s.background}
             onChange={(e) => settings.set({ subtitleStyle: { ...s, background: e.target.value } })}
             aria-label="Subtitle background"
@@ -227,6 +314,7 @@ export function Settings(): React.JSX.Element {
             onChange={(e) =>
               settings.set({ subtitleStyle: { ...s, verticalPosition: Number(e.target.value) } })
             }
+            className={styles.slider}
             aria-label="Subtitle vertical position"
           />
         </Row>
@@ -240,6 +328,7 @@ export function Settings(): React.JSX.Element {
             onChange={(e) =>
               settings.set({ subtitleStyle: { ...s, opacity: Number(e.target.value) } })
             }
+            className={styles.slider}
             aria-label="Subtitle opacity"
           />
         </Row>
@@ -247,15 +336,12 @@ export function Settings(): React.JSX.Element {
 
       <Section title="Server">
         <Row label={session?.server ?? ''} hint={`Signed in as ${session?.userName ?? ''}`}>
-          <div className="flex gap-2">
-            <button
-              className="rounded-lg bg-surface-2 px-3 py-1.5 text-sm hover:bg-surface-3"
-              onClick={() => queryClient.invalidateQueries()}
-            >
+          <div className={styles.buttons}>
+            <button className={styles.ghostBtn} onClick={() => queryClient.invalidateQueries()}>
               Reconnect
             </button>
             <button
-              className="rounded-lg bg-surface-2 px-3 py-1.5 text-sm text-red-400 hover:bg-surface-3"
+              className={styles.dangerBtn}
               onClick={async () => {
                 await logout()
                 navigate({ to: '/login' })
@@ -270,7 +356,7 @@ export function Settings(): React.JSX.Element {
       <Section title="About">
         <Row label={`Famto ${version}`} hint="MIT License">
           <a
-            className="text-sm text-accent hover:underline"
+            className={styles.link}
             href="https://github.com/famto/famto"
             target="_blank"
             rel="noreferrer"

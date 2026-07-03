@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useSession } from '../stores/session'
 import { JellyfinError } from '../lib/jellyfin'
+import styles from './Login.module.css'
 
 export function Login(): React.JSX.Element {
   const login = useSession((s) => s.login)
@@ -26,15 +27,13 @@ export function Login(): React.JSX.Element {
     }
   }
 
-  const field =
-    'w-full rounded-lg bg-surface-2 px-3.5 py-2.5 text-sm outline-none ring-accent/60 placeholder:text-neutral-500 focus:ring-2'
-
   return (
-    <div className="flex h-full items-center justify-center">
-      <form onSubmit={submit} className="w-80 space-y-3">
-        <h1 className="mb-6 text-center text-2xl font-semibold tracking-tight">Famto</h1>
+    <div className={styles.page}>
+      <form onSubmit={submit} className={styles.form}>
+        <h1 className={styles.brand}>Famto</h1>
+        <p className={styles.tagline}>Watching media, beautifully.</p>
         <input
-          className={field}
+          className={styles.field}
           placeholder="Server URL"
           value={server}
           onChange={(e) => setServer(e.target.value)}
@@ -42,29 +41,25 @@ export function Login(): React.JSX.Element {
           required
         />
         <input
-          className={field}
+          className={styles.field}
           placeholder="Username"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           required
         />
         <input
-          className={field}
+          className={styles.field}
           placeholder="Password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
         {error && (
-          <p className="text-sm text-red-400" role="alert">
+          <p className={styles.error} role="alert">
             {error}
           </p>
         )}
-        <button
-          type="submit"
-          disabled={busy}
-          className="w-full rounded-lg bg-accent py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-        >
+        <button type="submit" disabled={busy} className={styles.submit}>
           {busy ? 'Signing in…' : 'Sign In'}
         </button>
       </form>

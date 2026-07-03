@@ -1,0 +1,11 @@
+.page {
+  padding-block: 3rem;
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  block-size: 16rem;
+  color: var(--fg-faint);
+}

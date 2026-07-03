@@ -18,16 +18,16 @@ A calm, minimal desktop media player built exclusively for Jellyfin.
 
 ## Keyboard shortcuts
 
-| Key       | Action             |
-| --------- | ------------------ |
-| Space     | Play / pause       |
-| ← / →     | Seek ±10s          |
-| ↑ / ↓     | Volume             |
-| F         | Fullscreen         |
-| P         | Picture-in-Picture |
-| M         | Mute               |
-| Esc       | Exit fullscreen    |
-| Ctrl/⌘+F  | Search             |
+| Key      | Action             |
+| -------- | ------------------ |
+| Space    | Play / pause       |
+| ← / →    | Seek ±10s          |
+| ↑ / ↓    | Volume             |
+| F        | Fullscreen         |
+| P        | Picture-in-Picture |
+| M        | Mute               |
+| Esc      | Exit fullscreen    |
+| Ctrl/⌘+F | Search             |
 
 ## Development
 

@@ -1,0 +1,73 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  block-size: 100%;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  flex-shrink: 0;
+  padding-block: 1.1rem;
+  padding-inline: 2rem;
+  border-block-end: 1px solid var(--border);
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.brand::first-letter {
+  color: var(--accent);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.iconBtn {
+  display: grid;
+  place-items: center;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  border-radius: var(--radius-s);
+  color: var(--fg-muted);
+  transition:
+    color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.iconBtn:hover {
+  background: var(--surface-2);
+  color: var(--accent-2);
+}
+
+.iconBtn:global([data-status='active']) {
+  color: var(--accent);
+}
+
+.icon {
+  inline-size: 1.3rem;
+  block-size: 1.3rem;
+}
+
+.themeIcon {
+  inline-size: 1.3rem;
+  block-size: 1.3rem;
+  transition:
+    transform var(--dur-med) var(--ease),
+    opacity var(--dur-med) var(--ease);
+}
+
+.main {
+  flex: 1;
+  min-inline-size: 0;
+  overflow-y: auto;
+}

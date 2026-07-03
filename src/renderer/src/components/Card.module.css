@@ -1,0 +1,130 @@
+.card {
+  inline-size: 10rem;
+  flex-shrink: 0;
+}
+
+.card.wide {
+  inline-size: 16rem;
+}
+
+.poster {
+  position: relative;
+  display: block;
+  inline-size: 100%;
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border-radius: var(--radius-m);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-1);
+  transition: box-shadow var(--dur-med) var(--ease);
+}
+
+.poster.wide {
+  aspect-ratio: 16 / 9;
+}
+
+.poster:hover,
+.poster:focus-visible {
+  box-shadow: var(--shadow-2), var(--shadow-glow);
+}
+
+.image {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: cover;
+  transition: transform var(--dur-med) var(--ease);
+}
+
+.poster:hover .image,
+.poster:focus-visible .image {
+  transform: scale(1.04);
+}
+
+.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 100%;
+  block-size: 100%;
+  padding: 0.5rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--fg-faint);
+}
+
+.playScrim {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim-soft);
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.poster:hover .playScrim,
+.poster:focus-visible .playScrim {
+  opacity: 1;
+}
+
+.playButton {
+  display: grid;
+  place-items: center;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--accent-fg);
+  transform: scale(0.85);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.poster:hover .playButton,
+.poster:focus-visible .playButton {
+  transform: scale(1);
+}
+
+.playButton svg {
+  inline-size: 1.1rem;
+  block-size: 1.1rem;
+  margin-inline-start: 0.1rem;
+}
+
+.progress {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
+  block-size: 0.2rem;
+  background: color-mix(in oklch, black 45%, transparent);
+}
+
+.progressFill {
+  block-size: 100%;
+  background: var(--accent);
+}
+
+.title {
+  display: block;
+  margin-block-start: 0.6rem;
+  inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  color: var(--fg);
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.title:hover,
+.title:focus-visible {
+  color: var(--accent-3);
+}
+
+.subtitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: var(--fg-faint);
+}

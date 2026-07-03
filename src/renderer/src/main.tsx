@@ -16,7 +16,11 @@ function applyTheme(theme: 'dark' | 'light' | 'system'): void {
 }
 
 applyTheme(useSettings.getState().theme)
-useSettings.subscribe((s) => applyTheme(s.theme))
+document.documentElement.dataset.scheme = useSettings.getState().colorScheme
+useSettings.subscribe((s) => {
+  applyTheme(s.theme)
+  document.documentElement.dataset.scheme = s.colorScheme
+})
 
 const queryClient = new QueryClient({
   defaultOptions: {

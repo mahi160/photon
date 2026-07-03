@@ -1,0 +1,87 @@
+.page {
+  max-inline-size: 42rem;
+  margin-inline: auto;
+  padding-block: 3.5rem;
+  padding-inline: 2rem;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 560;
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  margin-block-start: 0.5rem;
+  font-size: 0.9375rem;
+  color: var(--fg-faint);
+}
+
+.section {
+  margin-block-start: 2.75rem;
+}
+
+.sectionTitle {
+  margin-block-end: 1rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding-block: 0.9rem;
+  border-block-end: 1px solid var(--border);
+}
+
+.item:last-child {
+  border-block-end: none;
+}
+
+.label {
+  font-size: 0.9375rem;
+  color: var(--fg);
+}
+
+.hint {
+  margin-block-start: 0.15rem;
+  font-size: 0.8125rem;
+  color: var(--fg-faint);
+}
+
+.keys {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.plus {
+  font-size: 0.75rem;
+  color: var(--fg-faint);
+}
+
+.key {
+  display: grid;
+  place-items: center;
+  min-inline-size: 2rem;
+  block-size: 2rem;
+  padding-inline: 0.5rem;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-1);
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}

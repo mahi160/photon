@@ -20,8 +20,11 @@ interface SettingsState {
   subtitleStyle: SubtitleStyle
   preferredSubtitleLanguage: string // ISO 639-2, '' = off unless default
   subtitlesEnabled: boolean
+  preferredAudioLanguage: string // ISO 639-2, '' = server default. Kept in sync with the player.
+  lastSubtitleDelay: number // seconds, restored on next playback
   // general
   theme: 'dark' | 'light' | 'system'
+  colorScheme: 'rose-pine' | 'everforest' | 'gruvbox' | 'kanagawa'
   set: (partial: Partial<Omit<SettingsState, 'set'>>) => void
 }
 
@@ -42,7 +45,10 @@ export const useSettings = create<SettingsState>()(
       },
       preferredSubtitleLanguage: '',
       subtitlesEnabled: true,
+      preferredAudioLanguage: '',
+      lastSubtitleDelay: 0,
       theme: 'dark',
+      colorScheme: 'rose-pine',
       set: (partial) => set(partial)
     }),
     { name: 'famto.settings' }

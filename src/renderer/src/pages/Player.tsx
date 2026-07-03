@@ -15,6 +15,8 @@ import {
 import { useSettings } from '../stores/settings'
 import { PlayerControls } from '../components/PlayerControls'
 import { SubtitleStyleTag } from '../components/SubtitleStyleTag'
+import { useHotkeys } from '../lib/useHotkeys'
+import styles from './Player.module.css'
 
 async function resolvePlayable(item: BaseItem): Promise<BaseItem> {
   if (item.Type !== 'Series') return item
@@ -90,6 +92,7 @@ export function Player(): React.JSX.Element {
         reportStart(sess, sess.startSeconds)
 
         // default subtitle: preferred language, else server default, if enabled
+        let activeTextIndex: number | null = null
         if (settings.subtitlesEnabled && opts.subtitleStreamIndex === undefined) {
           const preferred =
             sess.textTracks.find((t) => t.language === settings.preferredSubtitleLanguage) ??
@@ -97,7 +100,17 @@ export function Player(): React.JSX.Element {
           if (preferred) {
             engine.setTextTrack(preferred.index)
             setSubtitleIndex(preferred.index)
+            activeTextIndex = preferred.index
           }
+        } else if (opts.subtitleStreamIndex !== undefined) {
+          const explicit = sess.textTracks.find((t) => t.index === opts.subtitleStreamIndex)
+          if (explicit) activeTextIndex = explicit.index
+        }
+
+        // restore last subtitle sync offset, text tracks only
+        if (activeTextIndex !== null && settings.lastSubtitleDelay) {
+          engine.setSubtitleDelay(settings.lastSubtitleDelay)
+          setSubtitleDelay(settings.lastSubtitleDelay)
         }
 
         navigator.mediaSession.metadata = new MediaMetadata({
@@ -109,7 +122,12 @@ export function Player(): React.JSX.Element {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [settings.maxBitrate, settings.subtitlesEnabled, settings.preferredSubtitleLanguage]
+    [
+      settings.maxBitrate,
+      settings.subtitlesEnabled,
+      settings.preferredSubtitleLanguage,
+      settings.lastSubtitleDelay
+    ]
   )
 
   // initial load once item arrives
@@ -118,17 +136,27 @@ export function Player(): React.JSX.Element {
     if (!item.data || loadedFor.current === item.data.Id) return
     loadedFor.current = item.data.Id
     setError(null)
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new item, not a render loop
-    if (search.audio !== undefined) setAudioIndex(search.audio)
     resolvePlayable(item.data)
-      .then((playable) =>
-        load(playable, {
+      .then((playable) => {
+        // remember last audio language: only meaningful if the playable item
+        // itself carries stream info (movies/episodes fetched with MediaSources)
+        const streams = playable.MediaSources?.[0]?.MediaStreams ?? []
+        const preferredAudio =
+          search.audio === undefined && settings.preferredAudioLanguage
+            ? streams.find(
+                (s) => s.Type === 'Audio' && s.Language === settings.preferredAudioLanguage
+              )?.Index
+            : undefined
+        const audioStreamIndex = search.audio ?? preferredAudio
+        if (audioStreamIndex !== undefined) setAudioIndex(audioStreamIndex)
+        return load(playable, {
           startSeconds: search.start,
-          audioStreamIndex: search.audio,
+          audioStreamIndex,
           subtitleStreamIndex: search.sub
         })
-      )
+      })
       .catch(() => setError('Nothing to play.'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item.data, load, search.start, search.audio, search.sub])
 
   async function handleEnded(): Promise<void> {
@@ -218,75 +246,42 @@ export function Player(): React.JSX.Element {
   }, [pip])
 
   // keyboard shortcuts (PRD: Navigation)
-  useEffect(() => {
-    function onKey(e: KeyboardEvent): void {
-      const engine = engineRef.current
-      if (!engine) return
-      switch (e.key) {
-        case ' ':
-          e.preventDefault()
-          togglePlay()
-          break
-        case 'ArrowLeft':
-          engine.seek(engine.currentTime() - 10)
-          break
-        case 'ArrowRight':
-          engine.seek(engine.currentTime() + 10)
-          break
-        case 'ArrowUp': {
-          e.preventDefault()
-          const v = Math.min(1, volume + 0.05)
-          engine.setVolume(v)
-          setVolume(v)
-          break
-        }
-        case 'ArrowDown': {
-          e.preventDefault()
-          const v = Math.max(0, volume - 0.05)
-          engine.setVolume(v)
-          setVolume(v)
-          break
-        }
-        case 'f':
-        case 'F':
-          toggleFullscreen()
-          break
-        case 'p':
-        case 'P':
-          togglePiP()
-          break
-        case 'm':
-        case 'M':
-          engine.setMuted(!muted)
-          setMuted(!muted)
-          break
-        case '[':
-        case ']': {
-          // subtitle sync: shift delay by the same step as the slider, text subs only
-          if (subtitleIndex === null) break
-          const isText = session?.textTracks.some((t) => t.index === subtitleIndex) ?? false
-          if (!isText) break
-          const step = e.key === '[' ? -0.5 : 0.5
-          const d = Math.max(-10, Math.min(10, subtitleDelay + step))
-          changeDelay(d)
-          showToast(`Subtitle delay: ${d > 0 ? '+' : ''}${d.toFixed(1)}s`)
-          break
-        }
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [
-    togglePlay,
-    toggleFullscreen,
-    togglePiP,
-    volume,
-    muted,
-    session,
-    subtitleIndex,
-    subtitleDelay,
-    showToast
-  ])
+  function shiftSubtitleDelay(step: number): void {
+    // subtitle sync: shift delay by the same step as the slider, text subs only
+    if (subtitleIndex === null) return
+    const isText = session?.textTracks.some((t) => t.index === subtitleIndex) ?? false
+    if (!isText) return
+    const d = Math.max(-10, Math.min(10, subtitleDelay + step))
+    changeDelay(d)
+    showToast(`Subtitle delay: ${d > 0 ? '+' : ''}${d.toFixed(1)}s`)
+  }
+
+  useHotkeys(
+    {
+      space: () => togglePlay(),
+      arrowleft: () => engineRef.current?.seek(engineRef.current.currentTime() - 10),
+      arrowright: () => engineRef.current?.seek(engineRef.current.currentTime() + 10),
+      arrowup: () => {
+        const v = Math.min(1, volume + 0.05)
+        engineRef.current?.setVolume(v)
+        setVolume(v)
+      },
+      arrowdown: () => {
+        const v = Math.max(0, volume - 0.05)
+        engineRef.current?.setVolume(v)
+        setVolume(v)
+      },
+      f: () => toggleFullscreen(),
+      p: () => togglePiP(),
+      m: () => {
+        engineRef.current?.setMuted(!muted)
+        setMuted(!muted)
+      },
+      '[': () => shiftSubtitleDelay(-0.5),
+      ']': () => shiftSubtitleDelay(0.5)
+    },
+    [togglePlay, toggleFullscreen, togglePiP, volume, muted, session, subtitleIndex, subtitleDelay]
+  )
 
   // auto-hide controls
   const [controlsVisible, setControlsVisible] = useState(true)
@@ -314,8 +309,14 @@ export function Player(): React.JSX.Element {
     if (index === null) {
       engine.setTextTrack(null)
       setSubtitleIndex(null)
+      settings.set({ subtitlesEnabled: false })
       return
     }
+    const language = sess.subtitleStreams.find((s) => s.Index === index)?.Language
+    settings.set({
+      subtitlesEnabled: true,
+      ...(language ? { preferredSubtitleLanguage: language } : {})
+    })
     const isText = sess.textTracks.some((t) => t.index === index)
     if (isText) {
       engine.setTextTrack(index)
@@ -336,6 +337,8 @@ export function Player(): React.JSX.Element {
     const sess = sessionRef.current
     if (!engine || !sess) return
     setAudioIndex(index)
+    const language = sess.audioStreams.find((s) => s.Index === index)?.Language
+    if (language) settings.set({ preferredAudioLanguage: language })
     // HTML5 can't switch embedded audio tracks: reload stream with the new index
     void load(sess.item, {
       startSeconds: engine.currentTime(),
@@ -349,6 +352,7 @@ export function Player(): React.JSX.Element {
   function changeDelay(seconds: number): void {
     engineRef.current?.setSubtitleDelay(seconds)
     setSubtitleDelay(seconds)
+    settings.set({ lastSubtitleDelay: seconds })
   }
 
   const subtitleIsText =
@@ -356,31 +360,27 @@ export function Player(): React.JSX.Element {
 
   return (
     <div
-      className="relative h-full bg-black"
+      className={styles.stage}
       onMouseMove={poke}
       style={{ cursor: controlsVisible ? 'default' : 'none' }}
     >
       <SubtitleStyleTag />
-      <video ref={videoRef} className="h-full w-full" />
-      {toast && (
-        <div className="pointer-events-none absolute top-6 left-1/2 -translate-x-1/2 rounded-lg bg-black/80 px-4 py-2 text-sm text-white">
-          {toast}
-        </div>
-      )}
+      <video ref={videoRef} className={styles.video} />
+      {toast && <div className={styles.toast}>{toast}</div>}
       {error && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80">
-          <p className="text-neutral-300">{error}</p>
+        <div className={styles.errorLayer}>
+          <p className={styles.errorText}>{error}</p>
           <button
             onClick={() => {
               setError(null)
               loadedFor.current = null
               item.refetch()
             }}
-            className="rounded-lg bg-accent px-4 py-2 text-sm text-white"
+            className={styles.errorRetry}
           >
             Retry
           </button>
-          <button onClick={() => navigate({ to: '/' })} className="text-sm text-neutral-500">
+          <button onClick={() => navigate({ to: '/' })} className={styles.errorBack}>
             Back to Home
           </button>
         </div>
