@@ -30,7 +30,11 @@ async function resolvePlayable(item: BaseItem): Promise<BaseItem> {
 
 export function Player(): React.JSX.Element {
   const { itemId } = useParams({ from: '/app/player/$itemId' })
-  const search = useSearch({ strict: false }) as { start?: number }
+  const search = useSearch({ strict: false }) as {
+    start?: number
+    audio?: number
+    sub?: number
+  }
   const navigate = useNavigate()
   const settings = useSettings()
 
@@ -109,10 +113,17 @@ export function Player(): React.JSX.Element {
     if (!item.data || loadedFor.current === item.data.Id) return
     loadedFor.current = item.data.Id
     setError(null)
+    if (search.audio !== undefined) setAudioIndex(search.audio)
     resolvePlayable(item.data)
-      .then((playable) => load(playable, { startSeconds: search.start }))
+      .then((playable) =>
+        load(playable, {
+          startSeconds: search.start,
+          audioStreamIndex: search.audio,
+          subtitleStreamIndex: search.sub
+        })
+      )
       .catch(() => setError('Nothing to play.'))
-  }, [item.data, load, search.start])
+  }, [item.data, load, search.start, search.audio, search.sub])
 
   // engine events
   useEffect(() => {

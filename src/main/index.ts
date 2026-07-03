@@ -1,8 +1,18 @@
 import { app, shell, BrowserWindow, ipcMain, safeStorage } from 'electron'
 import { join } from 'path'
-import { readFileSync, writeFileSync, rmSync } from 'fs'
+import { readFileSync, writeFileSync, rmSync, existsSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+
+// hardware acceleration flag must be applied before app is ready
+const prefsFile = join(app.getPath('userData'), 'prefs.json')
+try {
+  if (existsSync(prefsFile) && JSON.parse(readFileSync(prefsFile, 'utf-8')).disableHwAccel) {
+    app.disableHardwareAcceleration()
+  }
+} catch {
+  /* corrupt prefs: ignore */
+}
 
 // --- secure session storage (token never touches plaintext disk) ---
 const sessionFile = (): string => join(app.getPath('userData'), 'session.bin')
@@ -29,6 +39,33 @@ ipcMain.handle('session:clear', () => {
   } catch {
     /* already gone */
   }
+})
+
+ipcMain.handle('app:version', () => app.getVersion())
+
+ipcMain.handle('app:setLoginItem', (_e, enabled: boolean) => {
+  app.setLoginItemSettings({ openAtLogin: enabled })
+})
+
+ipcMain.handle('app:getLoginItem', () => app.getLoginItemSettings().openAtLogin)
+
+ipcMain.handle('app:setHwAccel', (_e, enabled: boolean) => {
+  // takes effect on next launch
+  writeFileSync(prefsFile, JSON.stringify({ disableHwAccel: !enabled }))
+})
+
+ipcMain.handle('app:getHwAccel', () => {
+  try {
+    return !JSON.parse(readFileSync(prefsFile, 'utf-8')).disableHwAccel
+  } catch {
+    return true
+  }
+})
+
+ipcMain.handle('update:check', async () => {
+  if (is.dev) return
+  const { autoUpdater } = await import('electron-updater')
+  void autoUpdater.checkForUpdatesAndNotify().catch(() => {})
 })
 
 function createWindow(): void {

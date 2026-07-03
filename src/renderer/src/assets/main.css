@@ -14,6 +14,18 @@ body,
   height: 100%;
 }
 
+[data-theme='light'] {
+  --color-surface-0: #f7f7f8;
+  --color-surface-1: #efeff1;
+  --color-surface-2: #e4e4e7;
+  --color-surface-3: #d4d4d8;
+  color-scheme: light;
+}
+
+[data-theme='light'] body {
+  color: #27272a;
+}
+
 body {
   @apply bg-surface-0 text-neutral-200 antialiased select-none;
   font-family:
