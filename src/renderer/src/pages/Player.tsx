@@ -56,6 +56,13 @@ export function Player(): React.JSX.Element {
   const [audioIndex, setAudioIndex] = useState<number | undefined>(undefined)
   const [subtitleDelay, setSubtitleDelay] = useState(0)
   const [pip, setPip] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const showToast = useCallback((msg: string) => {
+    setToast(msg)
+    clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(null), 1200)
+  }, [])
 
   const load = useCallback(
     async (
@@ -253,11 +260,33 @@ export function Player(): React.JSX.Element {
           engine.setMuted(!muted)
           setMuted(!muted)
           break
+        case '[':
+        case ']': {
+          // subtitle sync: shift delay by the same step as the slider, text subs only
+          if (subtitleIndex === null) break
+          const isText = session?.textTracks.some((t) => t.index === subtitleIndex) ?? false
+          if (!isText) break
+          const step = e.key === '[' ? -0.5 : 0.5
+          const d = Math.max(-10, Math.min(10, subtitleDelay + step))
+          changeDelay(d)
+          showToast(`Subtitle delay: ${d > 0 ? '+' : ''}${d.toFixed(1)}s`)
+          break
+        }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [togglePlay, toggleFullscreen, togglePiP, volume, muted])
+  }, [
+    togglePlay,
+    toggleFullscreen,
+    togglePiP,
+    volume,
+    muted,
+    session,
+    subtitleIndex,
+    subtitleDelay,
+    showToast
+  ])
 
   // auto-hide controls
   const [controlsVisible, setControlsVisible] = useState(true)
@@ -333,6 +362,11 @@ export function Player(): React.JSX.Element {
     >
       <SubtitleStyleTag />
       <video ref={videoRef} className="h-full w-full" />
+      {toast && (
+        <div className="pointer-events-none absolute top-6 left-1/2 -translate-x-1/2 rounded-lg bg-black/80 px-4 py-2 text-sm text-white">
+          {toast}
+        </div>
+      )}
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/80">
           <p className="text-neutral-300">{error}</p>
