@@ -24,20 +24,6 @@ export function AppLayout(): React.JSX.Element {
         <Link to="/" className="text-lg font-semibold tracking-tight">
           Famto
         </Link>
-        <nav className="flex items-center gap-4">
-          <Link
-            to="/movies"
-            className="text-sm text-neutral-400 transition-colors hover:text-neutral-100 [&.active]:text-neutral-100"
-          >
-            Movies
-          </Link>
-          <Link
-            to="/shows"
-            className="text-sm text-neutral-400 transition-colors hover:text-neutral-100 [&.active]:text-neutral-100"
-          >
-            TV Shows
-          </Link>
-        </nav>
         <div className="flex-1" />
         <Link to="/search" aria-label="Search" className={iconBtn}>
           <svg

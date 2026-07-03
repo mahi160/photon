@@ -18,8 +18,8 @@ export function Home(): React.JSX.Element {
   return (
     <div className="py-8">
       <Row title="Continue Watching" items={resume.data} wide />
-      <Row title="Recently Added Movies" items={movies.data} />
-      <Row title="Recently Added Shows" items={shows.data} />
+      <Row title="Movies" items={movies.data} to="/movies" />
+      <Row title="TV Shows" items={shows.data} to="/shows" />
       {empty && (
         <div className="flex h-64 items-center justify-center text-neutral-500">
           Nothing here yet. Add media to your Jellyfin libraries.
