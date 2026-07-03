@@ -1,34 +1,52 @@
-# famto-scaffold
+# Famto
 
-An Electron application with React and TypeScript
+A calm, minimal desktop media player built exclusively for Jellyfin.
 
-## Recommended IDE Setup
+> Famto is not a media manager. It is a media player.
 
-- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
+## Features
 
-## Project Setup
+- Sign in to one Jellyfin server; session persists in the OS keychain
+- Home: Continue Watching, Recently Added Movies, Recently Added Shows — nothing else
+- Movies and TV Shows grids (all libraries merged), sorted by added/name/release
+- Instant search: movies and shows filter locally, episodes stream in from the server
+- Player: HTML5/HLS with direct play when Chromium can decode it, silent server
+  transcode when it can't
+- Audio and subtitle track switching, subtitle delay and styling (text subs)
+- Picture-in-Picture, fullscreen, playback speed, keyboard-first controls
+- Watch progress synced back to Jellyfin
 
-### Install
+## Keyboard shortcuts
+
+| Key       | Action             |
+| --------- | ------------------ |
+| Space     | Play / pause       |
+| ← / →     | Seek ±10s          |
+| ↑ / ↓     | Volume             |
+| F         | Fullscreen         |
+| P         | Picture-in-Picture |
+| M         | Mute               |
+| Esc       | Exit fullscreen    |
+| Ctrl/⌘+F  | Search             |
+
+## Development
 
 ```bash
-$ pnpm install
+pnpm install
+pnpm dev        # run in development
+pnpm build      # typecheck + build
+pnpm lint       # eslint
+npx vitest run  # tests
+pnpm build:mac  # package (also build:win, build:linux)
 ```
 
-### Development
+## Architecture
 
-```bash
-$ pnpm dev
-```
+- Electron + React + TypeScript + Vite, TanStack Router/Query, Zustand, Tailwind v4
+- The UI never touches `<video>` directly — see `src/renderer/src/player/engine.ts`
+  and [ADR-0002](docs/adr/0002-playback-engine-interface.md)
+- Domain language lives in [CONTEXT.md](CONTEXT.md); decisions in `docs/adr/`
 
-### Build
+## License
 
-```bash
-# For windows
-$ pnpm build:win
-
-# For macOS
-$ pnpm build:mac
-
-# For Linux
-$ pnpm build:linux
-```
+MIT

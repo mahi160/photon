@@ -14,7 +14,12 @@ function EpisodeRow({ ep, onPlay }: { ep: BaseItem; onPlay: () => void }): React
       <div className="relative w-40 shrink-0 overflow-hidden rounded-lg bg-surface-2">
         <div className="aspect-video">
           {imageUrl(ep, 320) && (
-            <img src={imageUrl(ep, 320)!} alt="" loading="lazy" className="h-full w-full object-cover" />
+            <img
+              src={imageUrl(ep, 320)!}
+              alt=""
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
           )}
         </div>
         {pct !== undefined && pct > 0 && pct < 100 && (
@@ -125,7 +130,9 @@ export function ShowDetails(): React.JSX.Element {
         )}
 
         <div className="mt-4 space-y-1">
-          {episodes.data?.map((ep) => <EpisodeRow key={ep.Id} ep={ep} onPlay={() => play(ep)} />)}
+          {episodes.data?.map((ep) => (
+            <EpisodeRow key={ep.Id} ep={ep} onPlay={() => play(ep)} />
+          ))}
         </div>
       </div>
     </div>

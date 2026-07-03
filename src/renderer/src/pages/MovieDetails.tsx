@@ -37,12 +37,15 @@ export function MovieDetails(): React.JSX.Element {
     navigate({
       to: '/player/$itemId',
       params: { itemId: item!.Id },
-      search: { start, ...(audio !== undefined ? { audio } : {}), ...(sub !== undefined ? { sub } : {}) }
+      search: {
+        start,
+        ...(audio !== undefined ? { audio } : {}),
+        ...(sub !== undefined ? { sub } : {})
+      }
     })
   }
 
-  const select =
-    'rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none max-w-64 truncate'
+  const select = 'rounded-lg bg-surface-2 px-3 py-1.5 text-sm outline-none max-w-64 truncate'
 
   return (
     <div className="flex gap-10 p-10">
@@ -86,7 +89,9 @@ export function MovieDetails(): React.JSX.Element {
               <select
                 className={select}
                 value={audio ?? ''}
-                onChange={(e) => setAudio(e.target.value === '' ? undefined : Number(e.target.value))}
+                onChange={(e) =>
+                  setAudio(e.target.value === '' ? undefined : Number(e.target.value))
+                }
                 aria-label="Audio track"
               >
                 <option value="">Audio: Default</option>

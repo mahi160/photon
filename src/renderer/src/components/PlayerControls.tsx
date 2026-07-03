@@ -11,8 +11,7 @@ function fmt(s: number): string {
     : `${m}:${String(sec).padStart(2, '0')}`
 }
 
-const btn =
-  'rounded-lg p-2 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white'
+const btn = 'rounded-lg p-2 text-neutral-300 transition-colors hover:bg-white/10 hover:text-white'
 
 function Menu({
   label,
@@ -109,7 +108,13 @@ export function PlayerControls(p: Props): React.JSX.Element {
     >
       <div className="flex items-center gap-3 bg-gradient-to-b from-black/70 to-transparent p-4">
         <button className={btn} onClick={p.onBack} aria-label="Back">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-5">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="size-5"
+          >
             <path d="M15 18l-6-6 6-6" />
           </svg>
         </button>
@@ -168,9 +173,20 @@ export function PlayerControls(p: Props): React.JSX.Element {
           </span>
           <div className="flex-1" />
 
-          <Menu label={<span className="text-xs">{p.rate}×</span>} open={menu === 'speed'} setOpen={toggle('speed')}>
+          <Menu
+            label={<span className="text-xs">{p.rate}×</span>}
+            open={menu === 'speed'}
+            setOpen={toggle('speed')}
+          >
             {speeds.map((s) => (
-              <MenuItem key={s} active={s === p.rate} onClick={() => { p.onRate(s); setMenu(null) }}>
+              <MenuItem
+                key={s}
+                active={s === p.rate}
+                onClick={() => {
+                  p.onRate(s)
+                  setMenu(null)
+                }}
+              >
                 {s}×
               </MenuItem>
             ))}
@@ -189,7 +205,10 @@ export function PlayerControls(p: Props): React.JSX.Element {
               <MenuItem
                 key={a.Index}
                 active={a.Index === p.audioIndex}
-                onClick={() => { p.onSelectAudio(a.Index); setMenu(null) }}
+                onClick={() => {
+                  p.onSelectAudio(a.Index)
+                  setMenu(null)
+                }}
               >
                 {a.DisplayTitle ?? `Audio ${a.Index}`}
               </MenuItem>
@@ -199,21 +218,35 @@ export function PlayerControls(p: Props): React.JSX.Element {
 
           <Menu
             label={
-              <svg viewBox="0 0 24 24" fill="currentColor" className="size-5" aria-label="Subtitles">
+              <svg
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                className="size-5"
+                aria-label="Subtitles"
+              >
                 <path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm2 9v2h8v-2H6zm10 0v2h2v-2h-2zM6 10v2h2v-2H6zm4 0v2h8v-2h-8z" />
               </svg>
             }
             open={menu === 'subs'}
             setOpen={toggle('subs')}
           >
-            <MenuItem active={p.subtitleIndex === null} onClick={() => { p.onSelectSubtitle(null); setMenu(null) }}>
+            <MenuItem
+              active={p.subtitleIndex === null}
+              onClick={() => {
+                p.onSelectSubtitle(null)
+                setMenu(null)
+              }}
+            >
               Off
             </MenuItem>
             {p.subtitleStreams.map((s) => (
               <MenuItem
                 key={s.Index}
                 active={s.Index === p.subtitleIndex}
-                onClick={() => { p.onSelectSubtitle(s.Index); setMenu(null) }}
+                onClick={() => {
+                  p.onSelectSubtitle(s.Index)
+                  setMenu(null)
+                }}
               >
                 {s.DisplayTitle ?? `Subtitle ${s.Index}`}
                 {s.DeliveryMethod !== 'External' && ' (burned-in)'}

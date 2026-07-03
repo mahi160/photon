@@ -4,7 +4,13 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useSession } from '../stores/session'
 import { useSettings } from '../stores/settings'
 
-function Section({ title, children }: { title: string; children: React.ReactNode }): React.JSX.Element {
+function Section({
+  title,
+  children
+}: {
+  title: string
+  children: React.ReactNode
+}): React.JSX.Element {
   return (
     <section className="mb-10">
       <h2 className="mb-4 text-base font-medium text-neutral-300">{title}</h2>
@@ -13,7 +19,15 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function Row({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }): React.JSX.Element {
+function Row({
+  label,
+  children,
+  hint
+}: {
+  label: string
+  children: React.ReactNode
+  hint?: string
+}): React.JSX.Element {
   return (
     <div className="flex items-center justify-between gap-8">
       <div>
@@ -25,7 +39,15 @@ function Row({ label, children, hint }: { label: string; children: React.ReactNo
   )
 }
 
-function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }): React.JSX.Element {
+function Toggle({
+  checked,
+  onChange,
+  label
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  label: string
+}): React.JSX.Element {
   return (
     <button
       role="switch"
@@ -162,7 +184,9 @@ export function Settings(): React.JSX.Element {
             max={200}
             step={10}
             value={s.fontSize}
-            onChange={(e) => settings.set({ subtitleStyle: { ...s, fontSize: Number(e.target.value) } })}
+            onChange={(e) =>
+              settings.set({ subtitleStyle: { ...s, fontSize: Number(e.target.value) } })
+            }
             aria-label="Subtitle size"
           />
         </Row>
@@ -213,7 +237,9 @@ export function Settings(): React.JSX.Element {
             max={1}
             step={0.1}
             value={s.opacity}
-            onChange={(e) => settings.set({ subtitleStyle: { ...s, opacity: Number(e.target.value) } })}
+            onChange={(e) =>
+              settings.set({ subtitleStyle: { ...s, opacity: Number(e.target.value) } })
+            }
             aria-label="Subtitle opacity"
           />
         </Row>

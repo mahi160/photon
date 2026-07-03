@@ -55,7 +55,9 @@ export function LibraryGrid({
         </div>
       )}
       <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-x-4 gap-y-6">
-        {data?.map((item) => <Card key={item.Id} item={item} />)}
+        {data?.map((item) => (
+          <Card key={item.Id} item={item} />
+        ))}
       </div>
     </div>
   )

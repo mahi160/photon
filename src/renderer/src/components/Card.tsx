@@ -3,7 +3,13 @@ import { imageUrl, type BaseItem } from '../lib/jellyfin'
 
 // Card semantics (CONTEXT.md): click card / hover play button = play,
 // click title label = details. Same everywhere.
-export function Card({ item, wide = false }: { item: BaseItem; wide?: boolean }): React.JSX.Element {
+export function Card({
+  item,
+  wide = false
+}: {
+  item: BaseItem
+  wide?: boolean
+}): React.JSX.Element {
   const navigate = useNavigate()
   const img = imageUrl(item, wide ? 480 : 360)
   const pct = item.UserData?.PlayedPercentage
@@ -17,7 +23,8 @@ export function Card({ item, wide = false }: { item: BaseItem; wide?: boolean })
     if (item.Type === 'Movie') navigate({ to: '/movies/$itemId', params: { itemId: item.Id } })
     else if (item.Type === 'Series')
       navigate({ to: '/shows/$seriesId', params: { seriesId: item.Id } })
-    else if (item.SeriesId) navigate({ to: '/shows/$seriesId', params: { seriesId: item.SeriesId } })
+    else if (item.SeriesId)
+      navigate({ to: '/shows/$seriesId', params: { seriesId: item.SeriesId } })
   }
 
   const subtitle =

@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { searchIndexQuery, episodeSearchQuery } from '../lib/queries'
 import { Card } from '../components/Card'
+import { filterLocal } from '../lib/search'
 import type { BaseItem } from '../lib/jellyfin'
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -11,19 +12,6 @@ function useDebounced<T>(value: T, ms: number): T {
     return () => clearTimeout(t)
   }, [value, ms])
   return v
-}
-
-// local fuzzy filter: prefix matches rank above substring matches
-function filterLocal(items: BaseItem[], term: string): BaseItem[] {
-  const q = term.toLowerCase()
-  const starts: BaseItem[] = []
-  const contains: BaseItem[] = []
-  for (const item of items) {
-    const name = item.Name.toLowerCase()
-    if (name.startsWith(q)) starts.push(item)
-    else if (name.includes(q)) contains.push(item)
-  }
-  return [...starts, ...contains].slice(0, 48)
 }
 
 function Group({ title, items }: { title: string; items: BaseItem[] }): React.JSX.Element | null {

@@ -25,10 +25,7 @@ export class Html5Engine implements PlaybackEngine {
     video.addEventListener('leavepictureinpicture', this.onPipLeave)
   }
 
-  private emit<K extends keyof EngineEvents>(
-    event: K,
-    ...args: Parameters<EngineEvents[K]>
-  ): void {
+  private emit<K extends keyof EngineEvents>(event: K, ...args: Parameters<EngineEvents[K]>): void {
     for (const cb of this.listeners[event]) (cb as (...a: unknown[]) => void)(...args)
   }
 

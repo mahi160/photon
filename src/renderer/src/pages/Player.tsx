@@ -86,9 +86,7 @@ export function Player(): React.JSX.Element {
         if (settings.subtitlesEnabled && opts.subtitleStreamIndex === undefined) {
           const preferred =
             sess.textTracks.find((t) => t.language === settings.preferredSubtitleLanguage) ??
-            sess.textTracks.find(
-              (t) => t.index === sess.mediaSource.DefaultSubtitleStreamIndex
-            )
+            sess.textTracks.find((t) => t.index === sess.mediaSource.DefaultSubtitleStreamIndex)
           if (preferred) {
             engine.setTextTrack(preferred.index)
             setSubtitleIndex(preferred.index)
@@ -113,6 +111,7 @@ export function Player(): React.JSX.Element {
     if (!item.data || loadedFor.current === item.data.Id) return
     loadedFor.current = item.data.Id
     setError(null)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new item, not a render loop
     if (search.audio !== undefined) setAudioIndex(search.audio)
     resolvePlayable(item.data)
       .then((playable) =>
@@ -124,27 +123,6 @@ export function Player(): React.JSX.Element {
       )
       .catch(() => setError('Nothing to play.'))
   }, [item.data, load, search.start, search.audio, search.sub])
-
-  // engine events
-  useEffect(() => {
-    const engine = engineRef.current
-    if (!engine || !session) return
-    const offs = [
-      engine.on('time', (t) => {
-        setTime(t)
-        setDuration(engine.duration() || ticksToSeconds(session.mediaSource.RunTimeTicks))
-      }),
-      engine.on('state', setState),
-      engine.on('error', setError),
-      engine.on('pip', setPip),
-      engine.on('ended', () => {
-        reportStopped(session, engine.currentTime())
-        void handleEnded()
-      })
-    ]
-    return () => offs.forEach((off) => off())
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session])
 
   async function handleEnded(): Promise<void> {
     const playable = sessionRef.current?.item
@@ -170,6 +148,27 @@ export function Player(): React.JSX.Element {
     navigate({ to: '/' })
   }
 
+  // engine events
+  useEffect(() => {
+    const engine = engineRef.current
+    if (!engine || !session) return
+    const offs = [
+      engine.on('time', (t) => {
+        setTime(t)
+        setDuration(engine.duration() || ticksToSeconds(session.mediaSource.RunTimeTicks))
+      }),
+      engine.on('state', setState),
+      engine.on('error', setError),
+      engine.on('pip', setPip),
+      engine.on('ended', () => {
+        reportStopped(session, engine.currentTime())
+        void handleEnded()
+      })
+    ]
+    return () => offs.forEach((off) => off())
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session])
+
   // progress reporting: every 10s + on pause
   useEffect(() => {
     const id = setInterval(() => {
@@ -191,15 +190,14 @@ export function Player(): React.JSX.Element {
     }
   }, [])
 
-  const engine = engineRef.current
-
   const togglePlay = useCallback(() => {
+    const engine = engineRef.current
     if (!engine) return
     if (state === 'playing') {
       engine.pause()
       if (sessionRef.current) reportProgress(sessionRef.current, engine.currentTime(), true)
     } else engine.play()
-  }, [engine, state])
+  }, [state])
 
   const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen()
@@ -207,13 +205,15 @@ export function Player(): React.JSX.Element {
   }, [])
 
   const togglePiP = useCallback(() => {
+    const engine = engineRef.current
     if (!engine) return
     void (pip ? engine.exitPiP() : engine.enterPiP())
-  }, [engine, pip])
+  }, [pip])
 
   // keyboard shortcuts (PRD: Navigation)
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
+      const engine = engineRef.current
       if (!engine) return
       switch (e.key) {
         case ' ':
@@ -257,7 +257,7 @@ export function Player(): React.JSX.Element {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [engine, togglePlay, toggleFullscreen, togglePiP, volume, muted])
+  }, [togglePlay, toggleFullscreen, togglePiP, volume, muted])
 
   // auto-hide controls
   const [controlsVisible, setControlsVisible] = useState(true)
@@ -268,6 +268,7 @@ export function Player(): React.JSX.Element {
     hideTimer.current = setTimeout(() => setControlsVisible(false), 3000)
   }, [])
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot initial reveal
     poke()
     return () => clearTimeout(hideTimer.current)
   }, [poke])
@@ -278,6 +279,7 @@ export function Player(): React.JSX.Element {
   )
 
   function selectSubtitle(index: number | null): void {
+    const engine = engineRef.current
     const sess = sessionRef.current
     if (!engine || !sess) return
     if (index === null) {
@@ -301,6 +303,7 @@ export function Player(): React.JSX.Element {
   }
 
   function selectAudio(index: number): void {
+    const engine = engineRef.current
     const sess = sessionRef.current
     if (!engine || !sess) return
     setAudioIndex(index)
@@ -315,7 +318,7 @@ export function Player(): React.JSX.Element {
   }
 
   function changeDelay(seconds: number): void {
-    engine?.setSubtitleDelay(seconds)
+    engineRef.current?.setSubtitleDelay(seconds)
     setSubtitleDelay(seconds)
   }
 
@@ -371,17 +374,17 @@ export function Player(): React.JSX.Element {
           subtitleDelayEnabled={subtitleIsText && subtitleIndex !== null}
           onBack={() => navigate({ to: '/' })}
           onTogglePlay={togglePlay}
-          onSeek={(t) => engine?.seek(t)}
+          onSeek={(t) => engineRef.current?.seek(t)}
           onVolume={(v) => {
-            engine?.setVolume(v)
+            engineRef.current?.setVolume(v)
             setVolume(v)
           }}
           onMute={() => {
-            engine?.setMuted(!muted)
+            engineRef.current?.setMuted(!muted)
             setMuted(!muted)
           }}
           onRate={(r) => {
-            engine?.setRate(r)
+            engineRef.current?.setRate(r)
             setRate(r)
             if (settings.rememberSpeed) settings.set({ lastSpeed: r })
           }}

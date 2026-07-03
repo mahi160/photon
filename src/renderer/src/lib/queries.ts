@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/explicit-function-return-type -- queryOptions types are inferred */
 import { queryOptions } from '@tanstack/react-query'
 import { currentSession, jf, type BaseItem, type ItemsResult } from './jellyfin'
 

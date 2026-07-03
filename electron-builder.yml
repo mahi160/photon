@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: famto-scaffold
+appId: dev.famto
+productName: Famto
 directories:
   buildResources: build
 files:
@@ -12,7 +12,7 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: famto-scaffold
+  executableName: famto
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}

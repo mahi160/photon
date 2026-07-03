@@ -84,7 +84,9 @@ const playerRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/player/$itemId',
   component: Player,
-  validateSearch: (search: Record<string, unknown>): { start?: number; audio?: number; sub?: number } => {
+  validateSearch: (
+    search: Record<string, unknown>
+  ): { start?: number; audio?: number; sub?: number } => {
     const out: { start?: number; audio?: number; sub?: number } = {}
     if (typeof search.start === 'number') out.start = search.start
     if (typeof search.audio === 'number') out.audio = search.audio

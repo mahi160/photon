@@ -13,7 +13,12 @@ export function buildDeviceProfile(maxBitrate: number): object {
   return {
     MaxStreamingBitrate: maxBitrate,
     DirectPlayProfiles: [
-      { Container: 'mp4,m4v', Type: 'Video', VideoCodec: videoCodecs.join(','), AudioCodec: 'aac,mp3,opus,flac' },
+      {
+        Container: 'mp4,m4v',
+        Type: 'Video',
+        VideoCodec: videoCodecs.join(','),
+        AudioCodec: 'aac,mp3,opus,flac'
+      },
       { Container: 'webm', Type: 'Video', VideoCodec: 'vp8,vp9,av1', AudioCodec: 'vorbis,opus' }
     ],
     TranscodingProfiles: [
