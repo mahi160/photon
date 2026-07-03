@@ -106,25 +106,27 @@ export function PlayerControls(p: Props): React.JSX.Element {
         if (e.target === e.currentTarget) p.onTogglePlay()
       }}
     >
-      <div className="flex items-center gap-3 bg-gradient-to-b from-black/70 to-transparent p-4">
-        <button className={btn} onClick={p.onBack} aria-label="Back">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            className="size-5"
-          >
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </button>
-        <div className="truncate text-sm text-neutral-200">{p.title}</div>
-        {p.state === 'buffering' && (
-          <div className="size-4 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
-        )}
+      <div className="p-4">
+        <div className="inline-flex max-w-[70%] items-center gap-2 rounded-xl bg-surface-1/80 py-1.5 pl-1.5 pr-4 shadow-lg backdrop-blur">
+          <button className={btn} onClick={p.onBack} aria-label="Back">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="size-5"
+            >
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+          <div className="truncate text-sm text-neutral-200">{p.title}</div>
+          {p.state === 'buffering' && (
+            <div className="size-4 shrink-0 animate-spin rounded-full border-2 border-white/20 border-t-white/80" />
+          )}
+        </div>
       </div>
 
-      <div className="bg-gradient-to-t from-black/80 to-transparent p-4 pt-10">
+      <div className="mx-auto mb-6 w-[min(92%,56rem)] rounded-2xl bg-surface-1/80 p-4 shadow-xl backdrop-blur">
         <input
           type="range"
           min={0}
