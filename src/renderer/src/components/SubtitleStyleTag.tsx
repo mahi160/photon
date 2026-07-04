@@ -15,6 +15,10 @@ export function SubtitleStyleTag(): React.JSX.Element {
     video::-webkit-media-text-track-container {
       transform: translateY(-${s.verticalPosition}%);
     }
+    video::-webkit-media-text-track-display {
+      max-width: 70%;
+      margin-inline: auto;
+    }
   `
   return <style>{css}</style>
 }
