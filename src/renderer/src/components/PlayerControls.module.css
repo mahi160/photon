@@ -59,6 +59,12 @@
   transform: scale(0.94);
 }
 
+.iconBtn:disabled {
+  pointer-events: none;
+  cursor: not-allowed;
+  opacity: 0.35;
+}
+
 .icon {
   inline-size: 1.2rem;
   block-size: 1.2rem;
@@ -232,30 +238,6 @@
   background: var(--accent);
 }
 
-.volume {
-  cursor: pointer;
-
-  inline-size: 5rem;
-  block-size: 0.25rem;
-  border-radius: var(--radius-full);
-
-  appearance: none;
-  background: linear-gradient(
-    to right,
-    color-mix(in oklch, white 88%, transparent) var(--pct, 0%),
-    color-mix(in oklch, white 25%, transparent) var(--pct, 0%)
-  );
-}
-
-.volume::-webkit-slider-thumb {
-  inline-size: 0.7rem;
-  block-size: 0.7rem;
-  border-radius: var(--radius-full);
-
-  appearance: none;
-  background: white;
-}
-
 .time {
   margin-inline-start: 0.75rem;
   font-size: 0.75rem;
@@ -314,27 +296,66 @@
   opacity: 0.4;
 }
 
-.menuItemActive {
+.menuItemActive,
+.menuItem[data-selected] {
   color: var(--accent-2);
   background: var(--accent-2-soft);
 }
 
-.delay {
-  margin-block-start: 0.5rem;
-  padding-block-start: 0.5rem;
+.syncLabel {
   padding-inline: 0.75rem;
-  border-block-start: 1px solid var(--player-border);
-
   font-size: 0.75rem;
   color: var(--player-fg-muted);
 }
 
-.delaySlider {
-  inline-size: 100%;
-  margin-block-start: 0.35rem;
-  accent-color: var(--accent);
+.stepperGroup {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+
+  margin-block-start: 0.5rem;
+  padding-inline: 0.75rem;
 }
 
-.delaySlider:disabled {
+.stepBtn {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+
+  inline-size: 1.8rem;
+  block-size: 1.8rem;
+  border: 1px solid var(--player-border);
+  border-radius: var(--radius-s);
+
+  font-size: 1rem;
+  color: var(--player-fg);
+
+  background: var(--player-glass);
+}
+
+.stepBtn:hover {
+  background: color-mix(in oklch, white 10%, transparent);
+}
+
+.stepBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.stepInput {
+  inline-size: 4.5rem;
+  padding-block: 0.3rem;
+  border: 1px solid var(--player-border);
+  border-radius: var(--radius-s);
+
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--player-fg);
+  text-align: center;
+
+  background: var(--player-glass);
+}
+
+.stepInput:disabled {
   opacity: 0.4;
 }

@@ -15,7 +15,9 @@ const api = {
     ipcRenderer.invoke('mpv:play', opts),
   mpvStatus: (): Promise<{ running: boolean; timePos: number; paused: boolean }> =>
     ipcRenderer.invoke('mpv:status'),
-  mpvStop: (): Promise<void> => ipcRenderer.invoke('mpv:stop')
+  mpvStop: (): Promise<void> => ipcRenderer.invoke('mpv:stop'),
+  mpvCheck: (): Promise<boolean> => ipcRenderer.invoke('mpv:check'),
+  fetchSubtitle: (url: string): Promise<string> => ipcRenderer.invoke('subtitle:fetch', url)
 }
 
 export type PreloadApi = typeof api

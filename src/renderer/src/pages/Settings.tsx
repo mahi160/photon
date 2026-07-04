@@ -1,3 +1,4 @@
+import { NumberField } from '@base-ui/react/number-field'
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
@@ -161,6 +162,45 @@ function SubtitleColorSwatches({
   )
 }
 
+function Stepper({
+  value,
+  onChange,
+  min,
+  max,
+  step,
+  format,
+  label
+}: {
+  value: number
+  onChange: (v: number) => void
+  min: number
+  max: number
+  step: number
+  format?: Intl.NumberFormatOptions
+  label: string
+}): React.JSX.Element {
+  return (
+    <NumberField.Root
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onValueChange={(v) => v !== null && onChange(v)}
+      format={format}
+    >
+      <NumberField.Group className={styles.stepperGroup}>
+        <NumberField.Decrement className={styles.stepBtn} aria-label={`Decrease ${label}`}>
+          −
+        </NumberField.Decrement>
+        <NumberField.Input className={styles.stepInput} aria-label={label} />
+        <NumberField.Increment className={styles.stepBtn} aria-label={`Increase ${label}`}>
+          +
+        </NumberField.Increment>
+      </NumberField.Group>
+    </NumberField.Root>
+  )
+}
+
 const playerModes = [
   { value: 'web', label: 'Built-in' },
   { value: 'auto', label: 'Built-in · mpv when transcoding' },
@@ -244,7 +284,10 @@ export function Settings(): React.JSX.Element {
             }}
           />
         </Row>
-        <Row label="Player" hint="mpv plays in its own window, avoids transcoding (requires mpv)">
+        <Row
+          label="Player"
+          hint="mpv plays in its own window, avoids transcoding (requires mpv). Picture-in-Picture always switches to the built-in player."
+        >
           <select
             className={styles.select}
             value={settings.playerMode}
@@ -292,18 +335,14 @@ export function Settings(): React.JSX.Element {
             aria-label="Preferred subtitle language"
           />
         </Row>
-        <Row label="Size">
-          <input
-            type="range"
+        <Row label="Size" hint="% of the base subtitle size">
+          <Stepper
             min={50}
             max={200}
             step={10}
             value={s.fontSize}
-            onChange={(e) =>
-              settings.set({ subtitleStyle: { ...s, fontSize: Number(e.target.value) } })
-            }
-            className={styles.slider}
-            aria-label="Subtitle size"
+            onChange={(v) => settings.set({ subtitleStyle: { ...s, fontSize: v } })}
+            label="subtitle size"
           />
         </Row>
         <Row label="Color">
@@ -332,31 +371,24 @@ export function Settings(): React.JSX.Element {
           />
         </Row>
         <Row label="Vertical position">
-          <input
-            type="range"
+          <Stepper
             min={0}
             max={30}
             step={2}
             value={s.verticalPosition}
-            onChange={(e) =>
-              settings.set({ subtitleStyle: { ...s, verticalPosition: Number(e.target.value) } })
-            }
-            className={styles.slider}
-            aria-label="Subtitle vertical position"
+            onChange={(v) => settings.set({ subtitleStyle: { ...s, verticalPosition: v } })}
+            label="subtitle vertical position"
           />
         </Row>
         <Row label="Opacity">
-          <input
-            type="range"
+          <Stepper
             min={0.2}
             max={1}
             step={0.1}
             value={s.opacity}
-            onChange={(e) =>
-              settings.set({ subtitleStyle: { ...s, opacity: Number(e.target.value) } })
-            }
-            className={styles.slider}
-            aria-label="Subtitle opacity"
+            onChange={(v) => settings.set({ subtitleStyle: { ...s, opacity: v } })}
+            format={{ style: 'percent', maximumFractionDigits: 0 }}
+            label="subtitle opacity"
           />
         </Row>
       </Section>

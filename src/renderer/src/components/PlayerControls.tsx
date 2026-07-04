@@ -1,4 +1,7 @@
 import { Menu as BaseMenu } from '@base-ui/react/menu'
+import { NumberField } from '@base-ui/react/number-field'
+import { Popover as BasePopover } from '@base-ui/react/popover'
+import { Select as BaseSelect } from '@base-ui/react/select'
 import { useEffect, useRef, useState } from 'react'
 import type { MediaStream } from '../lib/jellyfin'
 import styles from './PlayerControls.module.css'
@@ -91,8 +94,11 @@ interface Props {
 const speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 
 export function PlayerControls(p: Props): React.JSX.Element {
-  const [menu, setMenu] = useState<'audio' | 'subs' | 'speed' | null>(null)
-  const toggle = (m: 'audio' | 'subs' | 'speed') => (open: boolean) => setMenu(open ? m : null)
+  const [menu, setMenu] = useState<'audio' | 'subs' | 'speed' | 'sync' | null>(null)
+  const toggle =
+    (m: 'audio' | 'subs' | 'speed' | 'sync') =>
+    (open: boolean): void =>
+      setMenu(open ? m : null)
 
   // transient center play/pause pulse, like every other video player
   const [pulse, setPulse] = useState<{ kind: 'playing' | 'paused'; id: number } | null>(null)
@@ -107,7 +113,6 @@ export function PlayerControls(p: Props): React.JSX.Element {
   }, [p.state])
 
   const timePct = p.duration ? `${Math.min(100, (p.time / p.duration) * 100)}%` : '0%'
-  const volumePct = `${(p.muted ? 0 : p.volume) * 100}%`
 
   return (
     <div
@@ -196,17 +201,24 @@ export function PlayerControls(p: Props): React.JSX.Element {
                 </svg>
               )}
             </button>
-            <input
-              type="range"
+            <NumberField.Root
               min={0}
               max={1}
-              step={0.01}
+              step={0.05}
               value={p.muted ? 0 : p.volume}
-              onChange={(e) => p.onVolume(Number(e.target.value))}
-              className={styles.volume}
-              style={{ '--pct': volumePct } as React.CSSProperties}
-              aria-label="Volume"
-            />
+              onValueChange={(v) => v !== null && p.onVolume(v)}
+              format={{ style: 'percent', maximumFractionDigits: 0 }}
+            >
+              <NumberField.Group className={styles.stepperGroup}>
+                <NumberField.Decrement className={styles.stepBtn} aria-label="Decrease volume">
+                  −
+                </NumberField.Decrement>
+                <NumberField.Input className={styles.stepInput} />
+                <NumberField.Increment className={styles.stepBtn} aria-label="Increase volume">
+                  +
+                </NumberField.Increment>
+              </NumberField.Group>
+            </NumberField.Root>
             <span className={styles.time}>
               {fmt(p.time)} / {fmt(p.duration)}
             </span>
@@ -260,57 +272,97 @@ export function PlayerControls(p: Props): React.JSX.Element {
               {!p.audioStreams.length && <MenuItem onClick={() => {}}>Default</MenuItem>}
             </Menu>
 
-            <Menu
-              label={
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  className={styles.icon}
-                  aria-label="Subtitles"
-                >
+            <BaseSelect.Root
+              value={p.subtitleIndex}
+              onValueChange={(v) => p.onSelectSubtitle(v)}
+              open={menu === 'subs'}
+              onOpenChange={toggle('subs')}
+            >
+              <BaseSelect.Trigger className={styles.iconBtn} aria-label="Subtitles">
+                <svg viewBox="0 0 24 24" fill="currentColor" className={styles.icon}>
                   <path d="M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm2 9v2h8v-2H6zm10 0v2h2v-2h-2zM6 10v2h2v-2H6zm4 0v2h8v-2h-8z" />
                 </svg>
-              }
-              open={menu === 'subs'}
-              setOpen={toggle('subs')}
-            >
-              <MenuItem
-                active={p.subtitleIndex === null}
-                onClick={() => {
-                  p.onSelectSubtitle(null)
-                  setMenu(null)
-                }}
+              </BaseSelect.Trigger>
+              <BaseSelect.Portal>
+                {/* alignItemWithTrigger: opens with the selected subtitle lined up
+                    on the trigger instead of always sliding out from one edge */}
+                <BaseSelect.Positioner alignItemWithTrigger side="top" sideOffset={8}>
+                  <BaseSelect.Popup className={styles.menu}>
+                    <BaseSelect.Item className={styles.menuItem}>
+                      <BaseSelect.ItemText>Off</BaseSelect.ItemText>
+                    </BaseSelect.Item>
+                    {p.subtitleStreams.map((s) => (
+                      <BaseSelect.Item key={s.Index} value={s.Index} className={styles.menuItem}>
+                        <BaseSelect.ItemText>
+                          {s.DisplayTitle ?? `Subtitle ${s.Index}`}
+                          {s.DeliveryMethod !== 'External' && ' (burned-in)'}
+                        </BaseSelect.ItemText>
+                      </BaseSelect.Item>
+                    ))}
+                  </BaseSelect.Popup>
+                </BaseSelect.Positioner>
+              </BaseSelect.Portal>
+            </BaseSelect.Root>
+
+            <BasePopover.Root open={menu === 'sync'} onOpenChange={toggle('sync')}>
+              <BasePopover.Trigger
+                className={styles.iconBtn}
+                disabled={!p.subtitleDelayEnabled}
+                aria-label="Subtitle sync"
               >
-                Off
-              </MenuItem>
-              {p.subtitleStreams.map((s) => (
-                <MenuItem
-                  key={s.Index}
-                  active={s.Index === p.subtitleIndex}
-                  onClick={() => {
-                    p.onSelectSubtitle(s.Index)
-                    setMenu(null)
-                  }}
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className={styles.icon}
                 >
-                  {s.DisplayTitle ?? `Subtitle ${s.Index}`}
-                  {s.DeliveryMethod !== 'External' && ' (burned-in)'}
-                </MenuItem>
-              ))}
-              <div className={styles.delay}>
-                Delay: {p.subtitleDelay.toFixed(1)}s
-                <input
-                  type="range"
-                  min={-10}
-                  max={10}
-                  step={0.5}
-                  value={p.subtitleDelay}
-                  disabled={!p.subtitleDelayEnabled}
-                  onChange={(e) => p.onSubtitleDelay(Number(e.target.value))}
-                  className={styles.delaySlider}
-                  aria-label="Subtitle delay"
-                />
-              </div>
-            </Menu>
+                  <circle cx="12" cy="12" r="9" />
+                  <path d="M12 7v5l3 2" />
+                </svg>
+              </BasePopover.Trigger>
+              <BasePopover.Portal>
+                <BasePopover.Positioner side="top" align="end" sideOffset={8}>
+                  <BasePopover.Popup className={styles.menu}>
+                    <div className={styles.syncLabel}>Subtitle sync</div>
+                    <NumberField.Root
+                      min={-10}
+                      max={10}
+                      step={0.5}
+                      disabled={!p.subtitleDelayEnabled}
+                      value={p.subtitleDelay}
+                      onValueChange={(v) => v !== null && p.onSubtitleDelay(v)}
+                      format={{
+                        style: 'unit',
+                        unit: 'second',
+                        unitDisplay: 'narrow',
+                        signDisplay: 'exceptZero'
+                      }}
+                    >
+                      <NumberField.Group className={styles.stepperGroup}>
+                        {/* delay value shifts cue times directly (cue.startTime += delay,
+                            same convention as mpv's sub-delay): a bigger number pushes
+                            subtitles LATER, a smaller/negative one pulls them EARLIER.
+                            These labels were swapped before — that's the sync bug. */}
+                        <NumberField.Decrement
+                          className={styles.stepBtn}
+                          aria-label="Advance subtitles (show earlier)"
+                        >
+                          −
+                        </NumberField.Decrement>
+                        <NumberField.Input className={styles.stepInput} />
+                        <NumberField.Increment
+                          className={styles.stepBtn}
+                          aria-label="Delay subtitles (show later)"
+                        >
+                          +
+                        </NumberField.Increment>
+                      </NumberField.Group>
+                    </NumberField.Root>
+                  </BasePopover.Popup>
+                </BasePopover.Positioner>
+              </BasePopover.Portal>
+            </BasePopover.Root>
 
             <button className={styles.iconBtn} onClick={p.onPiP} aria-label="Picture in Picture">
               <svg viewBox="0 0 24 24" fill="currentColor" className={styles.icon}>
