@@ -1,3 +1,4 @@
+import { Menu as BaseMenu } from '@base-ui/react/menu'
 import { useEffect, useRef, useState } from 'react'
 import type { MediaStream } from '../lib/jellyfin'
 import styles from './PlayerControls.module.css'
@@ -24,12 +25,14 @@ function Menu({
   setOpen: (v: boolean) => void
 }): React.JSX.Element {
   return (
-    <div className={styles.menuWrap}>
-      <button className={styles.iconBtn} onClick={() => setOpen(!open)}>
-        {label}
-      </button>
-      {open && <div className={styles.menu}>{children}</div>}
-    </div>
+    <BaseMenu.Root open={open} onOpenChange={setOpen}>
+      <BaseMenu.Trigger className={styles.iconBtn}>{label}</BaseMenu.Trigger>
+      <BaseMenu.Portal>
+        <BaseMenu.Positioner side="top" align="end" sideOffset={8}>
+          <BaseMenu.Popup className={styles.menu}>{children}</BaseMenu.Popup>
+        </BaseMenu.Positioner>
+      </BaseMenu.Portal>
+    </BaseMenu.Root>
   )
 }
 
@@ -45,13 +48,13 @@ function MenuItem({
   disabled?: boolean
 }): React.JSX.Element {
   return (
-    <button
+    <BaseMenu.Item
       disabled={disabled}
       onClick={onClick}
       className={`${styles.menuItem} ${active ? styles.menuItemActive : ''}`}
     >
       {children}
-    </button>
+    </BaseMenu.Item>
   )
 }
 

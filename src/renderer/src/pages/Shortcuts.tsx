@@ -1,4 +1,5 @@
-import { Fragment, useEffect } from 'react'
+import { Dialog } from '@base-ui/react/dialog'
+import { Fragment } from 'react'
 import styles from './Shortcuts.module.css'
 
 function Keys({ keys, join = '+' }: { keys: string[]; join?: string }): React.JSX.Element {
@@ -45,56 +46,48 @@ export function ShortcutsOverlay({
   open: boolean
   onClose: () => void
 }): React.JSX.Element | null {
-  useEffect(() => {
-    if (!open) return
-    function onKey(e: KeyboardEvent): void {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
-
-  if (!open) return null
-
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.card} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal>
-        <h1 className={styles.title}>Keyboard shortcuts</h1>
+    <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
+      <Dialog.Portal>
+        <Dialog.Backdrop className={styles.overlay} />
+        <Dialog.Popup className={styles.card}>
+          <h1 className={styles.title}>Keyboard shortcuts</h1>
 
-        <div className={styles.columns}>
-          <section className={styles.section}>
-            <h2 className={styles.sectionTitle}>Global</h2>
-            <div className={styles.list}>
-              <Item label="Search" keys={['/']} />
-              <Item label="Search" keys={[mod, 'F']} />
-              <Item label="This overlay" keys={['?']} />
-              <Item label="Back / close" keys={['Esc']} />
-            </div>
-          </section>
+          <div className={styles.columns}>
+            <section className={styles.section}>
+              <h2 className={styles.sectionTitle}>Global</h2>
+              <div className={styles.list}>
+                <Item label="Search" keys={['/']} />
+                <Item label="Search" keys={[mod, 'F']} />
+                <Item label="This overlay" keys={['?']} />
+                <Item label="Back / close" keys={['Esc']} />
+              </div>
+            </section>
 
-          <section className={styles.section}>
-            <h2 className={styles.sectionTitle}>Player</h2>
-            <div className={styles.list}>
-              <Item label="Play / pause" keys={['Space']} />
-              <Item label="Seek ±10s" keys={['←', '→']} join="/" />
-              <Item label="Volume" keys={['↑', '↓']} join="/" />
-              <Item label="Mute" keys={['M']} />
-              <Item label="Fullscreen" keys={['F']} />
-              <Item label="Picture in picture" keys={['P']} />
-              <Item
-                label="Nudge subtitle delay"
-                hint="Text subtitles only"
-                keys={['[', ']']}
-                join="/"
-              />
-            </div>
-          </section>
-        </div>
+            <section className={styles.section}>
+              <h2 className={styles.sectionTitle}>Player</h2>
+              <div className={styles.list}>
+                <Item label="Play / pause" keys={['Space']} />
+                <Item label="Seek ±10s" keys={['←', '→']} join="/" />
+                <Item label="Volume" keys={['↑', '↓']} join="/" />
+                <Item label="Mute" keys={['M']} />
+                <Item label="Fullscreen" keys={['F']} />
+                <Item label="Picture in picture" keys={['P']} />
+                <Item
+                  label="Nudge subtitle delay"
+                  hint="Text subtitles only"
+                  keys={['[', ']']}
+                  join="/"
+                />
+              </div>
+            </section>
+          </div>
 
-        <div className={styles.footer}>
-          Press <kbd className={styles.key}>Esc</kbd> to close
-        </div>
-      </div>
-    </div>
+          <div className={styles.footer}>
+            Press <kbd className={styles.key}>Esc</kbd> to close
+          </div>
+        </Dialog.Popup>
+      </Dialog.Portal>
+    </Dialog.Root>
   )
 }
