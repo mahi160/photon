@@ -171,6 +171,12 @@ export function backdropUrl(item: BaseItem, width = 1280): string | null {
   return null
 }
 
+// untranscoded stream — used for direct play and for external players (mpv)
+export function directStreamUrl(itemId: string, mediaSourceId: string): string {
+  if (!session) throw new JellyfinError(0, 'Not signed in')
+  return `${session.server}/Videos/${itemId}/stream?static=true&mediaSourceId=${mediaSourceId}&api_key=${session.token}`
+}
+
 export function serverUrl(): string {
   if (!session) throw new JellyfinError(0, 'Not signed in')
   return session.server
