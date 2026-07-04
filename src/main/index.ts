@@ -3,16 +3,22 @@ import { join } from 'path'
 import { readFileSync, writeFileSync, rmSync, existsSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { registerMpv } from './mpv'
+
+registerMpv()
+
+const prefsFile = join(app.getPath('userData'), 'prefs.json')
+
+function readPrefs(): { disableHwAccel?: boolean } {
+  try {
+    return existsSync(prefsFile) ? JSON.parse(readFileSync(prefsFile, 'utf-8')) : {}
+  } catch {
+    return {} /* corrupt prefs: ignore */
+  }
+}
 
 // hardware acceleration flag must be applied before app is ready
-const prefsFile = join(app.getPath('userData'), 'prefs.json')
-try {
-  if (existsSync(prefsFile) && JSON.parse(readFileSync(prefsFile, 'utf-8')).disableHwAccel) {
-    app.disableHardwareAcceleration()
-  }
-} catch {
-  /* corrupt prefs: ignore */
-}
+if (readPrefs().disableHwAccel) app.disableHardwareAcceleration()
 
 // --- secure session storage (token never touches plaintext disk) ---
 const sessionFile = (): string => join(app.getPath('userData'), 'session.bin')
@@ -54,19 +60,7 @@ ipcMain.handle('app:setHwAccel', (_e, enabled: boolean) => {
   writeFileSync(prefsFile, JSON.stringify({ disableHwAccel: !enabled }))
 })
 
-ipcMain.handle('app:getHwAccel', () => {
-  try {
-    return !JSON.parse(readFileSync(prefsFile, 'utf-8')).disableHwAccel
-  } catch {
-    return true
-  }
-})
-
-ipcMain.handle('update:check', async () => {
-  if (is.dev) return
-  const { autoUpdater } = await import('electron-updater')
-  void autoUpdater.checkForUpdatesAndNotify().catch(() => {})
-})
+ipcMain.handle('app:getHwAccel', () => !readPrefs().disableHwAccel)
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -103,6 +97,12 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('dev.famto')
+
+  if (!is.dev) {
+    void import('electron-updater')
+      .then(({ autoUpdater }) => autoUpdater.checkForUpdatesAndNotify())
+      .catch(() => {})
+  }
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

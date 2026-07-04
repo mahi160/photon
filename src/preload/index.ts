@@ -11,7 +11,11 @@ const api = {
   getLoginItem: (): Promise<boolean> => ipcRenderer.invoke('app:getLoginItem'),
   setHwAccel: (enabled: boolean): Promise<void> => ipcRenderer.invoke('app:setHwAccel', enabled),
   getHwAccel: (): Promise<boolean> => ipcRenderer.invoke('app:getHwAccel'),
-  checkUpdates: (): Promise<void> => ipcRenderer.invoke('update:check')
+  mpvPlay: (opts: { url: string; start: number; title: string }): Promise<boolean> =>
+    ipcRenderer.invoke('mpv:play', opts),
+  mpvStatus: (): Promise<{ running: boolean; timePos: number; paused: boolean }> =>
+    ipcRenderer.invoke('mpv:status'),
+  mpvStop: (): Promise<void> => ipcRenderer.invoke('mpv:stop')
 }
 
 export type PreloadApi = typeof api

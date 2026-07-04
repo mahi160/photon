@@ -13,6 +13,7 @@ export interface SubtitleStyle {
 interface SettingsState {
   // playback
   maxBitrate: number // bits/sec, 0 = auto (very high)
+  useMpv: boolean // play in an external mpv window instead of the built-in player
   autoplayNext: boolean
   rememberSpeed: boolean
   lastSpeed: number
@@ -32,6 +33,7 @@ export const useSettings = create<SettingsState>()(
   persist(
     (set) => ({
       maxBitrate: 0,
+      useMpv: false,
       autoplayNext: true,
       rememberSpeed: false,
       lastSpeed: 1,
@@ -54,5 +56,3 @@ export const useSettings = create<SettingsState>()(
     { name: 'famto.settings' }
   )
 )
-
-export const AUTO_BITRATE = 140_000_000
