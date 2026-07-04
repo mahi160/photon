@@ -1,0 +1,28 @@
+{
+  "extends": [
+    "stylelint-config-standard",
+    "stylelint-config-css-modules",
+    "stylelint-config-clean-order"
+  ],
+  "rules": {
+    "selector-class-pattern": "^[a-z][a-zA-Z0-9]*$",
+    "custom-property-pattern": "^[a-z][a-z0-9-]*$",
+    "keyframes-name-pattern": "^[a-z][a-zA-Z0-9-]*$",
+    "no-duplicate-selectors": null,
+    "color-hex-length": "long",
+    "alpha-value-notation": "number",
+    "color-function-notation": "modern",
+    "hue-degree-notation": "number",
+    "no-descending-specificity": null,
+    "value-keyword-case": [
+      "lower",
+      { "camelCaseSvgKeywords": true, "ignoreProperties": ["composes"] }
+    ],
+    "shorthand-property-no-redundant-values": true,
+    "declaration-block-no-redundant-longhand-properties": true,
+    "font-weight-notation": "numeric",
+    "media-feature-name-value-no-unknown": true,
+    "no-unknown-animations": true,
+    "no-invalid-position-at-import-rule": true
+  }
+}
