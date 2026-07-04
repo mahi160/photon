@@ -392,6 +392,10 @@ export function Settings(): React.JSX.Element {
           </a>
         </Row>
       </Section>
+
+      <p className={styles.footnote}>
+        Press <kbd className={styles.kbd}>?</kbd> anywhere for keyboard shortcuts.
+      </p>
     </div>
   )
 }

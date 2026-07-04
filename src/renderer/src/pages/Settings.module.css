@@ -230,3 +230,23 @@
 .link:hover {
   text-decoration: underline;
 }
+
+.footnote {
+  margin-block-start: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--fg-faint);
+}
+
+.kbd {
+  display: inline-grid;
+  place-items: center;
+  min-inline-size: 1.4rem;
+  padding-inline: 0.35rem;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  font-family: var(--font-body);
+  font-size: 0.75rem;
+  font-weight: 600;
+  vertical-align: middle;
+}

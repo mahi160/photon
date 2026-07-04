@@ -5,9 +5,9 @@ import { Card } from './Card'
 import styles from './LibraryGrid.module.css'
 
 const sorts: { key: SortKey; label: string }[] = [
-  { key: 'added', label: 'Recently Added' },
-  { key: 'name', label: 'Alphabetical' },
-  { key: 'release', label: 'Release Date' }
+  { key: 'added', label: 'Added' },
+  { key: 'name', label: 'Name' },
+  { key: 'release', label: 'Release' }
 ]
 
 export function LibraryGrid({
@@ -20,22 +20,26 @@ export function LibraryGrid({
   const [sort, setSort] = useState<SortKey>('added')
   const { data, isPending, isError, refetch } = useQuery(libraryQuery(type, sort))
 
+  const noun = type === 'Movie' ? 'movies' : 'shows'
+
   return (
     <div className={styles.page}>
       <div className={styles.head}>
         <h1 className={styles.title}>{title}</h1>
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as SortKey)}
-          className={styles.select}
-          aria-label="Sort"
-        >
+        {data && <span className={styles.count}>{`${data.length} ${noun}`}</span>}
+        <div className={styles.spacer} />
+        <div className={styles.sort} role="group" aria-label="Sort">
           {sorts.map((s) => (
-            <option key={s.key} value={s.key}>
+            <button
+              key={s.key}
+              onClick={() => setSort(s.key)}
+              className={`${styles.sortBtn} ${sort === s.key ? styles.sortBtnActive : ''}`}
+              aria-pressed={sort === s.key}
+            >
               {s.label}
-            </option>
+            </button>
           ))}
-        </select>
+        </div>
       </div>
       {isPending && <div className={styles.status}>Loading…</div>}
       {isError && (

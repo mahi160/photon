@@ -16,7 +16,6 @@ import { MovieDetails } from './pages/MovieDetails'
 import { ShowDetails } from './pages/ShowDetails'
 import { Player } from './pages/Player'
 import { Settings } from './pages/Settings'
-import { Shortcuts } from './pages/Shortcuts'
 
 const rootRoute = createRootRoute({
   component: Outlet
@@ -69,11 +68,6 @@ const settingsRoute = createRoute({
   path: '/settings',
   component: Settings
 })
-const shortcutsRoute = createRoute({
-  getParentRoute: () => shellRoute,
-  path: '/shortcuts',
-  component: Shortcuts
-})
 const movieDetailsRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: '/movies/$itemId',
@@ -110,7 +104,6 @@ const routeTree = rootRoute.addChildren([
       showsRoute,
       searchRoute,
       settingsRoute,
-      shortcutsRoute,
       movieDetailsRoute,
       showDetailsRoute
     ]),

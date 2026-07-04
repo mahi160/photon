@@ -31,25 +31,37 @@ export function Login(): React.JSX.Element {
     <div className={styles.page}>
       <form onSubmit={submit} className={styles.form}>
         <h1 className={styles.brand}>Famto</h1>
-        <p className={styles.tagline}>Watching media, beautifully.</p>
+        <p className={styles.tagline}>Sign in to your Jellyfin server.</p>
+        <label className={styles.label} htmlFor="login-server">
+          Server
+        </label>
         <input
+          id="login-server"
           className={styles.field}
-          placeholder="Server URL"
+          placeholder="https://jellyfin.example.net"
+          spellCheck={false}
           value={server}
           onChange={(e) => setServer(e.target.value)}
           autoFocus
           required
         />
+        <label className={styles.label} htmlFor="login-username">
+          Username
+        </label>
         <input
+          id="login-username"
           className={styles.field}
-          placeholder="Username"
+          spellCheck={false}
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           required
         />
+        <label className={styles.label} htmlFor="login-password">
+          Password
+        </label>
         <input
+          id="login-password"
           className={styles.field}
-          placeholder="Password"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}

@@ -21,8 +21,8 @@ export function Home(): React.JSX.Element {
     <div className={styles.page}>
       <Row title="Continue Watching" items={resume.data} wide />
       <Row title="Next Up" items={nextUp.data} wide />
-      <Row title="Movies" items={movies.data} to="/movies" />
-      <Row title="TV Shows" items={shows.data} to="/shows" />
+      <Row title="Recently Added Movies" items={movies.data} to="/movies" />
+      <Row title="Recently Added Shows" items={shows.data} to="/shows" />
       {empty && (
         <div className={styles.empty}>Nothing here yet. Add media to your Jellyfin libraries.</div>
       )}

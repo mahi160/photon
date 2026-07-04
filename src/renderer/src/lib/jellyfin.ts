@@ -133,6 +133,7 @@ export interface BaseItem {
   Type: 'Movie' | 'Series' | 'Season' | 'Episode' | string
   ProductionYear?: number
   RunTimeTicks?: number
+  OfficialRating?: string
   Overview?: string
   SeriesId?: string
   SeriesName?: string

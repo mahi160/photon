@@ -41,23 +41,29 @@
 
 .brand {
   margin-block-end: 0.35rem;
-  text-align: center;
   font-family: var(--font-display);
   font-style: italic;
-  font-size: 2.75rem;
+  font-size: 2.25rem;
   font-weight: 560;
 }
 
 .tagline {
   margin-block-end: 2.25rem;
-  text-align: center;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: var(--fg-faint);
+}
+
+.label {
+  display: block;
+  margin-block-end: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--fg-muted);
 }
 
 .field {
   inline-size: 100%;
-  margin-block-end: 0.75rem;
+  margin-block-end: 1rem;
   padding-block: 0.7rem;
   padding-inline: 0.9rem;
   border-radius: var(--radius-s);
