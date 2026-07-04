@@ -1,15 +1,14 @@
+import { Fragment } from 'react'
 import styles from './Shortcuts.module.css'
 
 function Keys({ keys, join = '+' }: { keys: string[]; join?: string }): React.JSX.Element {
   return (
     <div className={styles.keys}>
       {keys.map((k, i) => (
-        <>
+        <Fragment key={k}>
           {i > 0 && <span className={styles.plus}>{join}</span>}
-          <kbd key={k} className={styles.key}>
-            {k}
-          </kbd>
-        </>
+          <kbd className={styles.key}>{k}</kbd>
+        </Fragment>
       ))}
     </div>
   )

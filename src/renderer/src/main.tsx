@@ -7,20 +7,18 @@ import { RouterProvider } from '@tanstack/react-router'
 import { router } from './router'
 import { useSession } from './stores/session'
 import { useSettings } from './stores/settings'
+import { resolveTheme } from './lib/theme'
 
-function applyTheme(theme: 'dark' | 'light' | 'system'): void {
-  const dark =
-    theme === 'dark' ||
-    (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-  document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+function applyAppearance(): void {
+  const s = useSettings.getState()
+  document.documentElement.dataset.theme = resolveTheme(s.theme)
+  document.documentElement.dataset.scheme = s.colorScheme
 }
 
-applyTheme(useSettings.getState().theme)
-document.documentElement.dataset.scheme = useSettings.getState().colorScheme
-useSettings.subscribe((s) => {
-  applyTheme(s.theme)
-  document.documentElement.dataset.scheme = s.colorScheme
-})
+applyAppearance()
+useSettings.subscribe(applyAppearance)
+// follow OS theme changes while in 'system' mode
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance)
 
 const queryClient = new QueryClient({
   defaultOptions: {
