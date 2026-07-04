@@ -68,10 +68,17 @@ export async function startPlayback(
   const ms = info.MediaSources?.[0]
   if (!ms) throw new Error('Playback failed.')
 
+  const streams = ms.MediaStreams ?? []
+  const subtitleStreams = streams.filter((st) => st.Type === 'Subtitle')
+  // a burn-in subtitle only exists in the server's transcoded output — direct
+  // play/stream serves the original file and would silently drop it
+  const requestedSubtitle = subtitleStreams.find((st) => st.Index === opts.subtitleStreamIndex)
+  const requiresBurnIn = !!requestedSubtitle && requestedSubtitle.DeliveryMethod !== 'External'
+
   let url: string
   let hls = false
   let playMethod: 'DirectPlay' | 'Transcode' = 'Transcode'
-  if (ms.SupportsDirectPlay || ms.SupportsDirectStream) {
+  if (!requiresBurnIn && (ms.SupportsDirectPlay || ms.SupportsDirectStream)) {
     url = directStreamUrl(item.Id, ms.Id)
     playMethod = 'DirectPlay'
   } else if (ms.TranscodingUrl) {
@@ -80,9 +87,6 @@ export async function startPlayback(
   } else {
     throw new Error('Playback failed.')
   }
-
-  const streams = ms.MediaStreams ?? []
-  const subtitleStreams = streams.filter((st) => st.Type === 'Subtitle')
   const textTracks: TextTrackSource[] = subtitleStreams
     .filter((st) => st.DeliveryMethod === 'External' && st.DeliveryUrl)
     .map((st) => ({

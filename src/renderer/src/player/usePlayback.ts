@@ -130,7 +130,8 @@ export function usePlayback(
           artist: playable.SeriesName ?? ''
         })
         return true
-      } catch {
+      } catch (e) {
+        console.error('[playback] load failed', e)
         setError('Playback failed.')
         return false
       }
@@ -174,13 +175,14 @@ export function usePlayback(
         // itself carries stream info (movies/episodes fetched with MediaSources)
         const settings = useSettings.getState()
         const streams = playable.MediaSources?.[0]?.MediaStreams ?? []
-        const preferredAudio =
-          params.audio === undefined && settings.preferredAudioLanguage
-            ? streams.find(
-                (s) => s.Type === 'Audio' && s.Language === settings.preferredAudioLanguage
-              )?.Index
-            : undefined
-        const audioStreamIndex = params.audio ?? preferredAudio
+        const audioStreams = streams.filter((s) => s.Type === 'Audio')
+        // no explicit request or remembered preference: prefer English, else
+        // whatever track comes first, instead of leaving it to the server
+        const defaultAudio =
+          audioStreams.find((s) => s.Language === settings.preferredAudioLanguage) ??
+          audioStreams.find((s) => s.Language === 'eng') ??
+          audioStreams[0]
+        const audioStreamIndex = params.audio ?? defaultAudio?.Index
         if (audioStreamIndex !== undefined) setAudioIndex(audioStreamIndex)
         return loadFor(playable, {
           startSeconds: params.start,
@@ -188,7 +190,10 @@ export function usePlayback(
           subtitleStreamIndex: params.sub
         })
       })
-      .catch(() => setError('Nothing to play.'))
+      .catch((e) => {
+        console.error('[playback] resolve failed', e)
+        setError('Nothing to play.')
+      })
   }, [item, params.start, params.audio, params.sub, attempt, loadFor])
 
   // progress reporting: every 10s + on any pause (button, hotkey, PiP, media keys)

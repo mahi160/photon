@@ -43,7 +43,10 @@ export class Html5Engine implements PlaybackEngine {
   private onPause = (): void => this.emit('state', 'paused')
   private onWaiting = (): void => this.emit('state', 'buffering')
   private onEnded = (): void => this.emit('ended')
-  private onError = (): void => this.emit('error', 'Playback failed.')
+  private onError = (): void => {
+    console.error('[playback] video error', this.video.error)
+    this.emit('error', 'Playback failed.')
+  }
   private onPipEnter = (): void => this.emit('pip', true)
   private onPipLeave = (): void => this.emit('pip', false)
 
@@ -59,7 +62,12 @@ export class Html5Engine implements PlaybackEngine {
     if (req.hls && Hls.isSupported()) {
       this.hls = new Hls()
       this.hls.on(Hls.Events.ERROR, (_e, data) => {
-        if (data.fatal) this.emit('error', 'Playback failed.')
+        if (data.fatal) {
+          console.error('[playback] hls fatal error', data)
+          this.emit('error', 'Playback failed.')
+        } else {
+          console.warn('[playback] hls error', data)
+        }
       })
       this.hls.loadSource(req.url)
       this.hls.attachMedia(this.video)
