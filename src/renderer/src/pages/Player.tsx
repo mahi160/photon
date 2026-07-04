@@ -14,7 +14,21 @@ import styles from './Player.module.css'
 
 export function Player(): React.JSX.Element {
   const mode = useSettings((s) => s.playerMode)
-  if (mode === 'mpv') return <MpvPlayer />
+  // one-shot escape hatch: mpv failed to start → built-in player for this item
+  const [forceWeb, setForceWeb] = useState(false)
+  // mpv → PiP handoff resumes the built-in player at mpv's last position
+  const [webResume, setWebResume] = useState<number | undefined>(undefined)
+  if (forceWeb) return <WebPlayer startOverride={webResume} />
+  if (mode === 'mpv')
+    return (
+      <MpvPlayer
+        onFallback={() => setForceWeb(true)}
+        onRequestPiP={(pos) => {
+          setWebResume(pos)
+          setForceWeb(true)
+        }}
+      />
+    )
   if (mode === 'auto') return <AutoPlayer />
   return <WebPlayer />
 }
@@ -31,6 +45,8 @@ function AutoPlayer(): React.JSX.Element {
   const [choice, setChoice] = useState<'web' | 'mpv' | null>(null)
   const [failed, setFailed] = useState(false)
   const probedFor = useRef<string | null>(null)
+  // mpv → PiP handoff resumes the built-in player at mpv's last position
+  const [webResume, setWebResume] = useState<number | undefined>(undefined)
 
   useEffect(() => {
     const it = item.data
@@ -46,12 +62,26 @@ function AutoPlayer(): React.JSX.Element {
           maxBitrate: settings.maxBitrate || undefined
         })
       )
-      .then((sess) => setChoice(sess.playMethod === 'DirectPlay' ? 'web' : 'mpv'))
+      .then(async (sess) => {
+        // never route to a player that isn't installed — the server can
+        // transcode for the built-in player instead
+        const useMpv = sess.playMethod !== 'DirectPlay' && (await window.api.mpvCheck())
+        setChoice(useMpv ? 'mpv' : 'web')
+      })
       .catch(() => setFailed(true))
   }, [item.data, search.start, search.audio, search.sub])
 
-  if (choice === 'web') return <WebPlayer />
-  if (choice === 'mpv') return <MpvPlayer />
+  if (choice === 'web') return <WebPlayer startOverride={webResume} />
+  if (choice === 'mpv')
+    return (
+      <MpvPlayer
+        onFallback={() => setChoice('web')}
+        onRequestPiP={(pos) => {
+          setWebResume(pos)
+          setChoice('web')
+        }}
+      />
+    )
   return (
     <div className={styles.stage}>
       {failed && (
@@ -66,9 +96,11 @@ function AutoPlayer(): React.JSX.Element {
   )
 }
 
-function WebPlayer(): React.JSX.Element {
+function WebPlayer({ startOverride }: { startOverride?: number } = {}): React.JSX.Element {
   const { itemId } = useParams({ from: '/app/player/$itemId' })
-  const search = useSearch({ strict: false }) as StartParams
+  const routeSearch = useSearch({ strict: false }) as StartParams
+  const search =
+    startOverride !== undefined ? { ...routeSearch, start: startOverride } : routeSearch
   const navigate = useNavigate()
 
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -95,6 +127,21 @@ function WebPlayer(): React.JSX.Element {
     const d = Math.max(-10, Math.min(10, player.subtitleDelay + step))
     player.changeDelay(d)
     showToast(`Subtitle delay: ${d > 0 ? '+' : ''}${d.toFixed(1)}s`)
+  }
+
+  // a burned-in pick reloads the stream (server transcode start can take a
+  // few seconds) — say so, instead of leaving the picker looking unresponsive
+  function selectSubtitle(index: number | null): void {
+    player.selectSubtitle(index)
+    if (index === null) {
+      showToast('Subtitles off')
+      return
+    }
+    const stream = session?.subtitleStreams.find((s) => s.Index === index)
+    const label = stream?.DisplayTitle ?? `Subtitle ${index}`
+    showToast(
+      stream?.DeliveryMethod !== 'External' ? `Switching to ${label}…` : `Subtitles: ${label}`
+    )
   }
 
   // keyboard shortcuts (PRD: Navigation)
@@ -185,7 +232,7 @@ function WebPlayer(): React.JSX.Element {
           onMute={engine.toggleMute}
           onRate={player.changeRate}
           onSelectAudio={player.selectAudio}
-          onSelectSubtitle={player.selectSubtitle}
+          onSelectSubtitle={selectSubtitle}
           onSubtitleDelay={player.changeDelay}
           onFullscreen={toggleFullscreen}
           onPiP={engine.togglePiP}

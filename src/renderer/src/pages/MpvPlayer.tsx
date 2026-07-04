@@ -23,7 +23,15 @@ function titleOf(item: BaseItem): string {
 // session, hands mpv the untranscoded stream and reports progress to Jellyfin.
 // ponytail: audio/subtitle choice happens inside mpv; server-side external
 // subtitle files aren't passed along. Autoplay-next doesn't apply here.
-export function MpvPlayer(): React.JSX.Element {
+interface Props {
+  onFallback?: () => void
+  // mpv has no OS-integrated Picture-in-Picture (no libmpv hook into the
+  // system PiP surface) — the honest way to get real PiP is to hand off to
+  // the built-in player, which the server can always transcode for
+  onRequestPiP?: (positionSeconds: number) => void
+}
+
+export function MpvPlayer({ onFallback, onRequestPiP }: Props): React.JSX.Element {
   const { itemId } = useParams({ from: '/app/player/$itemId' })
   const search = useSearch({ strict: false }) as StartParams
   const navigate = useNavigate()
@@ -34,6 +42,7 @@ export function MpvPlayer(): React.JSX.Element {
   const sessRef = useRef<PlaybackSession | null>(null)
   const lastPos = useRef(0)
   const startedFor = useRef<string | null>(null)
+  const pipping = useRef(false) // suppress the running->false poll tick during handoff
 
   useEffect(() => {
     const it = item.data
@@ -68,7 +77,7 @@ export function MpvPlayer(): React.JSX.Element {
   useEffect(() => {
     const id = setInterval(async () => {
       const sess = sessRef.current
-      if (!sess) return
+      if (!sess || pipping.current) return
       const st = await window.api.mpvStatus()
       if (st.running) {
         lastPos.current = st.timePos
@@ -81,6 +90,16 @@ export function MpvPlayer(): React.JSX.Element {
     }, 5000)
     return () => clearInterval(id)
   }, [navigate])
+
+  async function requestPiP(): Promise<void> {
+    pipping.current = true
+    const st = await window.api.mpvStatus()
+    await window.api.mpvStop()
+    const sess = sessRef.current
+    sessRef.current = null
+    if (sess) reportStopped(sess, st.timePos)
+    onRequestPiP?.(st.timePos)
+  }
 
   // leaving the page stops mpv and closes the Jellyfin session
   useEffect(() => {
@@ -96,7 +115,14 @@ export function MpvPlayer(): React.JSX.Element {
     <div className={styles.stage}>
       <div className={styles.errorLayer}>
         {error ? (
-          <p className={styles.errorText}>{error}</p>
+          <>
+            <p className={styles.errorText}>{error}</p>
+            {onFallback && (
+              <button onClick={onFallback} className={styles.errorRetry}>
+                Use built-in player
+              </button>
+            )}
+          </>
         ) : (
           <p className={styles.errorText}>
             {title ? `Playing in mpv — ${title}` : 'Starting mpv…'}
@@ -105,6 +131,11 @@ export function MpvPlayer(): React.JSX.Element {
         <button onClick={() => navigate({ to: '/' })} className={styles.errorBack}>
           Back to Home
         </button>
+        {!error && onRequestPiP && (
+          <button onClick={() => void requestPiP()} className={styles.errorBack}>
+            Picture-in-Picture (switches to transcode)
+          </button>
+        )}
       </div>
     </div>
   )

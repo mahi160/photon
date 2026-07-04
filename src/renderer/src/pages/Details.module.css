@@ -224,7 +224,7 @@
   outline: none;
 }
 
-.select:focus {
+.select:focus-visible {
   border-color: var(--accent-border);
 }
 

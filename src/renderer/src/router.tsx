@@ -1,4 +1,5 @@
 import {
+  createHashHistory,
   createRootRoute,
   createRoute,
   createRouter,
@@ -111,7 +112,15 @@ const routeTree = rootRoute.addChildren([
   ])
 ])
 
-export const router = createRouter({ routeTree, defaultPreload: 'intent' })
+// hash history: the packaged app loads index.html via file://, where
+// window.location.pathname is the absolute disk path, not '/' — browser
+// history (the default) tries to match that as a route and fails with a
+// blank "Not Found" screen. Hash history ignores the file:// path entirely.
+export const router = createRouter({
+  routeTree,
+  defaultPreload: 'intent',
+  history: createHashHistory()
+})
 
 declare module '@tanstack/react-router' {
   interface Register {
