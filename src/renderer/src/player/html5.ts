@@ -5,10 +5,12 @@ type Listeners = { [K in keyof EngineEvents]: Set<EngineEvents[K]> }
 
 export class Html5Engine implements PlaybackEngine {
   private hls: Hls | null = null
+  private hlsRecoveries = 0 // fatal-error recovery attempts for the current load
   private delay = 0 // desired subtitle shift, seconds
   // shift actually applied to each track's cues — tracks load cues lazily and
   // keep them across mode changes, so the applied amount is tracked per track
   private appliedDelay = new WeakMap<TextTrack, number>()
+  private blobUrls: string[] = [] // revoke on reload/destroy
   private abort = new AbortController()
   private listeners: Listeners = {
     time: new Set(),
@@ -19,9 +21,11 @@ export class Html5Engine implements PlaybackEngine {
   }
 
   constructor(private video: HTMLVideoElement) {
-    // external VTT tracks are cross-origin (Jellyfin server) — without this the
-    // browser silently refuses to fetch/render them
-    video.crossOrigin = 'anonymous'
+    // no crossOrigin here: it would force CORS on the main stream fetch too,
+    // and most self-hosted servers/reverse proxies don't send CORS headers on
+    // the streaming routes (jellyfin-web never hits this because it's
+    // same-origin). <video src> plays cross-origin fine without it — text
+    // tracks are fetched separately via main (see load()) to dodge CORS there.
     const signal = this.abort.signal
     video.addEventListener('timeupdate', this.onTime, { signal })
     video.addEventListener('play', this.onPlay, { signal })
@@ -56,21 +60,53 @@ export class Html5Engine implements PlaybackEngine {
     this.delay = 0
     this.appliedDelay = new WeakMap()
 
-    // remove previous <track> elements
+    // remove previous <track> elements and their blob urls
     for (const el of Array.from(this.video.querySelectorAll('track'))) el.remove()
+    for (const u of this.blobUrls) URL.revokeObjectURL(u)
+    this.blobUrls = []
 
+    // drop whatever the video element was previously doing (plain src or a
+    // prior hls.js MSE blob) before switching modes — otherwise the old
+    // request keeps retrying in the background after this reload (harmless,
+    // but noisy in devtools/network logs)
+    this.video.removeAttribute('src')
     if (req.hls && Hls.isSupported()) {
-      this.hls = new Hls()
-      this.hls.on(Hls.Events.ERROR, (_e, data) => {
-        if (data.fatal) {
-          console.error('[playback] hls fatal error', data)
-          this.emit('error', 'Playback failed.')
-        } else {
-          console.warn('[playback] hls error', data)
+      this.hlsRecoveries = 0
+      // Jellyfin produces HLS segments on demand: a request for a segment the
+      // transcoder hasn't encoded yet blocks until it exists. Slow transcodes
+      // (10-bit HEVC → h264 + subtitle burn-in) need far more than the 20s
+      // default before that's a real failure — jellyfin-web uses 120s too.
+      const hls = new Hls({
+        fragLoadPolicy: {
+          default: {
+            maxTimeToFirstByteMs: 120_000,
+            maxLoadTimeMs: 120_000,
+            timeoutRetry: { maxNumRetry: 4, retryDelayMs: 1000, maxRetryDelayMs: 8000 },
+            errorRetry: { maxNumRetry: 6, retryDelayMs: 1000, maxRetryDelayMs: 8000 }
+          }
         }
       })
-      this.hls.loadSource(req.url)
-      this.hls.attachMedia(this.video)
+      this.hls = hls
+      hls.on(Hls.Events.ERROR, (_e, data) => {
+        if (!data.fatal) {
+          console.warn('[playback] hls error', data)
+          return
+        }
+        // transient segment/decode hiccups are common mid-transcode — try the
+        // standard hls.js recovery before surfacing a hard failure
+        if (this.hlsRecoveries < 3) {
+          this.hlsRecoveries++
+          console.warn('[playback] hls fatal error, recovering', data)
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad()
+          else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError()
+          else this.emit('error', 'Playback failed.')
+          return
+        }
+        console.error('[playback] hls fatal error', data)
+        this.emit('error', 'Playback failed.')
+      })
+      hls.loadSource(req.url)
+      hls.attachMedia(this.video)
     } else {
       this.video.src = req.url
     }
@@ -80,11 +116,20 @@ export class Html5Engine implements PlaybackEngine {
       track.kind = 'subtitles'
       track.label = t.label
       if (t.language) track.srclang = t.language
-      track.src = t.url
       track.dataset.jfIndex = String(t.index)
       // cues arrive after the VTT fetch — sync the delay once they exist
       track.addEventListener('load', () => this.syncDelay(track.track))
       this.video.appendChild(track)
+      // fetched via main (not track.src = t.url directly) so a server/proxy
+      // missing CORS headers only breaks this subtitle, not the whole video
+      window.api
+        .fetchSubtitle(t.url)
+        .then((vtt) => {
+          const blobUrl = URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }))
+          this.blobUrls.push(blobUrl)
+          track.src = blobUrl
+        })
+        .catch((e) => console.error('[playback] subtitle fetch failed', t.label, e))
     }
 
     if (req.startSeconds > 0) this.video.currentTime = req.startSeconds
@@ -168,6 +213,8 @@ export class Html5Engine implements PlaybackEngine {
   destroy(): void {
     this.hls?.destroy()
     this.abort.abort()
+    for (const u of this.blobUrls) URL.revokeObjectURL(u)
+    this.blobUrls = []
     this.video.removeAttribute('src')
     this.video.load()
   }

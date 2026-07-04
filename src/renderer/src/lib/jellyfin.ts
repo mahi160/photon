@@ -110,6 +110,7 @@ export interface MediaStream {
   Language?: string
   DisplayTitle?: string
   IsTextSubtitleStream?: boolean
+  IsDefault?: boolean // container disposition flag — what the browser plays in direct play
   DeliveryMethod?: string
   DeliveryUrl?: string
   IsExternal?: boolean

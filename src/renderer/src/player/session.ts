@@ -34,12 +34,35 @@ interface PlaybackInfoResponse {
   PlaySessionId: string
 }
 
+// Why the requested tracks can't ride on the original file:
+// - burnIn: a non-text subtitle only exists in the server's transcoded output
+// - audioSwitch: in direct play the browser always plays the container's
+//   default audio track — another track needs a server remux/transcode
+// (exported for tests)
+export function transcodeNeeds(
+  streams: MediaStream[],
+  opts: { audioStreamIndex?: number; subtitleStreamIndex?: number }
+): { burnIn: boolean; audioSwitch: boolean } {
+  const requestedSubtitle = streams.find(
+    (st) => st.Type === 'Subtitle' && st.Index === opts.subtitleStreamIndex
+  )
+  const audioStreams = streams.filter((st) => st.Type === 'Audio')
+  const containerDefaultAudio = audioStreams.find((st) => st.IsDefault) ?? audioStreams[0]
+  return {
+    burnIn: !!requestedSubtitle && requestedSubtitle.DeliveryMethod !== 'External',
+    audioSwitch:
+      opts.audioStreamIndex !== undefined &&
+      containerDefaultAudio !== undefined &&
+      opts.audioStreamIndex !== containerDefaultAudio.Index
+  }
+}
+
 export async function startPlayback(
   item: BaseItem,
   opts: {
     startSeconds?: number
     audioStreamIndex?: number
-    subtitleStreamIndex?: number // burn-in selection only
+    subtitleStreamIndex?: number // stream index, or -1 for explicitly off
     maxBitrate?: number
   } = {}
 ): Promise<PlaybackSession> {
@@ -48,37 +71,48 @@ export async function startPlayback(
 
   const startSeconds = opts.startSeconds ?? ticksToSeconds(item.UserData?.PlaybackPositionTicks)
 
-  const info = await jf<PlaybackInfoResponse>(`/Items/${item.Id}/PlaybackInfo`, {
-    method: 'POST',
-    query: {
-      UserId: s.userId,
-      StartTimeIndex: 0,
-      AutoOpenLiveStream: false,
-      ...(opts.audioStreamIndex !== undefined ? { AudioStreamIndex: opts.audioStreamIndex } : {}),
-      ...(opts.subtitleStreamIndex !== undefined
-        ? { SubtitleStreamIndex: opts.subtitleStreamIndex }
-        : {})
-    },
-    body: {
-      DeviceProfile: buildDeviceProfile(opts.maxBitrate || AUTO_BITRATE),
-      StartTimeTicks: secondsToTicks(startSeconds)
-    }
-  })
+  const fetchInfo = (disableDirect: boolean): Promise<PlaybackInfoResponse> =>
+    jf<PlaybackInfoResponse>(`/Items/${item.Id}/PlaybackInfo`, {
+      method: 'POST',
+      query: {
+        UserId: s.userId,
+        AutoOpenLiveStream: false,
+        ...(opts.audioStreamIndex !== undefined ? { AudioStreamIndex: opts.audioStreamIndex } : {}),
+        ...(opts.subtitleStreamIndex !== undefined
+          ? { SubtitleStreamIndex: opts.subtitleStreamIndex }
+          : {})
+      },
+      body: {
+        DeviceProfile: buildDeviceProfile(opts.maxBitrate || AUTO_BITRATE),
+        StartTimeTicks: secondsToTicks(startSeconds),
+        ...(disableDirect ? { EnableDirectPlay: false, EnableDirectStream: false } : {})
+      }
+    })
 
-  const ms = info.MediaSources?.[0]
+  let info = await fetchInfo(false)
+  let ms = info.MediaSources?.[0]
   if (!ms) throw new Error('Playback failed.')
+
+  let needs = transcodeNeeds(ms.MediaStreams ?? [], opts)
+  let requiresTranscode = needs.burnIn || needs.audioSwitch
+  // the server doesn't know an audio switch rules out direct play (it's a
+  // browser limitation) — ask again with direct play disabled to get a
+  // transcode url. ponytail: one extra round-trip only on this path.
+  if (requiresTranscode && !ms.TranscodingUrl) {
+    info = await fetchInfo(true)
+    ms = info.MediaSources?.[0]
+    if (!ms) throw new Error('Playback failed.')
+    needs = transcodeNeeds(ms.MediaStreams ?? [], opts)
+    requiresTranscode = needs.burnIn || needs.audioSwitch
+  }
 
   const streams = ms.MediaStreams ?? []
   const subtitleStreams = streams.filter((st) => st.Type === 'Subtitle')
-  // a burn-in subtitle only exists in the server's transcoded output — direct
-  // play/stream serves the original file and would silently drop it
-  const requestedSubtitle = subtitleStreams.find((st) => st.Index === opts.subtitleStreamIndex)
-  const requiresBurnIn = !!requestedSubtitle && requestedSubtitle.DeliveryMethod !== 'External'
 
   let url: string
   let hls = false
   let playMethod: 'DirectPlay' | 'Transcode' = 'Transcode'
-  if (!requiresBurnIn && (ms.SupportsDirectPlay || ms.SupportsDirectStream)) {
+  if (!requiresTranscode && (ms.SupportsDirectPlay || ms.SupportsDirectStream)) {
     url = directStreamUrl(item.Id, ms.Id)
     playMethod = 'DirectPlay'
   } else if (ms.TranscodingUrl) {
@@ -87,6 +121,14 @@ export async function startPlayback(
   } else {
     throw new Error('Playback failed.')
   }
+  // ponytail: cheap visibility into what the server was asked to burn in —
+  // check this before assuming a client-side bug when subtitles don't show
+  // console.log, not .debug — Chromium DevTools hides Verbose-level logs by default
+  if (needs.burnIn)
+    console.log('[playback] burn-in requested', {
+      url,
+      subtitleStreamIndex: opts.subtitleStreamIndex
+    })
   const textTracks: TextTrackSource[] = subtitleStreams
     .filter((st) => st.DeliveryMethod === 'External' && st.DeliveryUrl)
     .map((st) => ({

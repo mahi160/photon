@@ -10,7 +10,12 @@ function supported(type: string): boolean {
 
 export function buildDeviceProfile(maxBitrate: number): object {
   const h264 = 'h264'
-  const videoCodecs = [h264, 'vp9', 'av1']
+  const videoCodecs = [h264]
+  // gate every non-h264 codec the same way — an unchecked codec here claims
+  // direct-play support this Electron's Chromium may not actually decode,
+  // and the server has no way to know that (it just trusts the profile)
+  if (supported('video/webm; codecs="vp9"')) videoCodecs.push('vp9')
+  if (supported('video/mp4; codecs="av01.0.05M.08"')) videoCodecs.push('av1')
   if (supported('video/mp4; codecs="hvc1.1.6.L93.B0"')) videoCodecs.push('hevc')
 
   return {
@@ -40,8 +45,10 @@ export function buildDeviceProfile(maxBitrate: number): object {
       }
     ],
     SubtitleProfiles: [
+      // vtt only: Chromium <track> renders WebVTT exclusively — declaring srt here
+      // makes the server hand out raw .srt the browser silently drops. The server
+      // converts srt (and other text formats) to vtt when only vtt is listed.
       { Format: 'vtt', Method: 'External' },
-      { Format: 'srt', Method: 'External' },
       // anything not deliverable as text gets burned in by the server
       { Format: 'pgssub', Method: 'Encode' },
       { Format: 'dvdsub', Method: 'Encode' },

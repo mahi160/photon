@@ -101,20 +101,39 @@ export function usePlayback(
         })
         reportStart(sess, sess.startSeconds)
 
-        // subtitle to show: explicit request wins, else preferred language /
-        // server default when subtitles are enabled. Burn-in requests are
-        // already in the video; only text tracks need activating.
+        // subtitle to show: explicit request wins (-1 = explicitly off), else
+        // preferred language / server default when subtitles are enabled.
+        // Burn-in requests are already in the video; only text tracks need
+        // activating.
         let activeTextIndex: number | null = null
         if (opts.subtitleStreamIndex !== undefined) {
-          const explicit = sess.textTracks.find((t) => t.index === opts.subtitleStreamIndex)
+          const explicit =
+            opts.subtitleStreamIndex >= 0
+              ? sess.textTracks.find((t) => t.index === opts.subtitleStreamIndex)
+              : undefined
           activeTextIndex = explicit?.index ?? null
-          setSubtitleIndex(opts.subtitleStreamIndex)
+          setSubtitleIndex(opts.subtitleStreamIndex >= 0 ? opts.subtitleStreamIndex : null)
         } else if (settings.subtitlesEnabled) {
+          const defaultIndex = sess.mediaSource.DefaultSubtitleStreamIndex
           const preferred =
             sess.textTracks.find((t) => t.language === settings.preferredSubtitleLanguage) ??
-            sess.textTracks.find((t) => t.index === sess.mediaSource.DefaultSubtitleStreamIndex)
+            sess.textTracks.find((t) => t.index === defaultIndex)
           activeTextIndex = preferred?.index ?? null
-          setSubtitleIndex(activeTextIndex)
+          if (preferred) {
+            setSubtitleIndex(preferred.index)
+          } else if (
+            sess.playMethod === 'Transcode' &&
+            defaultIndex !== undefined &&
+            defaultIndex >= 0 &&
+            sess.subtitleStreams.some(
+              (st) => st.Index === defaultIndex && st.DeliveryMethod !== 'External'
+            )
+          ) {
+            // server picked a non-text default (PGS/ASS) and burned it in
+            setSubtitleIndex(defaultIndex)
+          } else {
+            setSubtitleIndex(null)
+          }
         } else {
           setSubtitleIndex(null)
         }
@@ -179,15 +198,36 @@ export function usePlayback(
         // no explicit request or remembered preference: prefer English, else
         // whatever track comes first, instead of leaving it to the server
         const defaultAudio =
-          audioStreams.find((s) => s.Language === settings.preferredAudioLanguage) ??
+          audioStreams.find(
+            (s) =>
+              !!settings.preferredAudioLanguage && s.Language === settings.preferredAudioLanguage
+          ) ??
           audioStreams.find((s) => s.Language === 'eng') ??
+          // container default last: matching it keeps direct play possible
+          audioStreams.find((s) => s.IsDefault) ??
           audioStreams[0]
         const audioStreamIndex = params.audio ?? defaultAudio?.Index
         if (audioStreamIndex !== undefined) setAudioIndex(audioStreamIndex)
+        // subtitle preference must be in the *initial* request: PGS/ASS need a
+        // server burn-in, which only happens when the index is sent up front.
+        // -1 keeps the server from burning in its own default when subs are off.
+        let subtitleStreamIndex = params.sub
+        if (subtitleStreamIndex === undefined) {
+          if (settings.subtitlesEnabled) {
+            subtitleStreamIndex = streams.find(
+              (s) =>
+                s.Type === 'Subtitle' &&
+                !!settings.preferredSubtitleLanguage &&
+                s.Language === settings.preferredSubtitleLanguage
+            )?.Index // undefined = let the server pick its default
+          } else {
+            subtitleStreamIndex = -1
+          }
+        }
         return loadFor(playable, {
           startSeconds: params.start,
           audioStreamIndex,
-          subtitleStreamIndex: params.sub
+          subtitleStreamIndex
         })
       })
       .catch((e) => {
@@ -220,10 +260,21 @@ export function usePlayback(
     const sess = sessionRef.current
     if (!sess) return
     const settings = useSettings.getState()
+    // a burned-in sub lives in the video pixels — leaving it (off or to a text
+    // track) requires a reload without the burn-in
+    const burnedIn = subtitleIndex !== null && !isTextTrack(sess, subtitleIndex)
     if (index === null) {
-      engine.setTextTrack(null)
-      setSubtitleIndex(null)
       settings.set({ subtitlesEnabled: false })
+      setSubtitleIndex(null)
+      if (burnedIn) {
+        void loadFor(sess.item, {
+          startSeconds: engine.currentTime(),
+          audioStreamIndex: audioIndex,
+          subtitleStreamIndex: -1
+        })
+      } else {
+        engine.setTextTrack(null)
+      }
       return
     }
     const language = sess.subtitleStreams.find((s) => s.Index === index)?.Language
@@ -231,11 +282,11 @@ export function usePlayback(
       subtitlesEnabled: true,
       ...(language ? { preferredSubtitleLanguage: language } : {})
     })
-    if (isTextTrack(sess, index)) {
+    if (!burnedIn && isTextTrack(sess, index)) {
       engine.setTextTrack(index)
       setSubtitleIndex(index)
     } else {
-      // burn-in: requires a new transcode session at the current position
+      // burn-in (or leaving one): new session at the current position
       setSubtitleIndex(index)
       void loadFor(sess.item, {
         startSeconds: engine.currentTime(),
@@ -252,11 +303,11 @@ export function usePlayback(
     const language = sess.audioStreams.find((s) => s.Index === index)?.Language
     if (language) useSettings.getState().set({ preferredAudioLanguage: language })
     // HTML5 can't switch embedded audio tracks: reload stream with the new
-    // index, keeping the current subtitle selection (text or burn-in)
+    // index, keeping the current subtitle selection (text, burn-in, or off)
     void loadFor(sess.item, {
       startSeconds: engine.currentTime(),
       audioStreamIndex: index,
-      ...(subtitleIndex !== null ? { subtitleStreamIndex: subtitleIndex } : {})
+      subtitleStreamIndex: subtitleIndex ?? -1
     })
   }
 
