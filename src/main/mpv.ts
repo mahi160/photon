@@ -25,10 +25,27 @@ let status: MpvStatus = { running: false, timePos: 0, paused: false }
 
 function findMpv(): string {
   if (process.platform === 'darwin') {
-    // GUI apps on macOS don't inherit the shell PATH
-    for (const p of ['/opt/homebrew/bin/mpv', '/usr/local/bin/mpv']) if (existsSync(p)) return p
+    // GUI apps on macOS don't inherit the shell PATH (homebrew arm/intel, macports)
+    for (const p of ['/opt/homebrew/bin/mpv', '/usr/local/bin/mpv', '/opt/local/bin/mpv'])
+      if (existsSync(p)) return p
   }
   return 'mpv'
+}
+
+// cached availability probe — lets the renderer avoid routing playback to a
+// player that isn't installed (auto mode falls back to the built-in player)
+let mpvAvailable: boolean | null = null
+async function checkMpv(): Promise<boolean> {
+  if (mpvAvailable !== null) return mpvAvailable
+  mpvAvailable = await new Promise<boolean>((resolve) => {
+    const child = spawn(findMpv(), ['--version'], { stdio: 'ignore' })
+    child.once('error', () => resolve(false))
+    child.once('spawn', () => {
+      child.kill()
+      resolve(true)
+    })
+  })
+  return mpvAvailable
 }
 
 function connect(attempt = 0): void {
@@ -84,6 +101,10 @@ export function registerMpv(): void {
           `--start=${opts.start}`,
           `--force-media-title=${opts.title}`,
           '--no-terminal',
+          '--border=no', // no titlebar/chrome — keeps mpv's own OSC for scrubbing
+          // hides the Dock icon and global menu bar so mpv doesn't look like a
+          // second, unrelated app taking over macOS's menu bar
+          ...(process.platform === 'darwin' ? ['--macos-app-activation-policy=accessory'] : []),
           opts.url
         ],
         { stdio: 'ignore' }
@@ -110,6 +131,7 @@ export function registerMpv(): void {
 
   ipcMain.handle('mpv:status', (): MpvStatus => status)
   ipcMain.handle('mpv:stop', () => stop())
+  ipcMain.handle('mpv:check', () => checkMpv())
 
   app.on('will-quit', stop)
 }

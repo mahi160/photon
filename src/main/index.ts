@@ -62,6 +62,15 @@ ipcMain.handle('app:setHwAccel', (_e, enabled: boolean) => {
 
 ipcMain.handle('app:getHwAccel', () => !readPrefs().disableHwAccel)
 
+// Subtitle VTT fetched from main: renderer <track> fetches are subject to
+// CORS (needs Access-Control-Allow-Origin from the user's server/reverse
+// proxy); a Node-side fetch has no such restriction. Text only, small files.
+ipcMain.handle('subtitle:fetch', async (_e, url: string): Promise<string> => {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  return res.text()
+})
+
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1280,

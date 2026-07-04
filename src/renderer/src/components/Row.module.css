@@ -44,6 +44,8 @@
 }
 
 .track {
+  scrollbar-width: none; /* cut-off card at the edge already signals overflow */
+
   overflow-x: auto;
   display: flex;
   gap: 1.25rem;
