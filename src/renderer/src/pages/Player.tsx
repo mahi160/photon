@@ -164,6 +164,7 @@ function WebPlayer(): React.JSX.Element {
               ? `${session.item.SeriesName} · S${session.item.ParentIndexNumber}E${session.item.IndexNumber} · ${session.item.Name}`
               : session.item.Name
           }
+          playMethod={session.playMethod}
           state={engine.state}
           time={engine.time}
           duration={displayDuration}

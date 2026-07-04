@@ -58,6 +58,7 @@ function MenuItem({
 interface Props {
   visible: boolean
   title: string
+  playMethod: 'DirectPlay' | 'Transcode'
   state: 'playing' | 'paused' | 'buffering'
   time: number
   duration: number
@@ -142,6 +143,16 @@ export function PlayerControls(p: Props): React.JSX.Element {
             </svg>
           </button>
           <div className={styles.titleText}>{p.title}</div>
+          <span
+            className={styles.methodBadge}
+            title={
+              p.playMethod === 'DirectPlay'
+                ? 'Playing the original file'
+                : 'Converted by the server'
+            }
+          >
+            {p.playMethod === 'DirectPlay' ? 'Direct' : 'Transcode'}
+          </span>
           {p.state === 'buffering' && <div className={styles.spinner} />}
         </div>
       </div>

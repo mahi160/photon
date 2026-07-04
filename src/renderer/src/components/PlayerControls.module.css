@@ -70,6 +70,18 @@
   text-shadow: 0 1px 8px color-mix(in oklch, black 60%, transparent);
 }
 
+.methodBadge {
+  flex-shrink: 0;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--player-border);
+  background: var(--player-glass);
+  color: var(--player-fg-muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .spinner {
   flex-shrink: 0;
   inline-size: 0.9rem;
