@@ -5,7 +5,11 @@ type Listeners = { [K in keyof EngineEvents]: Set<EngineEvents[K]> }
 
 export class Html5Engine implements PlaybackEngine {
   private hls: Hls | null = null
-  private delay = 0 // applied cumulative subtitle shift, seconds
+  private delay = 0 // desired subtitle shift, seconds
+  // shift actually applied to each track's cues — tracks load cues lazily and
+  // keep them across mode changes, so the applied amount is tracked per track
+  private appliedDelay = new WeakMap<TextTrack, number>()
+  private abort = new AbortController()
   private listeners: Listeners = {
     time: new Set(),
     state: new Set(),
@@ -18,15 +22,16 @@ export class Html5Engine implements PlaybackEngine {
     // external VTT tracks are cross-origin (Jellyfin server) — without this the
     // browser silently refuses to fetch/render them
     video.crossOrigin = 'anonymous'
-    video.addEventListener('timeupdate', this.onTime)
-    video.addEventListener('play', this.onPlay)
-    video.addEventListener('playing', this.onPlay)
-    video.addEventListener('pause', this.onPause)
-    video.addEventListener('waiting', this.onWaiting)
-    video.addEventListener('ended', this.onEnded)
-    video.addEventListener('error', this.onError)
-    video.addEventListener('enterpictureinpicture', this.onPipEnter)
-    video.addEventListener('leavepictureinpicture', this.onPipLeave)
+    const signal = this.abort.signal
+    video.addEventListener('timeupdate', this.onTime, { signal })
+    video.addEventListener('play', this.onPlay, { signal })
+    video.addEventListener('playing', this.onPlay, { signal })
+    video.addEventListener('pause', this.onPause, { signal })
+    video.addEventListener('waiting', this.onWaiting, { signal })
+    video.addEventListener('ended', this.onEnded, { signal })
+    video.addEventListener('error', this.onError, { signal })
+    video.addEventListener('enterpictureinpicture', this.onPipEnter, { signal })
+    video.addEventListener('leavepictureinpicture', this.onPipLeave, { signal })
   }
 
   private emit<K extends keyof EngineEvents>(event: K, ...args: Parameters<EngineEvents[K]>): void {
@@ -46,6 +51,7 @@ export class Html5Engine implements PlaybackEngine {
     this.hls?.destroy()
     this.hls = null
     this.delay = 0
+    this.appliedDelay = new WeakMap()
 
     // remove previous <track> elements
     for (const el of Array.from(this.video.querySelectorAll('track'))) el.remove()
@@ -68,6 +74,8 @@ export class Html5Engine implements PlaybackEngine {
       if (t.language) track.srclang = t.language
       track.src = t.url
       track.dataset.jfIndex = String(t.index)
+      // cues arrive after the VTT fetch — sync the delay once they exist
+      track.addEventListener('load', () => this.syncDelay(track.track))
       this.video.appendChild(track)
     }
 
@@ -104,22 +112,28 @@ export class Html5Engine implements PlaybackEngine {
   setTextTrack(index: number | null): void {
     const tracks = Array.from(this.video.querySelectorAll('track'))
     for (const el of tracks) {
-      const mode = index !== null && el.dataset.jfIndex === String(index) ? 'showing' : 'disabled'
-      if (el.track) el.track.mode = mode
+      if (!el.track) continue
+      const active = index !== null && el.dataset.jfIndex === String(index)
+      el.track.mode = active ? 'showing' : 'disabled'
+      if (active) this.syncDelay(el.track)
     }
   }
 
   setSubtitleDelay(seconds: number): void {
-    const shift = seconds - this.delay
-    if (shift === 0) return
     this.delay = seconds
-    for (const track of Array.from(this.video.textTracks)) {
-      if (!track.cues) continue
-      for (const cue of Array.from(track.cues)) {
-        cue.startTime += shift
-        cue.endTime += shift
-      }
+    for (const track of Array.from(this.video.textTracks)) this.syncDelay(track)
+  }
+
+  // shift a track's cues to match the desired delay; no-op until cues are loaded
+  private syncDelay(track: TextTrack): void {
+    if (!track.cues) return
+    const shift = this.delay - (this.appliedDelay.get(track) ?? 0)
+    if (shift === 0) return
+    for (const cue of Array.from(track.cues)) {
+      cue.startTime += shift
+      cue.endTime += shift
     }
+    this.appliedDelay.set(track, this.delay)
   }
 
   async enterPiP(): Promise<void> {
@@ -145,15 +159,7 @@ export class Html5Engine implements PlaybackEngine {
 
   destroy(): void {
     this.hls?.destroy()
-    this.video.removeEventListener('timeupdate', this.onTime)
-    this.video.removeEventListener('play', this.onPlay)
-    this.video.removeEventListener('playing', this.onPlay)
-    this.video.removeEventListener('pause', this.onPause)
-    this.video.removeEventListener('waiting', this.onWaiting)
-    this.video.removeEventListener('ended', this.onEnded)
-    this.video.removeEventListener('error', this.onError)
-    this.video.removeEventListener('enterpictureinpicture', this.onPipEnter)
-    this.video.removeEventListener('leavepictureinpicture', this.onPipLeave)
+    this.abort.abort()
     this.video.removeAttribute('src')
     this.video.load()
   }

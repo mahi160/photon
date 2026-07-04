@@ -1,6 +1,9 @@
 // Accurate Chromium DeviceProfile — the server decides direct-play/remux/transcode
 // and the user never sees which (PRD: API Usage).
 
+// bitrate sent when the user picks "Auto" (settings.maxBitrate = 0)
+export const AUTO_BITRATE = 140_000_000
+
 function supported(type: string): boolean {
   return typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(type)
 }
@@ -14,7 +17,9 @@ export function buildDeviceProfile(maxBitrate: number): object {
     MaxStreamingBitrate: maxBitrate,
     DirectPlayProfiles: [
       {
-        Container: 'mp4,m4v',
+        // mkv: Chromium demuxes Matroska — codec lists below still gate it,
+        // so DTS/TrueHD audio etc. correctly falls back to remux/transcode
+        Container: 'mp4,m4v,mkv',
         Type: 'Video',
         VideoCodec: videoCodecs.join(','),
         AudioCodec: 'aac,mp3,opus,flac'

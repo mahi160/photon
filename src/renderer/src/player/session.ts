@@ -1,5 +1,6 @@
 import {
   currentSession,
+  directStreamUrl,
   jf,
   secondsToTicks,
   ticksToSeconds,
@@ -7,8 +8,7 @@ import {
   type MediaSource,
   type MediaStream
 } from '../lib/jellyfin'
-import { buildDeviceProfile } from './deviceProfile'
-import { AUTO_BITRATE } from '../stores/settings'
+import { AUTO_BITRATE, buildDeviceProfile } from './deviceProfile'
 import type { TextTrackSource } from './engine'
 
 export interface PlaybackSession {
@@ -22,6 +22,11 @@ export interface PlaybackSession {
   audioStreams: MediaStream[]
   subtitleStreams: MediaStream[] // all subs incl. burn-in candidates
   startSeconds: number
+}
+
+// whether a stream index is deliverable as a text track (vs. burned in)
+export function isTextTrack(sess: PlaybackSession, index: number): boolean {
+  return sess.textTracks.some((t) => t.index === index)
 }
 
 interface PlaybackInfoResponse {
@@ -67,7 +72,7 @@ export async function startPlayback(
   let hls = false
   let playMethod: 'DirectPlay' | 'Transcode' = 'Transcode'
   if (ms.SupportsDirectPlay || ms.SupportsDirectStream) {
-    url = `${s.server}/Videos/${item.Id}/stream?static=true&mediaSourceId=${ms.Id}&api_key=${s.token}`
+    url = directStreamUrl(item.Id, ms.Id)
     playMethod = 'DirectPlay'
   } else if (ms.TranscodingUrl) {
     url = s.server + ms.TranscodingUrl
