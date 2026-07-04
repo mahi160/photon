@@ -161,6 +161,12 @@ function SubtitleColorSwatches({
   )
 }
 
+const playerModes = [
+  { value: 'web', label: 'Built-in' },
+  { value: 'auto', label: 'Built-in · mpv when transcoding' },
+  { value: 'mpv', label: 'Always mpv' }
+] as const
+
 const bitrates = [
   { value: 0, label: 'Auto' },
   { value: 20_000_000, label: '20 Mbps' },
@@ -238,12 +244,21 @@ export function Settings(): React.JSX.Element {
             }}
           />
         </Row>
-        <Row label="Use mpv" hint="Play in an external mpv window (requires mpv installed)">
-          <Toggle
-            label="Use mpv"
-            checked={settings.useMpv}
-            onChange={(v) => settings.set({ useMpv: v })}
-          />
+        <Row label="Player" hint="mpv plays in its own window, avoids transcoding (requires mpv)">
+          <select
+            className={styles.select}
+            value={settings.playerMode}
+            onChange={(e) =>
+              settings.set({ playerMode: e.target.value as (typeof playerModes)[number]['value'] })
+            }
+            aria-label="Player"
+          >
+            {playerModes.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
         </Row>
         <Row label="Autoplay next episode">
           <Toggle

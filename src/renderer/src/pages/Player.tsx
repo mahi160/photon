@@ -3,7 +3,8 @@ import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { itemQuery } from '../lib/queries'
 import { ticksToSeconds } from '../lib/jellyfin'
-import { usePlayback, type StartParams } from '../player/usePlayback'
+import { resolvePlayable, usePlayback, type StartParams } from '../player/usePlayback'
+import { startPlayback } from '../player/session'
 import { useSettings } from '../stores/settings'
 import { PlayerControls } from '../components/PlayerControls'
 import { SubtitleStyleTag } from '../components/SubtitleStyleTag'
@@ -12,8 +13,57 @@ import { MpvPlayer } from './MpvPlayer'
 import styles from './Player.module.css'
 
 export function Player(): React.JSX.Element {
-  const useMpv = useSettings((s) => s.useMpv)
-  return useMpv ? <MpvPlayer /> : <WebPlayer />
+  const mode = useSettings((s) => s.playerMode)
+  if (mode === 'mpv') return <MpvPlayer />
+  if (mode === 'auto') return <AutoPlayer />
+  return <WebPlayer />
+}
+
+// Probes the server once: direct play stays in the built-in player, anything
+// that would transcode is handed to mpv (which plays the original file).
+// ponytail: decided at play start only — a mid-session reload that flips to
+// transcoding (e.g. an audio switch) stays in the built-in player.
+function AutoPlayer(): React.JSX.Element {
+  const { itemId } = useParams({ from: '/app/player/$itemId' })
+  const search = useSearch({ strict: false }) as StartParams
+  const navigate = useNavigate()
+  const item = useQuery(itemQuery(itemId))
+  const [choice, setChoice] = useState<'web' | 'mpv' | null>(null)
+  const [failed, setFailed] = useState(false)
+  const probedFor = useRef<string | null>(null)
+
+  useEffect(() => {
+    const it = item.data
+    if (!it || probedFor.current === it.Id) return
+    probedFor.current = it.Id
+    const settings = useSettings.getState()
+    resolvePlayable(it)
+      .then((playable) =>
+        startPlayback(playable, {
+          startSeconds: search.start,
+          audioStreamIndex: search.audio,
+          subtitleStreamIndex: search.sub,
+          maxBitrate: settings.maxBitrate || undefined
+        })
+      )
+      .then((sess) => setChoice(sess.playMethod === 'DirectPlay' ? 'web' : 'mpv'))
+      .catch(() => setFailed(true))
+  }, [item.data, search.start, search.audio, search.sub])
+
+  if (choice === 'web') return <WebPlayer />
+  if (choice === 'mpv') return <MpvPlayer />
+  return (
+    <div className={styles.stage}>
+      {failed && (
+        <div className={styles.errorLayer}>
+          <p className={styles.errorText}>Playback failed.</p>
+          <button onClick={() => navigate({ to: '/' })} className={styles.errorBack}>
+            Back to Home
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function WebPlayer(): React.JSX.Element {

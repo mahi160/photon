@@ -1,6 +1,11 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
+// web = built-in player (server transcodes when needed)
+// auto = built-in for direct play, mpv when transcoding would be needed
+// mpv = always play in the external mpv window
+export type PlayerMode = 'web' | 'auto' | 'mpv'
+
 export interface SubtitleStyle {
   fontSize: number // percent, 100 = default
   color: string
@@ -13,7 +18,7 @@ export interface SubtitleStyle {
 interface SettingsState {
   // playback
   maxBitrate: number // bits/sec, 0 = auto (very high)
-  useMpv: boolean // play in an external mpv window instead of the built-in player
+  playerMode: PlayerMode
   autoplayNext: boolean
   rememberSpeed: boolean
   lastSpeed: number
@@ -33,7 +38,7 @@ export const useSettings = create<SettingsState>()(
   persist(
     (set) => ({
       maxBitrate: 0,
-      useMpv: false,
+      playerMode: 'web',
       autoplayNext: true,
       rememberSpeed: false,
       lastSpeed: 1,
