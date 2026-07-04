@@ -3,7 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSession } from '../stores/session'
 import { useSettings } from '../stores/settings'
-import { colorSchemes, schemePrimitives, type ColorScheme } from '../lib/colorSchemes'
+import { colorSchemes } from '../lib/colorSchemes'
 import { resolvedDark } from '../lib/theme'
 import styles from './Settings.module.css'
 
@@ -92,41 +92,45 @@ function ColorSchemeSlabs(): React.JSX.Element {
   const scheme = useSettings((s) => s.colorScheme)
   const theme = useSettings((s) => s.theme)
   const set = useSettings((s) => s.set)
-  const dark = resolvedDark(theme)
+  const themeAttr = resolvedDark(theme) ? 'dark' : 'light'
   return (
     <div className={styles.schemeGrid}>
-      {colorSchemes.map((s) => {
-        const p = schemePrimitives[s.key][dark ? 'dark' : 'light']
-        return (
-          <button
-            key={s.key}
-            className={`${styles.schemeSlab} ${scheme === s.key ? styles.schemeSlabActive : ''}`}
-            style={{ background: p.bg, color: p.fg }}
-            onClick={() => set({ colorScheme: s.key })}
-          >
-            <span className={styles.schemeDots}>
-              <i style={{ background: p.accent }} />
-              <i style={{ background: p.accent2 }} />
-              <i style={{ background: p.accent3 }} />
-              <i style={{ background: p.accent4 }} />
-            </span>
-            <span className={styles.schemeLabel}>{s.label}</span>
-          </button>
-        )
-      })}
+      {colorSchemes.map((s) => (
+        // data-scheme/data-theme on the slab itself: the tokens.css cascade
+        // hands each slab its own scheme's variables — no duplicated palette data
+        <button
+          key={s.key}
+          data-scheme={s.key}
+          data-theme={themeAttr}
+          className={`${styles.schemeSlab} ${scheme === s.key ? styles.schemeSlabActive : ''}`}
+          style={{ background: 'var(--bg)', color: 'var(--fg)' }}
+          onClick={() => set({ colorScheme: s.key })}
+        >
+          <span className={styles.schemeDots}>
+            <i style={{ background: 'var(--accent)' }} />
+            <i style={{ background: 'var(--accent-2)' }} />
+            <i style={{ background: 'var(--accent-3)' }} />
+            <i style={{ background: 'var(--accent-4)' }} />
+          </span>
+          <span className={styles.schemeLabel}>{s.label}</span>
+        </button>
+      ))}
     </div>
   )
 }
 
-function subtitleSwatches(scheme: ColorScheme, dark: boolean): { label: string; value: string }[] {
-  const p = schemePrimitives[scheme][dark ? 'dark' : 'light']
+// the persisted subtitle color must be a concrete hex (it feeds video::cue),
+// so accent swatches resolve the active scheme's CSS variables at render time
+function subtitleSwatches(): { label: string; value: string }[] {
+  const root = getComputedStyle(document.documentElement)
+  const accent = (name: string): string => root.getPropertyValue(name).trim()
   return [
     { label: 'White', value: '#ffffff' },
     { label: 'Yellow', value: '#f6e05e' },
-    { label: 'Accent', value: p.accent },
-    { label: 'Accent 2', value: p.accent2 },
-    { label: 'Accent 3', value: p.accent3 },
-    { label: 'Accent 4', value: p.accent4 }
+    { label: 'Accent', value: accent('--accent') },
+    { label: 'Accent 2', value: accent('--accent-2') },
+    { label: 'Accent 3', value: accent('--accent-3') },
+    { label: 'Accent 4', value: accent('--accent-4') }
   ]
 }
 
@@ -137,9 +141,10 @@ function SubtitleColorSwatches({
   value: string
   onChange: (v: string) => void
 }): React.JSX.Element {
-  const scheme = useSettings((s) => s.colorScheme)
-  const theme = useSettings((s) => s.theme)
-  const swatches = subtitleSwatches(scheme, resolvedDark(theme))
+  // subscribe so swatches re-resolve when scheme or theme changes
+  useSettings((s) => s.colorScheme)
+  useSettings((s) => s.theme)
+  const swatches = subtitleSwatches()
   return (
     <div className={styles.swatchRow}>
       {swatches.map((sw) => (
@@ -231,6 +236,13 @@ export function Settings(): React.JSX.Element {
               setHwAccel(v)
               void window.api.setHwAccel(v)
             }}
+          />
+        </Row>
+        <Row label="Use mpv" hint="Play in an external mpv window (requires mpv installed)">
+          <Toggle
+            label="Use mpv"
+            checked={settings.useMpv}
+            onChange={(v) => settings.set({ useMpv: v })}
           />
         </Row>
         <Row label="Autoplay next episode">
