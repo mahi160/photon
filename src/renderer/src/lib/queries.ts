@@ -21,6 +21,15 @@ export const resumeItemsQuery = queryOptions({
     }).then((r) => r.Items)
 })
 
+// next episodes across all in-progress shows (home row)
+export const nextUpItemsQuery = queryOptions({
+  queryKey: ['nextUp', 'all'],
+  queryFn: () =>
+    jf<ItemsResult>('/Shows/NextUp', {
+      query: { userId: userId(), Limit: 12 }
+    }).then((r) => r.Items)
+})
+
 export const latestMoviesQuery = queryOptions({
   queryKey: ['latest', 'movies'],
   queryFn: () =>
