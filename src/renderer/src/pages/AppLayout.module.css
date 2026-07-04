@@ -6,23 +6,26 @@
 
 .header {
   display: flex;
-  align-items: center;
-  gap: 0.25rem;
   flex-shrink: 0;
+  gap: 0.25rem;
+  align-items: center;
+
   padding-block: 0.6rem;
   padding-inline: 1.25rem;
   border-block-end: 1px solid var(--border);
+
   background: var(--glass);
   backdrop-filter: blur(20px);
 }
 
 .brand {
+  margin-inline-end: 1.5rem;
+
   font-family: var(--font-display);
-  font-style: italic;
   font-size: 1.375rem;
   font-weight: 600;
+  font-style: italic;
   letter-spacing: -0.01em;
-  margin-inline-end: 1.5rem;
 }
 
 .brand::first-letter {
@@ -31,28 +34,31 @@
 
 .nav {
   display: flex;
-  align-items: center;
   gap: 0.25rem;
+  align-items: center;
 }
 
 .navLink {
   display: flex;
-  align-items: center;
   gap: 0.45rem;
+  align-items: center;
+
   padding-block: 0.45rem;
   padding-inline: 0.75rem;
   border-radius: var(--radius-s);
+
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--fg-muted);
+
   transition:
     color var(--dur-fast) var(--ease),
     background-color var(--dur-fast) var(--ease);
 }
 
 .navLink:hover {
-  background: var(--surface-1);
   color: var(--fg);
+  background: var(--surface-1);
 }
 
 .navLink:global([data-status='active']) {
@@ -71,16 +77,20 @@
 
 .searchPill {
   display: flex;
-  align-items: center;
   gap: 0.5rem;
+  align-items: center;
+
   inline-size: 12rem;
   padding-block: 0.4rem;
   padding-inline: 0.75rem;
-  border-radius: var(--radius-s);
   border: 1px solid var(--border);
-  background: var(--surface-1);
-  color: var(--fg-faint);
+  border-radius: var(--radius-s);
+
   font-size: 0.825rem;
+  color: var(--fg-faint);
+
+  background: var(--surface-1);
+
   transition:
     border-color var(--dur-fast) var(--ease),
     color var(--dur-fast) var(--ease);
@@ -92,9 +102,9 @@
 }
 
 .searchPillIcon {
+  flex-shrink: 0;
   inline-size: 0.9rem;
   block-size: 0.9rem;
-  flex-shrink: 0;
 }
 
 .searchPillLabel {
@@ -103,11 +113,12 @@
 }
 
 .searchKbd {
-  font-family: var(--font-body);
-  font-size: 0.7rem;
+  padding-inline: 0.35rem;
   border: 1px solid var(--border);
   border-radius: 0.25rem;
-  padding-inline: 0.35rem;
+
+  font-family: var(--font-body);
+  font-size: 0.7rem;
   line-height: 1.4;
   color: var(--fg-faint);
 }
@@ -115,18 +126,21 @@
 .iconBtn {
   display: grid;
   place-items: center;
+
   inline-size: 2.25rem;
   block-size: 2.25rem;
   border-radius: var(--radius-s);
+
   color: var(--fg-muted);
+
   transition:
     color var(--dur-fast) var(--ease),
     background-color var(--dur-fast) var(--ease);
 }
 
 .iconBtn:hover {
-  background: var(--surface-2);
   color: var(--accent-2);
+  background: var(--surface-2);
 }
 
 .iconBtn:global([data-status='active']) {
@@ -147,7 +161,7 @@
 }
 
 .main {
+  overflow-y: auto;
   flex: 1;
   min-inline-size: 0;
-  overflow-y: auto;
 }

@@ -7,42 +7,53 @@
 /* ---- backdrop hero ---- */
 .hero {
   position: relative;
-  block-size: 18.75rem;
+
+  overflow: hidden;
   display: flex;
   align-items: flex-start;
+
+  block-size: 18.75rem;
   padding: 1.25rem 3rem;
+
   background: var(--surface-1);
-  overflow: hidden;
 }
 
 .heroImg {
   position: absolute;
   inset: 0;
+
   inline-size: 100%;
   block-size: 100%;
+
   object-fit: cover;
 }
 
 .heroScrim {
   position: absolute;
-  inset-inline: 0;
   inset-block-end: 0;
+  inset-inline: 0;
+
   block-size: 70%;
+
   background: linear-gradient(to bottom, transparent, var(--bg));
 }
 
 .back {
   position: relative;
   z-index: 1;
+
   display: flex;
-  align-items: center;
   gap: 0.45rem;
+  align-items: center;
+
   margin-inline-start: -0.65rem;
   padding: 0.4rem 0.65rem;
   border-radius: var(--radius-s);
+
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--fg-muted);
+
   transition:
     color var(--dur-fast) var(--ease),
     background-color var(--dur-fast) var(--ease);
@@ -61,28 +72,31 @@
 /* ---- content ---- */
 .content {
   position: relative;
-  padding: 0 3rem 4rem;
   max-inline-size: 68.75rem;
+  padding: 0 3rem 4rem;
 }
 
 .top {
   position: relative;
   z-index: 1;
+
   display: flex;
   gap: 2.25rem;
+
   margin-block-start: -5.25rem;
 }
 
 .poster {
-  inline-size: 13.25rem;
   flex-shrink: 0;
+  inline-size: 13.25rem;
 }
 
 .posterImg {
-  inline-size: 100%;
   aspect-ratio: 2 / 3;
-  object-fit: cover;
+  inline-size: 100%;
   border-radius: var(--radius-m);
+
+  object-fit: cover;
   box-shadow: var(--shadow-2);
 }
 
@@ -90,36 +104,40 @@
   aspect-ratio: 2 / 3;
   inline-size: 100%;
   border-radius: var(--radius-m);
+
   background: var(--surface-2);
   box-shadow: var(--shadow-2);
 }
 
 .info {
-  padding-block-start: 6.5rem;
-  min-inline-size: 0;
   flex: 1;
+  min-inline-size: 0;
+  padding-block-start: 6.5rem;
 }
 
 .title {
   font-family: var(--font-display);
   font-size: 2.125rem;
   font-weight: 600;
-  letter-spacing: -0.015em;
   line-height: 1.15;
+  letter-spacing: -0.015em;
 }
 
 .meta {
   display: flex;
   flex-wrap: wrap;
   gap: 0.9rem;
+
   margin-block-start: 0.5rem;
+
   font-size: 0.85rem;
   color: var(--fg-muted);
 }
 
 .overview {
-  margin-block-start: 1.25rem;
   max-inline-size: 39rem;
+  margin-block-start: 1.25rem;
+
   font-size: 0.9375rem;
   line-height: 1.65;
   color: var(--fg);
@@ -128,22 +146,26 @@
 
 .actions {
   display: flex;
-  align-items: center;
   gap: 0.75rem;
+  align-items: center;
   margin-block-start: 1.75rem;
 }
 
 .playPrimary {
   display: inline-flex;
-  align-items: center;
   gap: 0.55rem;
+  align-items: center;
+
   padding-block: 0.7rem;
   padding-inline: 1.4rem;
   border-radius: var(--radius-s);
-  background: var(--accent);
-  color: var(--accent-fg);
+
   font-size: 0.9375rem;
   font-weight: 600;
+  color: var(--accent-fg);
+
+  background: var(--accent);
+
   transition: background-color var(--dur-fast) var(--ease);
 }
 
@@ -160,10 +182,13 @@
   padding-block: 0.7rem;
   padding-inline: 1.4rem;
   border-radius: var(--radius-s);
-  background: var(--surface-2);
-  color: var(--fg);
+
   font-size: 0.9375rem;
   font-weight: 600;
+  color: var(--fg);
+
+  background: var(--surface-2);
+
   transition: background-color var(--dur-fast) var(--ease);
 }
 
@@ -184,16 +209,19 @@
 }
 
 .select {
+  overflow: hidden;
+
   max-inline-size: 16rem;
   padding-block: 0.45rem;
   padding-inline: 0.75rem;
-  border-radius: var(--radius-s);
   border: 1px solid var(--border);
-  background: var(--surface-1);
+  border-radius: var(--radius-s);
+
   font-size: 0.825rem;
-  outline: none;
-  overflow: hidden;
   text-overflow: ellipsis;
+
+  background: var(--surface-1);
+  outline: none;
 }
 
 .select:focus {
@@ -207,17 +235,18 @@
 
 .epHead {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
   gap: 0.5rem;
+  align-items: center;
+
   margin-block-end: 0.9rem;
 }
 
 .epHeadTitle {
+  margin-inline-end: 0.75rem;
   font-family: var(--font-display);
   font-size: 1.25rem;
   font-weight: 600;
-  margin-inline-end: 0.75rem;
 }
 
 .seasons {
@@ -230,9 +259,11 @@
   padding-block: 0.3rem;
   padding-inline: 0.65rem;
   border-radius: var(--radius-s);
-  color: var(--fg-faint);
+
   font-size: 0.8125rem;
   font-weight: 600;
+  color: var(--fg-faint);
+
   transition:
     background-color var(--dur-fast) var(--ease),
     color var(--dur-fast) var(--ease);
@@ -244,8 +275,8 @@
 
 .seasonBtnActive,
 .seasonBtnActive:hover {
-  background: var(--surface-1);
   color: var(--fg);
+  background: var(--surface-1);
 }
 
 .episodes {
@@ -255,13 +286,16 @@
 
 .episodeRow {
   display: flex;
-  align-items: center;
   gap: 1.15rem;
+  align-items: center;
+
   inline-size: 100%;
-  padding: 0.75rem;
   margin-inline: -0.75rem;
+  padding: 0.75rem;
   border-radius: var(--radius-s);
+
   text-align: start;
+
   transition: background-color var(--dur-fast) var(--ease);
 }
 
@@ -271,11 +305,14 @@
 
 .episodeThumb {
   position: relative;
-  flex-shrink: 0;
-  inline-size: 8rem;
-  aspect-ratio: 16 / 9;
+
   overflow: hidden;
+  flex-shrink: 0;
+
+  aspect-ratio: 16 / 9;
+  inline-size: 8rem;
   border-radius: var(--radius-s);
+
   background: var(--surface-2);
 }
 
@@ -287,9 +324,11 @@
 
 .episodeProgress {
   position: absolute;
-  inset-inline: 0;
   inset-block-end: 0;
+  inset-inline: 0;
+
   block-size: 0.2rem;
+
   background: color-mix(in oklch, black 45%, transparent);
 }
 
@@ -302,12 +341,16 @@
   position: absolute;
   inset-block-start: 0.35rem;
   inset-inline-end: 0.35rem;
+
   display: grid;
   place-items: center;
+
   padding: 0.2rem;
   border-radius: var(--radius-full);
-  background: color-mix(in oklch, black 55%, transparent);
+
   color: var(--accent-3);
+
+  background: color-mix(in oklch, black 55%, transparent);
 }
 
 .watchedBadge svg {
@@ -317,15 +360,17 @@
 
 .episodeNum {
   flex-shrink: 0;
+
   inline-size: 1.5rem;
-  text-align: end;
+
   font-size: 0.8125rem;
   color: var(--fg-faint);
+  text-align: end;
 }
 
 .episodeInfo {
-  min-inline-size: 0;
   flex: 1;
+  min-inline-size: 0;
 }
 
 .episodeTitle {
@@ -335,11 +380,13 @@
 }
 
 .episodeOverview {
-  margin-block-start: 0.25rem;
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+
+  margin-block-start: 0.25rem;
+
   font-size: 0.8125rem;
   line-height: 1.5;
   color: var(--fg-muted);

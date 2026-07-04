@@ -1,35 +1,44 @@
 .page {
   position: relative;
+
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+
   block-size: 100%;
-  overflow: hidden;
 }
 
 .page::before,
 .page::after {
+  pointer-events: none;
   content: '';
+
   position: absolute;
   z-index: 0;
+
   border-radius: var(--radius-full);
+
   filter: blur(80px);
-  pointer-events: none;
 }
 
 .page::before {
   inset-block-start: -12rem;
   inset-inline-start: -8rem;
+
   inline-size: 26rem;
   block-size: 26rem;
+
   background: color-mix(in oklch, var(--accent) 45%, transparent);
 }
 
 .page::after {
   inset-block-end: -14rem;
   inset-inline-end: -10rem;
+
   inline-size: 30rem;
   block-size: 30rem;
+
   background: color-mix(in oklch, var(--accent-2) 40%, transparent);
 }
 
@@ -41,10 +50,11 @@
 
 .brand {
   margin-block-end: 0.35rem;
+
   font-family: var(--font-display);
-  font-style: italic;
   font-size: 2.25rem;
   font-weight: 560;
+  font-style: italic;
 }
 
 .tagline {
@@ -55,7 +65,9 @@
 
 .label {
   display: block;
+
   margin-block-end: 0.35rem;
+
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--fg-muted);
@@ -66,12 +78,15 @@
   margin-block-end: 1rem;
   padding-block: 0.7rem;
   padding-inline: 0.9rem;
-  border-radius: var(--radius-s);
   border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+
+  font-size: 0.875rem;
+
   background: var(--glass);
   backdrop-filter: blur(12px);
-  font-size: 0.875rem;
   outline: none;
+
   transition: border-color var(--dur-fast) var(--ease);
 }
 
@@ -93,10 +108,13 @@
   inline-size: 100%;
   padding-block: 0.75rem;
   border-radius: var(--radius-s);
-  background: var(--accent);
-  color: var(--accent-fg);
+
   font-size: 0.875rem;
   font-weight: 600;
+  color: var(--accent-fg);
+
+  background: var(--accent);
+
   transition:
     background-color var(--dur-fast) var(--ease),
     opacity var(--dur-fast) var(--ease);
@@ -107,6 +125,6 @@
 }
 
 .submit:disabled {
-  opacity: 0.55;
   cursor: default;
+  opacity: 0.55;
 }

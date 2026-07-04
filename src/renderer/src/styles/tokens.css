@@ -4,14 +4,12 @@
    swapping or adding a scheme is a six-line edit. */
 
 :root {
-  --font-display: 'Fraunces Variable', ui-serif, Georgia, serif;
+  --font-display: 'Fraunces Variable', ui-serif, georgia, serif;
   --font-body: 'Hanken Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
-
   --radius-s: 0.5rem;
   --radius-m: 0.875rem;
   --radius-l: 1.5rem;
   --radius-full: 999rem;
-
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --dur-fast: 120ms;
   --dur-med: 220ms;
@@ -20,12 +18,15 @@
 /* accent colors are always chosen light (dark themes) or dark (light
    themes) by each scheme below, so on-accent text only needs two values */
 [data-theme='dark'] {
-  color-scheme: dark;
   --accent-fg: #131318;
+
+  color-scheme: dark;
 }
+
 [data-theme='light'] {
-  color-scheme: light;
   --accent-fg: #fdfaf5;
+
+  color-scheme: light;
 }
 
 /* Rosé Pine / Dawn — rosepinetheme.com/palette (default) */
@@ -39,6 +40,7 @@
   --accent-3: #9ccfd8;
   --accent-4: #f6c177;
 }
+
 [data-theme='light'],
 [data-scheme='rose-pine'][data-theme='light'] {
   --bg: #faf4ed;
@@ -60,6 +62,7 @@
   --accent-3: #83c092;
   --accent-4: #e69875;
 }
+
 [data-scheme='everforest'][data-theme='light'] {
   --bg: #fdf6e3;
   --fg: #5c6a72;
@@ -80,6 +83,7 @@
   --accent-3: #8ec07c;
   --accent-4: #fabd2f;
 }
+
 [data-scheme='gruvbox'][data-theme='light'] {
   --bg: #fbf1c7;
   --fg: #3c3836;
@@ -100,6 +104,7 @@
   --accent-3: #7aa89f;
   --accent-4: #e6c384;
 }
+
 [data-scheme='kanagawa'][data-theme='light'] {
   --bg: #f2ecbc;
   --fg: #545464;
@@ -116,22 +121,16 @@
   --surface-3: color-mix(in oklch, var(--fg) 18%, var(--bg));
   --border-strong: color-mix(in oklch, var(--fg) 30%, var(--bg));
   --border: color-mix(in oklch, var(--border-strong) 60%, transparent);
-
   --fg-faint: color-mix(in oklch, var(--fg-muted) 65%, var(--bg));
-
   --accent-soft: color-mix(in oklch, var(--accent) 16%, transparent);
   --accent-border: color-mix(in oklch, var(--accent) 45%, transparent);
   --accent-hover: color-mix(in oklch, var(--accent) 85%, black);
-
   --accent-2-soft: color-mix(in oklch, var(--accent-2) 18%, transparent);
   --accent-3-soft: color-mix(in oklch, var(--accent-3) 18%, transparent);
-
   --glass: color-mix(in oklch, var(--surface-1) 70%, transparent);
   --glass-strong: color-mix(in oklch, var(--bg) 62%, transparent);
-
   --scrim: color-mix(in oklch, black 60%, transparent);
   --scrim-soft: color-mix(in oklch, black 35%, transparent);
-
   --shadow-1: 0 1px 2px color-mix(in oklch, black 30%, transparent);
   --shadow-2:
     0 8px 24px -8px color-mix(in oklch, black 55%, transparent),

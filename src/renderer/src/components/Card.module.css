@@ -1,6 +1,6 @@
 .card {
-  inline-size: 10rem;
   flex-shrink: 0;
+  inline-size: 10rem;
 }
 
 .card.wide {
@@ -9,13 +9,17 @@
 
 .poster {
   position: relative;
-  display: block;
-  inline-size: 100%;
-  aspect-ratio: 2 / 3;
+
   overflow: hidden;
+  display: block;
+
+  aspect-ratio: 2 / 3;
+  inline-size: 100%;
   border-radius: var(--radius-m);
+
   background: var(--surface-2);
   box-shadow: var(--shadow-1);
+
   transition: box-shadow var(--dur-med) var(--ease);
 }
 
@@ -44,22 +48,27 @@
   display: flex;
   align-items: center;
   justify-content: center;
+
   inline-size: 100%;
   block-size: 100%;
   padding: 0.5rem;
-  text-align: center;
+
   font-size: 0.75rem;
   color: var(--fg-faint);
+  text-align: center;
 }
 
 .playScrim {
   position: absolute;
   inset: 0;
+
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--scrim-soft);
+
   opacity: 0;
+  background: var(--scrim-soft);
+
   transition: opacity var(--dur-fast) var(--ease);
 }
 
@@ -69,14 +78,19 @@
 }
 
 .playButton {
+  transform: scale(0.85);
+
   display: grid;
   place-items: center;
+
   inline-size: 2.75rem;
   block-size: 2.75rem;
   border-radius: var(--radius-full);
-  background: var(--accent);
+
   color: var(--accent-fg);
-  transform: scale(0.85);
+
+  background: var(--accent);
+
   transition: transform var(--dur-fast) var(--ease);
 }
 
@@ -93,9 +107,11 @@
 
 .progress {
   position: absolute;
-  inset-inline: 0;
   inset-block-end: 0;
+  inset-inline: 0;
+
   block-size: 0.2rem;
+
   background: color-mix(in oklch, black 45%, transparent);
 }
 
@@ -105,14 +121,17 @@
 }
 
 .title {
-  display: block;
-  margin-block-start: 0.6rem;
-  inline-size: 100%;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: block;
+
+  inline-size: 100%;
+  margin-block-start: 0.6rem;
+
   font-size: 0.875rem;
   color: var(--fg);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
   transition: color var(--dur-fast) var(--ease);
 }
 
@@ -123,8 +142,9 @@
 
 .subtitle {
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+
   font-size: 0.75rem;
   color: var(--fg-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

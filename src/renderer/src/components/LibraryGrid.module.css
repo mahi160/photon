@@ -4,8 +4,8 @@
 
 .head {
   display: flex;
-  align-items: baseline;
   gap: 1.5rem;
+  align-items: baseline;
   margin-block-end: 2rem;
 }
 
@@ -33,9 +33,11 @@
   padding-block: 0.3rem;
   padding-inline: 0.65rem;
   border-radius: var(--radius-s);
+
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--fg-faint);
+
   transition:
     color var(--dur-fast) var(--ease),
     background-color var(--dur-fast) var(--ease);
@@ -66,6 +68,5 @@
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
-  column-gap: 1.1rem;
-  row-gap: 1.75rem;
+  gap: 1.75rem 1.1rem;
 }

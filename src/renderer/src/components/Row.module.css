@@ -5,6 +5,7 @@
 .heading {
   margin-block-end: 1.1rem;
   padding-inline: 2.5rem;
+
   font-family: var(--font-display);
   font-size: 1.625rem;
   font-weight: 600;
@@ -12,9 +13,11 @@
 
 .headingLink {
   display: inline-flex;
-  align-items: center;
   gap: 0.3rem;
+  align-items: center;
+
   color: var(--fg);
+
   transition: color var(--dur-fast) var(--ease);
 }
 
@@ -23,24 +26,28 @@
 }
 
 .chevron {
+  transform: translateX(-0.2rem);
+
   inline-size: 1rem;
   block-size: 1rem;
+
   opacity: 0;
-  transform: translateX(-0.2rem);
+
   transition:
     opacity var(--dur-fast) var(--ease),
     transform var(--dur-fast) var(--ease);
 }
 
 .headingLink:hover .chevron {
-  opacity: 1;
   transform: translateX(0);
+  opacity: 1;
 }
 
 .track {
+  overflow-x: auto;
   display: flex;
   gap: 1.25rem;
-  overflow-x: auto;
-  padding-inline: 2.5rem;
+
   padding-block-end: 0.5rem;
+  padding-inline: 2.5rem;
 }
