@@ -1,4 +1,3 @@
-# flatpak requires an id with >= 2 periods, so plain "dev.photon" doesn't qualify
 appId: io.github.mahi160.Photon
 productName: Photon
 directories:
@@ -31,11 +30,11 @@ dmg:
   artifactName: ${name}-${version}.${ext}
 linux:
   target:
-    - flatpak
+    - tar.gz
+    - deb
+    - rpm
   maintainer: mahi160
   category: Utility
-flatpak:
-  artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:
   provider: github
