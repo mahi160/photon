@@ -1,5 +1,6 @@
 import {
   currentSession,
+  deviceId,
   directStreamUrl,
   jf,
   secondsToTicks,
@@ -39,6 +40,7 @@ interface PlayOptions {
   audioStreamIndex?: number
   subtitleStreamIndex?: number // stream index, or -1 for explicitly off
   maxBitrate?: number
+  mediaSourceId?: string // pins renegotiation to the source already playing (track switch reloads)
 }
 
 function fetchPlaybackInfo(
@@ -49,19 +51,24 @@ function fetchPlaybackInfo(
 ): Promise<PlaybackInfoResponse> {
   const s = currentSession()
   if (!s) throw new Error('Not signed in')
+  // Everything rides in the body as one PlaybackInfoDto (matches
+  // jellyfin-web's own client). Query-param support on this endpoint is
+  // deprecated and doesn't reliably bind into the same negotiation as the
+  // body fields (EnableDirectPlay etc.) — splitting fields across both
+  // silently dropped SubtitleStreamIndex in testing.
   return jf<PlaybackInfoResponse>(`/Items/${itemId}/PlaybackInfo`, {
     method: 'POST',
-    query: {
+    body: {
       UserId: s.userId,
+      DeviceProfile: buildDeviceProfile(opts.maxBitrate || AUTO_BITRATE),
+      StartTimeTicks: secondsToTicks(startSeconds),
+      IsPlayback: true,
       AutoOpenLiveStream: false,
       ...(opts.audioStreamIndex !== undefined ? { AudioStreamIndex: opts.audioStreamIndex } : {}),
       ...(opts.subtitleStreamIndex !== undefined
         ? { SubtitleStreamIndex: opts.subtitleStreamIndex }
-        : {})
-    },
-    body: {
-      DeviceProfile: buildDeviceProfile(opts.maxBitrate || AUTO_BITRATE),
-      StartTimeTicks: secondsToTicks(startSeconds),
+        : {}),
+      ...(opts.mediaSourceId ? { MediaSourceId: opts.mediaSourceId } : {}),
       ...(disableDirect ? { EnableDirectPlay: false, EnableDirectStream: false } : {})
     }
   })
@@ -158,10 +165,12 @@ export async function startPlayback(
 
   let needs = transcodeNeeds(ms.MediaStreams ?? [], opts)
   let requiresTranscode = needs.burnIn || needs.audioSwitch
-  // the server doesn't know an audio switch rules out direct play (it's a
-  // browser limitation) — ask again with direct play disabled to get a
-  // transcode url. ponytail: one extra round-trip only on this path.
-  if (requiresTranscode && !ms.TranscodingUrl) {
+  // the server doesn't know an audio switch or burn-in rules out direct
+  // play (that's a browser limitation, not a codec one) — ask again with
+  // direct play explicitly disabled once we know transcoding is required,
+  // so the negotiation commits to a TranscodingUrl instead of possibly
+  // still offering a direct-play MediaSource that ignores our request.
+  if (requiresTranscode) {
     info = await fetchInfo(true)
     ms = info.MediaSources?.[0]
     if (!ms) throw new Error('Playback failed.')
@@ -249,5 +258,17 @@ export function reportStopped(sess: PlaybackSession, positionSeconds: number): v
   void jf('/Sessions/Playing/Stopped', {
     method: 'POST',
     body: reportBody(sess, positionSeconds, true)
+  }).catch(() => {})
+}
+
+// /Sessions/Playing/Stopped only updates progress tracking — it doesn't kill
+// the server-side ffmpeg job. Without this, switching audio/subtitles mid-
+// transcode leaves the old encode running and the new stream can still
+// resolve against it (jellyfin-web calls this before every track-switch
+// reload, for the same reason).
+export async function stopActiveEncoding(sess: PlaybackSession): Promise<void> {
+  await jf(`/Videos/ActiveEncodings`, {
+    method: 'DELETE',
+    query: { deviceId: deviceId(), playSessionId: sess.playSessionId }
   }).catch(() => {})
 }
