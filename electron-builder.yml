@@ -19,6 +19,9 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
+  # ad-hoc sign (no paid Apple cert): arm64 macOS refuses to run anything
+  # totally unsigned, unlike x64, so "-" is required, not optional
+  identity: '-'
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.
