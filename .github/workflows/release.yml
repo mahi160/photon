@@ -48,3 +48,5 @@ jobs:
           flatpak remote-add --if-not-exists --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
       - run: pnpm ${{ matrix.script }} -- --publish always
+        env:
+          DEBUG: ${{ matrix.os == 'ubuntu-latest' && '@malept/flatpak-bundler' || '' }}
