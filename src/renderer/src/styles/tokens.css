@@ -29,20 +29,19 @@
   color-scheme: light;
 }
 
-/* Rosé Pine / Dawn — rosepinetheme.com/palette (default) */
-[data-theme='dark'],
-[data-scheme='rose-pine'][data-theme='dark'] {
-  --bg: #191724;
-  --fg: #e0def4;
-  --fg-muted: #908caa;
-  --accent: #eb6f92;
-  --accent-2: #c4a7e7;
-  --accent-3: #9ccfd8;
-  --accent-4: #f6c177;
+/* Gruvbox Material (medium contrast) — dark theme */
+[data-theme='dark'] {
+  --bg: #32302f;
+  --fg: #d4be98;
+  --fg-muted: #a89984;
+  --accent: #e78a4e;
+  --accent-2: #d3869b;
+  --accent-3: #89b482;
+  --accent-4: #d8a657;
 }
 
-[data-theme='light'],
-[data-scheme='rose-pine'][data-theme='light'] {
+/* Rosé Pine Dawn — rosepinetheme.com/palette — light theme */
+[data-theme='light'] {
   --bg: #faf4ed;
   --fg: #575279;
   --fg-muted: #797593;
@@ -50,69 +49,6 @@
   --accent-2: #907aa9;
   --accent-3: #56949f;
   --accent-4: #ea9d34;
-}
-
-/* Everforest */
-[data-scheme='everforest'][data-theme='dark'] {
-  --bg: #2d353b;
-  --fg: #d3c6aa;
-  --fg-muted: #859289;
-  --accent: #a7c080;
-  --accent-2: #dbbc7f;
-  --accent-3: #83c092;
-  --accent-4: #e69875;
-}
-
-[data-scheme='everforest'][data-theme='light'] {
-  --bg: #fdf6e3;
-  --fg: #5c6a72;
-  --fg-muted: #939f91;
-  --accent: #8da101;
-  --accent-2: #dfa000;
-  --accent-3: #35a77c;
-  --accent-4: #f57d26;
-}
-
-/* Gruvbox */
-[data-scheme='gruvbox'][data-theme='dark'] {
-  --bg: #282828;
-  --fg: #ebdbb2;
-  --fg-muted: #a89984;
-  --accent: #fe8019;
-  --accent-2: #d3869b;
-  --accent-3: #8ec07c;
-  --accent-4: #fabd2f;
-}
-
-[data-scheme='gruvbox'][data-theme='light'] {
-  --bg: #fbf1c7;
-  --fg: #3c3836;
-  --fg-muted: #7c6f64;
-  --accent: #af3a03;
-  --accent-2: #8f3f71;
-  --accent-3: #427b58;
-  --accent-4: #b57614;
-}
-
-/* Kanagawa (Wave / Lotus) */
-[data-scheme='kanagawa'][data-theme='dark'] {
-  --bg: #1f1f28;
-  --fg: #dcd7ba;
-  --fg-muted: #727169;
-  --accent: #d27e99;
-  --accent-2: #957fb8;
-  --accent-3: #7aa89f;
-  --accent-4: #e6c384;
-}
-
-[data-scheme='kanagawa'][data-theme='light'] {
-  --bg: #f2ecbc;
-  --fg: #545464;
-  --fg-muted: #716e61;
-  --accent: #b35b79;
-  --accent-2: #766b90;
-  --accent-3: #597b75;
-  --accent-4: #de9800;
 }
 
 :root {
@@ -141,7 +77,7 @@
      chrome stays dark glass regardless of --bg/--surface */
   --player-glass: color-mix(in oklch, black 62%, var(--accent-2) 6%);
   --player-glass-strong: color-mix(in oklch, black 70%, var(--accent-2) 8%);
-  --player-fg: #e0def4;
-  --player-fg-muted: color-mix(in oklch, #e0def4 65%, transparent);
+  --player-fg: #d4be98;
+  --player-fg-muted: color-mix(in oklch, #d4be98 65%, transparent);
   --player-border: color-mix(in oklch, white 12%, transparent);
 }

@@ -41,10 +41,6 @@
   justify-content: space-between;
 }
 
-.row:has(.schemeGrid) {
-  align-items: flex-start;
-}
-
 .label {
   font-size: 0.9375rem;
   color: var(--fg);
@@ -177,51 +173,6 @@
 .slabActive {
   color: var(--fg);
   background: var(--surface-3);
-}
-
-.schemeGrid {
-  display: grid;
-  grid-template-columns: repeat(2, 8rem);
-  gap: 0.6rem;
-}
-
-.schemeSlab {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-
-  padding: 0.75rem;
-  border: 2px solid transparent;
-  border-radius: var(--radius-m);
-
-  text-align: start;
-
-  transition: border-color var(--dur-fast) var(--ease);
-}
-
-.schemeSlab:hover {
-  border-color: color-mix(in oklch, white 20%, transparent);
-}
-
-.schemeSlabActive {
-  border-color: var(--accent);
-}
-
-.schemeDots {
-  display: flex;
-  gap: 0.3rem;
-}
-
-.schemeDots i {
-  display: block;
-  inline-size: 0.6rem;
-  block-size: 0.6rem;
-  border-radius: var(--radius-full);
-}
-
-.schemeLabel {
-  font-size: 0.75rem;
-  font-weight: 600;
 }
 
 .swatchRow {

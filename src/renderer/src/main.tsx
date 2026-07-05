@@ -12,7 +12,6 @@ import { resolveTheme } from './lib/theme'
 function applyAppearance(): void {
   const s = useSettings.getState()
   document.documentElement.dataset.theme = resolveTheme(s.theme)
-  document.documentElement.dataset.scheme = s.colorScheme
 }
 
 applyAppearance()
