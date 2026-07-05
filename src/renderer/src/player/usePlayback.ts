@@ -55,9 +55,10 @@ export async function resolvePlayable(item: BaseItem): Promise<BaseItem> {
 // Audio: explicit request, else preferred language, else English, else the
 // container default (matching it keeps direct play possible), else first.
 // Subtitle preference must be in the *initial* request: PGS/ASS need a server
-// burn-in, which only happens when the index is sent up front. -1 keeps the
-// server from burning in its own default when subs are off; undefined lets
-// the server pick its default.
+// burn-in, which only happens when the index is sent up front — so a burn-in
+// server default (defaultSubtitleIndex) must be requested explicitly too, not
+// left for the server to "pick", or it silently never gets burned in.
+// -1 keeps the server from burning in its own default when subs are off.
 export function pickInitialTracks(
   streams: MediaStream[],
   settings: {
@@ -65,7 +66,8 @@ export function pickInitialTracks(
     preferredSubtitleLanguage?: string
     subtitlesEnabled: boolean
   },
-  params: StartParams
+  params: StartParams,
+  defaultSubtitleIndex?: number
 ): { audioStreamIndex?: number; subtitleStreamIndex?: number } {
   const audioStreams = streams.filter((s) => s.Type === 'Audio')
   const defaultAudio =
@@ -78,12 +80,12 @@ export function pickInitialTracks(
   let subtitleStreamIndex = params.sub
   if (subtitleStreamIndex === undefined) {
     subtitleStreamIndex = settings.subtitlesEnabled
-      ? streams.find(
+      ? (streams.find(
           (s) =>
             s.Type === 'Subtitle' &&
             !!settings.preferredSubtitleLanguage &&
             s.Language === settings.preferredSubtitleLanguage
-        )?.Index
+        )?.Index ?? defaultSubtitleIndex)
       : -1
   }
   return { audioStreamIndex: params.audio ?? defaultAudio?.Index, subtitleStreamIndex }
@@ -201,7 +203,8 @@ export function usePlayback(
         const { audioStreamIndex, subtitleStreamIndex } = pickInitialTracks(
           playable.MediaSources?.[0]?.MediaStreams ?? [],
           useSettings.getState(),
-          { audio, sub }
+          { audio, sub },
+          playable.MediaSources?.[0]?.DefaultSubtitleStreamIndex
         )
         if (audioStreamIndex !== undefined) setAudioIndex(audioStreamIndex)
         return loadFor(playable, {
