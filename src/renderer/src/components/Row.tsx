@@ -28,7 +28,7 @@ export function Row({
           title
         )}
       </h2>
-      <div className={styles.track}>
+      <div className={`${styles.track} ${wide ? styles.trackWide : ''}`}>
         {items.map((item) => (
           <Card key={item.Id} item={item} wide={wide} />
         ))}

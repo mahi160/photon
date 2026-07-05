@@ -1,10 +1,7 @@
+/* fluid by default — grids size cards via their cells; horizontal rows pin
+   a fixed basis on track children instead (Row.module.css) */
 .card {
   flex-shrink: 0;
-  inline-size: 10rem;
-}
-
-.card.wide {
-  inline-size: 16rem;
 }
 
 .poster {
@@ -132,7 +129,7 @@
   inline-size: 100%;
   margin-block-start: 0.6rem;
 
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   font-weight: 500;
   color: var(--fg);
   text-overflow: ellipsis;
@@ -149,10 +146,10 @@
 .subtitle {
   overflow: hidden;
 
-  margin-block-start: 0.1rem;
+  margin-block-start: 0.15rem;
 
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   color: var(--fg-faint);
   text-overflow: ellipsis;
   white-space: nowrap;

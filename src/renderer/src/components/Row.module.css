@@ -56,3 +56,12 @@
   padding-block: 0.25rem 0.5rem;
   padding-inline: var(--gutter);
 }
+
+/* cards are fluid; the row pins their size */
+.track > * {
+  flex: 0 0 11rem;
+}
+
+.trackWide > * {
+  flex-basis: 18rem;
+}

@@ -80,7 +80,7 @@
 .titleText {
   overflow: hidden;
 
-  font-size: 0.9375rem;
+  font-size: 1.0625rem;
   font-weight: 600;
   color: white;
   text-overflow: ellipsis;
@@ -92,7 +92,7 @@
   overflow: hidden;
 
   font-family: var(--font-mono);
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   color: color-mix(in oklch, white 55%, transparent);
   text-overflow: ellipsis;
   text-shadow: 0 1px 8px color-mix(in oklch, black 60%, transparent);
@@ -141,8 +141,8 @@
 
 .clock {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: color-mix(in oklch, white 70%, transparent);
+  font-size: 0.875rem;
+  color: color-mix(in oklch, white 75%, transparent);
   text-shadow: 0 1px 8px color-mix(in oklch, black 60%, transparent);
 }
 
@@ -418,8 +418,8 @@
 
 .time {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: color-mix(in oklch, white 80%, transparent);
+  font-size: 0.875rem;
+  color: color-mix(in oklch, white 85%, transparent);
   white-space: nowrap;
 }
 
@@ -427,8 +427,8 @@
   margin-inline-start: 0.6rem;
 
   font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: color-mix(in oklch, white 45%, transparent);
+  font-size: 0.8125rem;
+  color: color-mix(in oklch, white 50%, transparent);
   white-space: nowrap;
 }
 
