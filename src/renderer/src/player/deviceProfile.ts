@@ -82,15 +82,20 @@ export function buildDeviceProfile(maxBitrate: number): object {
       }
     ],
     SubtitleProfiles: [
-      // vtt only: Chromium <track> renders WebVTT exclusively — declaring srt here
-      // makes the server hand out raw .srt the browser silently drops. The server
-      // converts srt (and other text formats) to vtt when only vtt is listed.
-      { Format: 'vtt', Method: 'External' },
-      // anything not deliverable as text gets burned in by the server
-      { Format: 'pgssub', Method: 'Encode' },
-      { Format: 'dvdsub', Method: 'Encode' },
-      { Format: 'ass', Method: 'Encode' },
-      { Format: 'ssa', Method: 'Encode' }
+      // vtt only: Chromium <track> renders WebVTT exclusively — declaring any
+      // other text format (srt, ass, ssa) here makes the server hand back
+      // that format's raw content instead of converting it, and <track>
+      // silently drops what it can't parse. Leaving only vtt declared makes
+      // the server auto-convert any other *text* subtitle to vtt External.
+      // (jellyfin-web declares ass/ssa as External too, but only because it
+      // renders raw .ass itself via a WASM libass overlay — we don't have
+      // that, so copying its profile literally breaks ass/ssa for us.)
+      { Format: 'vtt', Method: 'External' }
+      // deliberately no pgssub/dvdsub/ass/ssa entries: declaring an Encode
+      // profile for image subs (pgssub/dvdsub) short-circuits the server's
+      // own "codec unsupported" negotiation — leaving them undeclared is what
+      // makes it fall back to burning them in and actually embed
+      // SubtitleStreamIndex/SubtitleMethod in the transcode url.
     ]
   }
 }

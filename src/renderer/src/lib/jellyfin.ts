@@ -13,7 +13,7 @@ export function configure(s: Session | null): void {
   session = s
 }
 
-function deviceId(): string {
+export function deviceId(): string {
   let id = localStorage.getItem('photon.deviceId')
   if (!id) {
     id = crypto.randomUUID()
