@@ -1,4 +1,5 @@
-appId: dev.photon
+# flatpak requires an id with >= 2 periods, so plain "dev.photon" doesn't qualify
+appId: io.github.mahi160.Photon
 productName: Photon
 directories:
   buildResources: build
