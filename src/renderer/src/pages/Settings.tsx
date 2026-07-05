@@ -1,4 +1,3 @@
-import { NumberField } from '@base-ui/react/number-field'
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
@@ -6,7 +5,14 @@ import { useSession } from '../stores/session'
 import { useSettings } from '../stores/settings'
 import { colorSchemes } from '../lib/colorSchemes'
 import { resolvedDark } from '../lib/theme'
+import { Stepper, type StepperClasses } from '../components/Stepper'
 import styles from './Settings.module.css'
+
+const stepperClasses: StepperClasses = {
+  group: styles.stepperGroup,
+  btn: styles.stepBtn,
+  input: styles.stepInput
+}
 
 function Section({
   title,
@@ -162,45 +168,6 @@ function SubtitleColorSwatches({
   )
 }
 
-function Stepper({
-  value,
-  onChange,
-  min,
-  max,
-  step,
-  format,
-  label
-}: {
-  value: number
-  onChange: (v: number) => void
-  min: number
-  max: number
-  step: number
-  format?: Intl.NumberFormatOptions
-  label: string
-}): React.JSX.Element {
-  return (
-    <NumberField.Root
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      onValueChange={(v) => v !== null && onChange(v)}
-      format={format}
-    >
-      <NumberField.Group className={styles.stepperGroup}>
-        <NumberField.Decrement className={styles.stepBtn} aria-label={`Decrease ${label}`}>
-          −
-        </NumberField.Decrement>
-        <NumberField.Input className={styles.stepInput} aria-label={label} />
-        <NumberField.Increment className={styles.stepBtn} aria-label={`Increase ${label}`}>
-          +
-        </NumberField.Increment>
-      </NumberField.Group>
-    </NumberField.Root>
-  )
-}
-
 const playerModes = [
   { value: 'web', label: 'Built-in' },
   { value: 'auto', label: 'Built-in · mpv when transcoding' },
@@ -343,6 +310,7 @@ export function Settings(): React.JSX.Element {
             value={s.fontSize}
             onChange={(v) => settings.set({ subtitleStyle: { ...s, fontSize: v } })}
             label="subtitle size"
+            classes={stepperClasses}
           />
         </Row>
         <Row label="Color">
@@ -378,6 +346,7 @@ export function Settings(): React.JSX.Element {
             value={s.verticalPosition}
             onChange={(v) => settings.set({ subtitleStyle: { ...s, verticalPosition: v } })}
             label="subtitle vertical position"
+            classes={stepperClasses}
           />
         </Row>
         <Row label="Opacity">
@@ -389,6 +358,7 @@ export function Settings(): React.JSX.Element {
             onChange={(v) => settings.set({ subtitleStyle: { ...s, opacity: v } })}
             format={{ style: 'percent', maximumFractionDigits: 0 }}
             label="subtitle opacity"
+            classes={stepperClasses}
           />
         </Row>
       </Section>
@@ -413,10 +383,10 @@ export function Settings(): React.JSX.Element {
       </Section>
 
       <Section title="About">
-        <Row label={`Famto ${version}`} hint="MIT License">
+        <Row label={`Photon ${version}`} hint="MIT License">
           <a
             className={styles.link}
-            href="https://github.com/famto/famto"
+            href="https://github.com/mahi160/photon"
             target="_blank"
             rel="noreferrer"
           >

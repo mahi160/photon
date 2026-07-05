@@ -16,6 +16,10 @@ const api = {
   mpvStatus: (): Promise<{ running: boolean; timePos: number; paused: boolean }> =>
     ipcRenderer.invoke('mpv:status'),
   mpvStop: (): Promise<void> => ipcRenderer.invoke('mpv:stop'),
+  mpvSet: (
+    prop: 'ontop' | 'window-scale' | 'fullscreen' | 'pause',
+    value: boolean | number
+  ): Promise<boolean> => ipcRenderer.invoke('mpv:set', prop, value),
   mpvCheck: (): Promise<boolean> => ipcRenderer.invoke('mpv:check'),
   fetchSubtitle: (url: string): Promise<string> => ipcRenderer.invoke('subtitle:fetch', url)
 }

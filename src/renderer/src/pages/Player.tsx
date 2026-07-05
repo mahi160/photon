@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { itemQuery } from '../lib/queries'
-import { ticksToSeconds } from '../lib/jellyfin'
-import { resolvePlayable, usePlayback, type StartParams } from '../player/usePlayback'
-import { startPlayback } from '../player/session'
+import { itemTitle, ticksToSeconds } from '../lib/jellyfin'
+import { resolvePlayable, usePlayback } from '../player/usePlayback'
+import { canDirectPlay } from '../player/session'
 import { useSettings } from '../stores/settings'
 import { PlayerControls } from '../components/PlayerControls'
 import { SubtitleStyleTag } from '../components/SubtitleStyleTag'
@@ -12,76 +12,61 @@ import { useHotkeys } from '../lib/useHotkeys'
 import { MpvPlayer } from './MpvPlayer'
 import styles from './Player.module.css'
 
-export function Player(): React.JSX.Element {
-  const mode = useSettings((s) => s.playerMode)
-  // one-shot escape hatch: mpv failed to start → built-in player for this item
-  const [forceWeb, setForceWeb] = useState(false)
-  // mpv → PiP handoff resumes the built-in player at mpv's last position
-  const [webResume, setWebResume] = useState<number | undefined>(undefined)
-  if (forceWeb) return <WebPlayer startOverride={webResume} />
-  if (mode === 'mpv')
-    return (
-      <MpvPlayer
-        onFallback={() => setForceWeb(true)}
-        onRequestPiP={(pos) => {
-          setWebResume(pos)
-          setForceWeb(true)
-        }}
-      />
-    )
-  if (mode === 'auto') return <AutoPlayer />
-  return <WebPlayer />
-}
-
-// Probes the server once: direct play stays in the built-in player, anything
-// that would transcode is handed to mpv (which plays the original file).
+// One state machine for player routing: engine is 'web', 'mpv', or null while
+// the 'auto' probe is in flight. mpv falling over (not installed) or a PiP
+// request both collapse to the built-in player — setEngine('web') is the only
+// transition. 'auto' probes the server once: direct play stays in the
+// built-in player, anything that would transcode is handed to mpv (which
+// plays the original file).
 // ponytail: decided at play start only — a mid-session reload that flips to
 // transcoding (e.g. an audio switch) stays in the built-in player.
-function AutoPlayer(): React.JSX.Element {
+export function Player(): React.JSX.Element {
+  const mode = useSettings((s) => s.playerMode)
   const { itemId } = useParams({ from: '/app/player/$itemId' })
-  const search = useSearch({ strict: false }) as StartParams
+  const search = useSearch({ from: '/app/player/$itemId' })
   const navigate = useNavigate()
-  const item = useQuery(itemQuery(itemId))
-  const [choice, setChoice] = useState<'web' | 'mpv' | null>(null)
+  const [engine, setEngine] = useState<'web' | 'mpv' | null>(mode === 'auto' ? null : mode)
+  // handoffs in either direction resume the other player at the last position
+  const [resume, setResume] = useState<number | undefined>(undefined)
+  const handoff = (to: 'web' | 'mpv') => (pos: number) => {
+    setResume(pos)
+    setEngine(to)
+  }
   const [failed, setFailed] = useState(false)
+  const item = useQuery({ ...itemQuery(itemId), enabled: engine === null })
   const probedFor = useRef<string | null>(null)
-  // mpv → PiP handoff resumes the built-in player at mpv's last position
-  const [webResume, setWebResume] = useState<number | undefined>(undefined)
 
   useEffect(() => {
     const it = item.data
-    if (!it || probedFor.current === it.Id) return
+    if (engine !== null || !it || probedFor.current === it.Id) return
     probedFor.current = it.Id
     const settings = useSettings.getState()
-    resolvePlayable(it)
-      .then((playable) =>
-        startPlayback(playable, {
-          startSeconds: search.start,
+    // probe and availability check are independent — run them together; never
+    // route to a player that isn't installed (the server can transcode for
+    // the built-in player instead)
+    Promise.all([
+      resolvePlayable(it).then((playable) =>
+        canDirectPlay(playable, {
           audioStreamIndex: search.audio,
           subtitleStreamIndex: search.sub,
           maxBitrate: settings.maxBitrate || undefined
         })
-      )
-      .then(async (sess) => {
-        // never route to a player that isn't installed — the server can
-        // transcode for the built-in player instead
-        const useMpv = sess.playMethod !== 'DirectPlay' && (await window.api.mpvCheck())
-        setChoice(useMpv ? 'mpv' : 'web')
-      })
+      ),
+      window.api.mpvCheck()
+    ])
+      .then(([direct, mpvOk]) => setEngine(!direct && mpvOk ? 'mpv' : 'web'))
       .catch(() => setFailed(true))
-  }, [item.data, search.start, search.audio, search.sub])
+  }, [engine, item.data, search.audio, search.sub])
 
-  if (choice === 'web') return <WebPlayer startOverride={webResume} />
-  if (choice === 'mpv')
+  if (engine === 'mpv')
     return (
       <MpvPlayer
-        onFallback={() => setChoice('web')}
-        onRequestPiP={(pos) => {
-          setWebResume(pos)
-          setChoice('web')
-        }}
+        startOverride={resume}
+        onFallback={() => setEngine('web')}
+        onRequestPiP={handoff('web')}
       />
     )
+  if (engine === 'web') return <WebPlayer startOverride={resume} onOpenMpv={handoff('mpv')} />
   return (
     <div className={styles.stage}>
       {failed && (
@@ -96,9 +81,15 @@ function AutoPlayer(): React.JSX.Element {
   )
 }
 
-function WebPlayer({ startOverride }: { startOverride?: number } = {}): React.JSX.Element {
+function WebPlayer({
+  startOverride,
+  onOpenMpv
+}: {
+  startOverride?: number
+  onOpenMpv?: (pos: number) => void
+}): React.JSX.Element {
   const { itemId } = useParams({ from: '/app/player/$itemId' })
-  const routeSearch = useSearch({ strict: false }) as StartParams
+  const routeSearch = useSearch({ from: '/app/player/$itemId' })
   const search =
     startOverride !== undefined ? { ...routeSearch, start: startOverride } : routeSearch
   const navigate = useNavigate()
@@ -107,6 +98,12 @@ function WebPlayer({ startOverride }: { startOverride?: number } = {}): React.JS
   const item = useQuery(itemQuery(itemId))
   const player = usePlayback(videoRef, item.data, search)
   const { engine, session } = player
+
+  // only offer the mpv handoff when mpv is actually installed
+  const [mpvOk, setMpvOk] = useState(false)
+  useEffect(() => {
+    void window.api.mpvCheck().then(setMpvOk)
+  }, [])
 
   const [toast, setToast] = useState<string | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -206,11 +203,7 @@ function WebPlayer({ startOverride }: { startOverride?: number } = {}): React.JS
       {!player.error && session && (
         <PlayerControls
           visible={controlsVisible}
-          title={
-            session.item.Type === 'Episode'
-              ? `${session.item.SeriesName} · S${session.item.ParentIndexNumber}E${session.item.IndexNumber} · ${session.item.Name}`
-              : session.item.Name
-          }
+          title={itemTitle(session.item)}
           playMethod={session.playMethod}
           state={engine.state}
           time={engine.time}
@@ -236,6 +229,7 @@ function WebPlayer({ startOverride }: { startOverride?: number } = {}): React.JS
           onSubtitleDelay={player.changeDelay}
           onFullscreen={toggleFullscreen}
           onPiP={engine.togglePiP}
+          onOpenMpv={onOpenMpv && mpvOk ? () => onOpenMpv(engine.currentTime()) : undefined}
         />
       )}
     </div>

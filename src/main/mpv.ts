@@ -6,7 +6,7 @@ import { join } from 'path'
 
 // External mpv integration: spawn mpv with a JSON IPC socket, observe
 // time-pos/pause so the renderer can report playback progress to Jellyfin.
-// mpv owns all playback UI; Famto only tracks position and lifetime.
+// mpv owns all playback UI; Photon only tracks position and lifetime.
 
 export interface MpvStatus {
   running: boolean
@@ -16,8 +16,8 @@ export interface MpvStatus {
 
 const socketPath =
   process.platform === 'win32'
-    ? '\\\\.\\pipe\\famto-mpv'
-    : join(app.getPath('temp'), 'famto-mpv.sock')
+    ? '\\\\.\\pipe\\photon-mpv'
+    : join(app.getPath('temp'), 'photon-mpv.sock')
 
 let proc: ChildProcess | null = null
 let sock: Socket | null = null
@@ -128,6 +128,16 @@ export function registerMpv(): void {
       return true
     }
   )
+
+  // window-level knobs the renderer may flip while mpv plays. Whitelisted so
+  // the renderer can't drive arbitrary mpv commands through the socket.
+  const settable = new Set(['ontop', 'window-scale', 'fullscreen', 'pause'])
+  ipcMain.handle('mpv:set', (_e, prop: string, value: boolean | number): boolean => {
+    if (!sock || !settable.has(prop) || (typeof value !== 'boolean' && typeof value !== 'number'))
+      return false
+    sock.write(JSON.stringify({ command: ['set_property', prop, value] }) + '\n')
+    return true
+  })
 
   ipcMain.handle('mpv:status', (): MpvStatus => status)
   ipcMain.handle('mpv:stop', () => stop())

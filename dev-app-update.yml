@@ -1,3 +1,4 @@
-provider: generic
-url: https://example.com/auto-updates
-updaterCacheDirName: famto-scaffold-updater
+provider: github
+owner: mahi160
+repo: photon
+updaterCacheDirName: photon-updater

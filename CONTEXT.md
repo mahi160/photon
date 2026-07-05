@@ -1,11 +1,11 @@
-# Famto
+# Photon
 
 A calm, minimal desktop media player built exclusively for Jellyfin. It is a media player, not a media manager.
 
 ## Language
 
 **Server**:
-The single Jellyfin server Famto is signed in to. Exactly one per install in v1.
+The single Jellyfin server Photon is signed in to. Exactly one per install in v1.
 _Avoid_: Instance, backend, connection
 
 **Card**:
@@ -13,7 +13,7 @@ A poster tile anywhere in the app. Clicking the card (or its hover play button) 
 _Avoid_: Tile, thumbnail, item
 
 **Movies / Shows**:
-The two browsable catalogs. Each merges every server library of its type into one grid; library boundaries are invisible in Famto.
+The two browsable catalogs. Each merges every server library of its type into one grid; library boundaries are invisible in Photon.
 _Avoid_: Library (as a UI concept), collection
 
 **Text Subtitle**:
@@ -25,5 +25,5 @@ A subtitle track rendered into the video by the server transcoder (PGS/VOBSUB/st
 _Avoid_: Hardsub, image sub
 
 **Continue Watching**:
-The server-provided list of partially watched items, ordered by recency. The sole resume surface in Famto — there is no separate "resume last" concept.
+The server-provided list of partially watched items, ordered by recency. The sole resume surface in Photon — there is no separate "resume last" concept.
 _Avoid_: Resume Last Playback, resume list

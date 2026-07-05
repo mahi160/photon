@@ -1,10 +1,16 @@
 import { Menu as BaseMenu } from '@base-ui/react/menu'
-import { NumberField } from '@base-ui/react/number-field'
 import { Popover as BasePopover } from '@base-ui/react/popover'
 import { Select as BaseSelect } from '@base-ui/react/select'
 import { useEffect, useRef, useState } from 'react'
 import type { MediaStream } from '../lib/jellyfin'
+import { Stepper, type StepperClasses } from './Stepper'
 import styles from './PlayerControls.module.css'
+
+const stepperClasses: StepperClasses = {
+  group: styles.stepperGroup,
+  btn: styles.stepBtn,
+  input: styles.stepInput
+}
 
 function fmt(s: number): string {
   if (!isFinite(s) || s < 0) return '0:00'
@@ -89,6 +95,7 @@ interface Props {
   onSubtitleDelay: (s: number) => void
   onFullscreen: () => void
   onPiP: () => void
+  onOpenMpv?: () => void // absent = mpv not installed / not applicable
 }
 
 const speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
@@ -201,24 +208,16 @@ export function PlayerControls(p: Props): React.JSX.Element {
                 </svg>
               )}
             </button>
-            <NumberField.Root
+            <Stepper
               min={0}
               max={1}
               step={0.05}
               value={p.muted ? 0 : p.volume}
-              onValueChange={(v) => v !== null && p.onVolume(v)}
+              onChange={p.onVolume}
               format={{ style: 'percent', maximumFractionDigits: 0 }}
-            >
-              <NumberField.Group className={styles.stepperGroup}>
-                <NumberField.Decrement className={styles.stepBtn} aria-label="Decrease volume">
-                  −
-                </NumberField.Decrement>
-                <NumberField.Input className={styles.stepInput} />
-                <NumberField.Increment className={styles.stepBtn} aria-label="Increase volume">
-                  +
-                </NumberField.Increment>
-              </NumberField.Group>
-            </NumberField.Root>
+              label="Volume"
+              classes={stepperClasses}
+            />
             <span className={styles.time}>
               {fmt(p.time)} / {fmt(p.duration)}
             </span>
@@ -325,45 +324,54 @@ export function PlayerControls(p: Props): React.JSX.Element {
                 <BasePopover.Positioner side="top" align="end" sideOffset={8}>
                   <BasePopover.Popup className={styles.menu}>
                     <div className={styles.syncLabel}>Subtitle sync</div>
-                    <NumberField.Root
+                    {/* delay value shifts cue times directly (cue.startTime += delay,
+                        same convention as mpv's sub-delay): a bigger number pushes
+                        subtitles LATER, a smaller/negative one pulls them EARLIER. */}
+                    <Stepper
                       min={-10}
                       max={10}
                       step={0.5}
                       disabled={!p.subtitleDelayEnabled}
                       value={p.subtitleDelay}
-                      onValueChange={(v) => v !== null && p.onSubtitleDelay(v)}
+                      onChange={p.onSubtitleDelay}
                       format={{
                         style: 'unit',
                         unit: 'second',
                         unitDisplay: 'narrow',
                         signDisplay: 'exceptZero'
                       }}
-                    >
-                      <NumberField.Group className={styles.stepperGroup}>
-                        {/* delay value shifts cue times directly (cue.startTime += delay,
-                            same convention as mpv's sub-delay): a bigger number pushes
-                            subtitles LATER, a smaller/negative one pulls them EARLIER.
-                            These labels were swapped before — that's the sync bug. */}
-                        <NumberField.Decrement
-                          className={styles.stepBtn}
-                          aria-label="Advance subtitles (show earlier)"
-                        >
-                          −
-                        </NumberField.Decrement>
-                        <NumberField.Input className={styles.stepInput} />
-                        <NumberField.Increment
-                          className={styles.stepBtn}
-                          aria-label="Delay subtitles (show later)"
-                        >
-                          +
-                        </NumberField.Increment>
-                      </NumberField.Group>
-                    </NumberField.Root>
+                      label="Subtitle delay"
+                      decrementLabel="Advance subtitles (show earlier)"
+                      incrementLabel="Delay subtitles (show later)"
+                      classes={stepperClasses}
+                    />
                   </BasePopover.Popup>
                 </BasePopover.Positioner>
               </BasePopover.Portal>
             </BasePopover.Root>
 
+            {p.onOpenMpv && (
+              <button
+                className={styles.iconBtn}
+                onClick={p.onOpenMpv}
+                aria-label="Open in mpv"
+                title="Open in mpv"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={styles.icon}
+                >
+                  <path d="M13 5h6v6" />
+                  <path d="M19 5l-8 8" />
+                  <path d="M10 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-4" />
+                </svg>
+              </button>
+            )}
             <button className={styles.iconBtn} onClick={p.onPiP} aria-label="Picture in Picture">
               <svg viewBox="0 0 24 24" fill="currentColor" className={styles.icon}>
                 <path d="M19 7h-8v6h8V7zm4-4H1v18h22V3zm-2 16H3V5h18v14z" />

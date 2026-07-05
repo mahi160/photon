@@ -4,7 +4,7 @@ You're **not building a Jellyfin replacement**. You're building **the desktop pl
 
 The key constraint I'd put at the top of the document is:
 
-> **Famto is not a media manager. It is a media player.**
+> **Photon is not a media manager. It is a media player.**
 
 That single sentence should settle almost every future feature request.
 
@@ -12,7 +12,7 @@ That single sentence should settle almost every future feature request.
 
 # Product Requirements Document (PRD)
 
-# Famto
+# Photon
 
 **Version:** 1.0
 **Status:** Draft
@@ -23,19 +23,19 @@ That single sentence should settle almost every future feature request.
 
 # Vision
 
-Famto is a calm, minimal desktop media player built exclusively for Jellyfin.
+Photon is a calm, minimal desktop media player built exclusively for Jellyfin.
 
 It focuses on one thing:
 
 > Watching media beautifully.
 
-Famto intentionally avoids becoming another full Jellyfin client. It does not attempt to expose every server capability or administrative feature. Instead, it provides a lightweight, fast, distraction-free playback experience with first-class Picture-in-Picture support and native desktop behavior.
+Photon intentionally avoids becoming another full Jellyfin client. It does not attempt to expose every server capability or administrative feature. Instead, it provides a lightweight, fast, distraction-free playback experience with first-class Picture-in-Picture support and native desktop behavior.
 
 Every design decision should answer one question:
 
 > **Does this make watching media better?**
 
-If the answer is no, the feature does not belong in Famto.
+If the answer is no, the feature does not belong in Photon.
 
 ---
 
@@ -81,7 +81,7 @@ English-only in v1; i18n arrives with the first real translation.
 
 ### Native
 
-Famto should feel like a desktop application rather than a website inside Electron.
+Photon should feel like a desktop application rather than a website inside Electron.
 
 ---
 
@@ -93,7 +93,7 @@ Users should spend almost all their time watching media—not interacting with t
 
 # Non Goals
 
-Famto will **NOT** include:
+Photon will **NOT** include:
 
 - Live TV
 - Music playback
@@ -145,7 +145,7 @@ All platforms should provide the same experience.
 
 ## Watch a movie
 
-Launch Famto
+Launch Photon
 
 ↓
 
@@ -285,7 +285,7 @@ Sign In
 
 Nothing else.
 
-Sessions always persist (token in OS keychain via `safeStorage`). Logout in Settings is the escape hatch. Famto supports exactly one server per install in v1.
+Sessions always persist (token in OS keychain via `safeStorage`). Logout in Settings is the escape hatch. Photon supports exactly one server per install in v1.
 
 ---
 
@@ -846,7 +846,7 @@ Prefer direct play whenever possible.
 
 If transcoding is required, defer entirely to the Jellyfin server. The client should not implement custom transcoding logic or quality heuristics.
 
-Famto sends an accurate DeviceProfile; the server decides direct-play/remux/transcode and the user never sees which.
+Photon sends an accurate DeviceProfile; the server decides direct-play/remux/transcode and the user never sees which.
 
 ---
 
@@ -935,7 +935,7 @@ If it doesn't satisfy any of these, it should be declined.
 
 # Definition of Done (v1.0)
 
-Famto 1.0 is complete when a user can:
+Photon 1.0 is complete when a user can:
 
 1. Install the app on Windows, macOS, or Linux.
 2. Sign in to a Jellyfin server.
@@ -956,4 +956,4 @@ No more, no less.
 
 Even though v1 uses Electron's built-in `<video>` element, **never let the UI talk directly to it**. Define a `PlaybackEngine` interface (play, pause, seek, setSubtitleTrack, enterPiP, etc.) and have the HTML5 implementation satisfy that interface.
 
-That way, if you decide to adopt `libmpv` later for superior codec support, HDR, and subtitle rendering, the rest of Famto—the UI, state management, keyboard shortcuts, and sync logic—doesn't need to change. It keeps the codebase aligned with your philosophy of staying small while leaving room for the one thing that matters most: an even better playback experience.
+That way, if you decide to adopt `libmpv` later for superior codec support, HDR, and subtitle rendering, the rest of Photon—the UI, state management, keyboard shortcuts, and sync logic—doesn't need to change. It keeps the codebase aligned with your philosophy of staying small while leaving room for the one thing that matters most: an even better playback experience.

@@ -1,4 +1,4 @@
-// Plain-fetch Jellyfin client. No SDK dep — the REST surface Famto needs is small.
+// Plain-fetch Jellyfin client. No SDK dep — the REST surface Photon needs is small.
 
 export interface Session {
   server: string // normalized base URL, no trailing slash
@@ -14,17 +14,17 @@ export function configure(s: Session | null): void {
 }
 
 function deviceId(): string {
-  let id = localStorage.getItem('famto.deviceId')
+  let id = localStorage.getItem('photon.deviceId')
   if (!id) {
     id = crypto.randomUUID()
-    localStorage.setItem('famto.deviceId', id)
+    localStorage.setItem('photon.deviceId', id)
   }
   return id
 }
 
 function authHeader(token?: string): string {
   const parts = [
-    'MediaBrowser Client="Famto"',
+    'MediaBrowser Client="Photon"',
     `Device="${encodeURIComponent(navigator.platform || 'Desktop')}"`,
     `DeviceId="${deviceId()}"`,
     'Version="1.0.0"'
@@ -95,7 +95,7 @@ export async function authenticateByName(
   }
 }
 
-// --- shared types (only the fields Famto reads) ---
+// --- shared types (only the fields Photon reads) ---
 
 export interface UserData {
   PlaybackPositionTicks?: number
@@ -146,6 +146,13 @@ export interface BaseItem {
   BackdropImageTags?: string[]
   UserData?: UserData
   MediaSources?: MediaSource[]
+}
+
+// display title: episodes get their series/episode context
+export function itemTitle(item: BaseItem): string {
+  return item.Type === 'Episode'
+    ? `${item.SeriesName} · S${item.ParentIndexNumber}E${item.IndexNumber} · ${item.Name}`
+    : item.Name
 }
 
 export interface ItemsResult {

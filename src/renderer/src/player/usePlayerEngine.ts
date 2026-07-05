@@ -54,6 +54,7 @@ export function usePlayerEngine(
   const [pip, setPip] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const rateRef = useRef(initialRate)
+  const volumeRef = useRef(1) // mirror for stable adjustVolume
 
   const ensureEngine = useCallback((): PlaybackEngine | null => {
     if (!engineRef.current && videoRef.current) {
@@ -110,11 +111,12 @@ export function usePlayerEngine(
   const changeVolume = useCallback((v: number) => {
     const clamped = Math.max(0, Math.min(1, v))
     engineRef.current?.setVolume(clamped)
+    volumeRef.current = clamped
     setVolume(clamped)
   }, [])
   const adjustVolume = useCallback(
-    (delta: number) => changeVolume(volume + delta),
-    [changeVolume, volume]
+    (delta: number) => changeVolume(volumeRef.current + delta),
+    [changeVolume]
   )
 
   const toggleMute = useCallback(() => {

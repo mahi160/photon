@@ -34,6 +34,39 @@ interface PlaybackInfoResponse {
   PlaySessionId: string
 }
 
+interface PlayOptions {
+  startSeconds?: number
+  audioStreamIndex?: number
+  subtitleStreamIndex?: number // stream index, or -1 for explicitly off
+  maxBitrate?: number
+}
+
+function fetchPlaybackInfo(
+  itemId: string,
+  startSeconds: number,
+  opts: PlayOptions,
+  disableDirect: boolean
+): Promise<PlaybackInfoResponse> {
+  const s = currentSession()
+  if (!s) throw new Error('Not signed in')
+  return jf<PlaybackInfoResponse>(`/Items/${itemId}/PlaybackInfo`, {
+    method: 'POST',
+    query: {
+      UserId: s.userId,
+      AutoOpenLiveStream: false,
+      ...(opts.audioStreamIndex !== undefined ? { AudioStreamIndex: opts.audioStreamIndex } : {}),
+      ...(opts.subtitleStreamIndex !== undefined
+        ? { SubtitleStreamIndex: opts.subtitleStreamIndex }
+        : {})
+    },
+    body: {
+      DeviceProfile: buildDeviceProfile(opts.maxBitrate || AUTO_BITRATE),
+      StartTimeTicks: secondsToTicks(startSeconds),
+      ...(disableDirect ? { EnableDirectPlay: false, EnableDirectStream: false } : {})
+    }
+  })
+}
+
 // Why the requested tracks can't ride on the original file:
 // - burnIn: a non-text subtitle only exists in the server's transcoded output
 // - audioSwitch: in direct play the browser always plays the container's
@@ -57,37 +90,67 @@ export function transcodeNeeds(
   }
 }
 
+// Routing probe for the 'auto' player mode: one PlaybackInfo round-trip, no
+// playback report is ever sent, so nothing is left running server-side.
+export async function canDirectPlay(item: BaseItem, opts: PlayOptions = {}): Promise<boolean> {
+  const info = await fetchPlaybackInfo(item.Id, 0, opts, false)
+  const ms = info.MediaSources?.[0]
+  if (!ms) throw new Error('Playback failed.')
+  const needs = transcodeNeeds(ms.MediaStreams ?? [], opts)
+  return !needs.burnIn && !needs.audioSwitch && !!(ms.SupportsDirectPlay || ms.SupportsDirectStream)
+}
+
+export interface SubtitleSelection {
+  display: number | null // stream index shown as selected in the UI
+  textTrack: number | null // text track to activate in the engine, null = none
+}
+
+// Which subtitle ends up active after a load. Explicit request wins (-1 =
+// explicitly off), else preferred language / server default when subtitles
+// are enabled. Burn-in subtitles are already in the video pixels (display
+// only); text tracks additionally need activating in the engine.
+export function resolveSubtitleSelection(
+  sess: {
+    textTracks: TextTrackSource[]
+    subtitleStreams: MediaStream[]
+    mediaSource: Pick<MediaSource, 'DefaultSubtitleStreamIndex'>
+    playMethod: 'DirectPlay' | 'Transcode'
+  },
+  requestedIndex: number | undefined,
+  settings: { subtitlesEnabled: boolean; preferredSubtitleLanguage?: string }
+): SubtitleSelection {
+  if (requestedIndex !== undefined) {
+    if (requestedIndex < 0) return { display: null, textTrack: null }
+    const text = sess.textTracks.find((t) => t.index === requestedIndex)
+    return { display: requestedIndex, textTrack: text?.index ?? null }
+  }
+  if (!settings.subtitlesEnabled) return { display: null, textTrack: null }
+  const defaultIndex = sess.mediaSource.DefaultSubtitleStreamIndex
+  const preferred =
+    sess.textTracks.find(
+      (t) =>
+        !!settings.preferredSubtitleLanguage && t.language === settings.preferredSubtitleLanguage
+    ) ?? sess.textTracks.find((t) => t.index === defaultIndex)
+  if (preferred) return { display: preferred.index, textTrack: preferred.index }
+  // server picked a non-text default (PGS/ASS) and burned it in
+  const burnedDefault =
+    sess.playMethod === 'Transcode' &&
+    defaultIndex !== undefined &&
+    defaultIndex >= 0 &&
+    sess.subtitleStreams.some((st) => st.Index === defaultIndex && st.DeliveryMethod !== 'External')
+  return { display: burnedDefault ? defaultIndex : null, textTrack: null }
+}
+
 export async function startPlayback(
   item: BaseItem,
-  opts: {
-    startSeconds?: number
-    audioStreamIndex?: number
-    subtitleStreamIndex?: number // stream index, or -1 for explicitly off
-    maxBitrate?: number
-  } = {}
+  opts: PlayOptions = {}
 ): Promise<PlaybackSession> {
   const s = currentSession()
   if (!s) throw new Error('Not signed in')
 
   const startSeconds = opts.startSeconds ?? ticksToSeconds(item.UserData?.PlaybackPositionTicks)
-
   const fetchInfo = (disableDirect: boolean): Promise<PlaybackInfoResponse> =>
-    jf<PlaybackInfoResponse>(`/Items/${item.Id}/PlaybackInfo`, {
-      method: 'POST',
-      query: {
-        UserId: s.userId,
-        AutoOpenLiveStream: false,
-        ...(opts.audioStreamIndex !== undefined ? { AudioStreamIndex: opts.audioStreamIndex } : {}),
-        ...(opts.subtitleStreamIndex !== undefined
-          ? { SubtitleStreamIndex: opts.subtitleStreamIndex }
-          : {})
-      },
-      body: {
-        DeviceProfile: buildDeviceProfile(opts.maxBitrate || AUTO_BITRATE),
-        StartTimeTicks: secondsToTicks(startSeconds),
-        ...(disableDirect ? { EnableDirectPlay: false, EnableDirectStream: false } : {})
-      }
-    })
+    fetchPlaybackInfo(item.Id, startSeconds, opts, disableDirect)
 
   let info = await fetchInfo(false)
   let ms = info.MediaSources?.[0]

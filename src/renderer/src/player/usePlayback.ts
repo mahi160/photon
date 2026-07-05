@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { jf, type BaseItem, type ItemsResult } from '../lib/jellyfin'
+import { jf, type BaseItem, type ItemsResult, type MediaStream } from '../lib/jellyfin'
 import { useSettings } from '../stores/settings'
 import {
   isTextTrack,
   reportProgress,
   reportStart,
   reportStopped,
+  resolveSubtitleSelection,
   startPlayback,
   type PlaybackSession
 } from './session'
@@ -48,6 +49,44 @@ export async function resolvePlayable(item: BaseItem): Promise<BaseItem> {
   const eps = await jf<ItemsResult>(`/Shows/${item.Id}/Episodes`, { query: { Limit: 1 } })
   if (eps.Items[0]) return eps.Items[0]
   throw new Error('Nothing to play.')
+}
+
+// What to request from the server on first load (exported for tests).
+// Audio: explicit request, else preferred language, else English, else the
+// container default (matching it keeps direct play possible), else first.
+// Subtitle preference must be in the *initial* request: PGS/ASS need a server
+// burn-in, which only happens when the index is sent up front. -1 keeps the
+// server from burning in its own default when subs are off; undefined lets
+// the server pick its default.
+export function pickInitialTracks(
+  streams: MediaStream[],
+  settings: {
+    preferredAudioLanguage?: string
+    preferredSubtitleLanguage?: string
+    subtitlesEnabled: boolean
+  },
+  params: StartParams
+): { audioStreamIndex?: number; subtitleStreamIndex?: number } {
+  const audioStreams = streams.filter((s) => s.Type === 'Audio')
+  const defaultAudio =
+    audioStreams.find(
+      (s) => !!settings.preferredAudioLanguage && s.Language === settings.preferredAudioLanguage
+    ) ??
+    audioStreams.find((s) => s.Language === 'eng') ??
+    audioStreams.find((s) => s.IsDefault) ??
+    audioStreams[0]
+  let subtitleStreamIndex = params.sub
+  if (subtitleStreamIndex === undefined) {
+    subtitleStreamIndex = settings.subtitlesEnabled
+      ? streams.find(
+          (s) =>
+            s.Type === 'Subtitle' &&
+            !!settings.preferredSubtitleLanguage &&
+            s.Language === settings.preferredSubtitleLanguage
+        )?.Index
+      : -1
+  }
+  return { audioStreamIndex: params.audio ?? defaultAudio?.Index, subtitleStreamIndex }
 }
 
 export function usePlayback(
@@ -101,46 +140,12 @@ export function usePlayback(
         })
         reportStart(sess, sess.startSeconds)
 
-        // subtitle to show: explicit request wins (-1 = explicitly off), else
-        // preferred language / server default when subtitles are enabled.
-        // Burn-in requests are already in the video; only text tracks need
-        // activating.
-        let activeTextIndex: number | null = null
-        if (opts.subtitleStreamIndex !== undefined) {
-          const explicit =
-            opts.subtitleStreamIndex >= 0
-              ? sess.textTracks.find((t) => t.index === opts.subtitleStreamIndex)
-              : undefined
-          activeTextIndex = explicit?.index ?? null
-          setSubtitleIndex(opts.subtitleStreamIndex >= 0 ? opts.subtitleStreamIndex : null)
-        } else if (settings.subtitlesEnabled) {
-          const defaultIndex = sess.mediaSource.DefaultSubtitleStreamIndex
-          const preferred =
-            sess.textTracks.find((t) => t.language === settings.preferredSubtitleLanguage) ??
-            sess.textTracks.find((t) => t.index === defaultIndex)
-          activeTextIndex = preferred?.index ?? null
-          if (preferred) {
-            setSubtitleIndex(preferred.index)
-          } else if (
-            sess.playMethod === 'Transcode' &&
-            defaultIndex !== undefined &&
-            defaultIndex >= 0 &&
-            sess.subtitleStreams.some(
-              (st) => st.Index === defaultIndex && st.DeliveryMethod !== 'External'
-            )
-          ) {
-            // server picked a non-text default (PGS/ASS) and burned it in
-            setSubtitleIndex(defaultIndex)
-          } else {
-            setSubtitleIndex(null)
-          }
-        } else {
-          setSubtitleIndex(null)
-        }
-        if (activeTextIndex !== null) setTextTrack(activeTextIndex)
+        const sel = resolveSubtitleSelection(sess, opts.subtitleStreamIndex, settings)
+        setSubtitleIndex(sel.display)
+        if (sel.textTrack !== null) setTextTrack(sel.textTrack)
 
         // restore last subtitle sync offset, text tracks only
-        const delay = activeTextIndex !== null ? settings.lastSubtitleDelay : 0
+        const delay = sel.textTrack !== null ? settings.lastSubtitleDelay : 0
         if (delay) engineSetDelay(delay)
         setSubtitleDelay(delay)
 
@@ -184,48 +189,23 @@ export function usePlayback(
   // `attempt` bumps on retry to force a reload of the same item.
   const [attempt, setAttempt] = useState(0)
   const loadedKey = useRef<string | null>(null)
+  const { start, audio, sub } = params
   useEffect(() => {
     if (!item || loadedKey.current === `${item.Id}#${attempt}`) return
     loadedKey.current = `${item.Id}#${attempt}`
     setError(null)
     resolvePlayable(item)
       .then((playable) => {
-        // remember last audio language: only meaningful if the playable item
-        // itself carries stream info (movies/episodes fetched with MediaSources)
-        const settings = useSettings.getState()
-        const streams = playable.MediaSources?.[0]?.MediaStreams ?? []
-        const audioStreams = streams.filter((s) => s.Type === 'Audio')
-        // no explicit request or remembered preference: prefer English, else
-        // whatever track comes first, instead of leaving it to the server
-        const defaultAudio =
-          audioStreams.find(
-            (s) =>
-              !!settings.preferredAudioLanguage && s.Language === settings.preferredAudioLanguage
-          ) ??
-          audioStreams.find((s) => s.Language === 'eng') ??
-          // container default last: matching it keeps direct play possible
-          audioStreams.find((s) => s.IsDefault) ??
-          audioStreams[0]
-        const audioStreamIndex = params.audio ?? defaultAudio?.Index
+        // track picking only sees stream info if the playable item carries it
+        // (movies/episodes fetched with MediaSources)
+        const { audioStreamIndex, subtitleStreamIndex } = pickInitialTracks(
+          playable.MediaSources?.[0]?.MediaStreams ?? [],
+          useSettings.getState(),
+          { audio, sub }
+        )
         if (audioStreamIndex !== undefined) setAudioIndex(audioStreamIndex)
-        // subtitle preference must be in the *initial* request: PGS/ASS need a
-        // server burn-in, which only happens when the index is sent up front.
-        // -1 keeps the server from burning in its own default when subs are off.
-        let subtitleStreamIndex = params.sub
-        if (subtitleStreamIndex === undefined) {
-          if (settings.subtitlesEnabled) {
-            subtitleStreamIndex = streams.find(
-              (s) =>
-                s.Type === 'Subtitle' &&
-                !!settings.preferredSubtitleLanguage &&
-                s.Language === settings.preferredSubtitleLanguage
-            )?.Index // undefined = let the server pick its default
-          } else {
-            subtitleStreamIndex = -1
-          }
-        }
         return loadFor(playable, {
-          startSeconds: params.start,
+          startSeconds: start,
           audioStreamIndex,
           subtitleStreamIndex
         })
@@ -234,7 +214,7 @@ export function usePlayback(
         console.error('[playback] resolve failed', e)
         setError('Nothing to play.')
       })
-  }, [item, params.start, params.audio, params.sub, attempt, loadFor])
+  }, [item, start, audio, sub, attempt, loadFor])
 
   // progress reporting: every 10s + on any pause (button, hotkey, PiP, media keys)
   const { state: engineState, currentTime } = engine

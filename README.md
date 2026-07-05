@@ -1,8 +1,8 @@
-# Famto
+# Photon
 
 A calm, minimal desktop media player built exclusively for Jellyfin.
 
-> Famto is not a media manager. It is a media player.
+> Photon is not a media manager. It is a media player.
 
 ## Features
 
@@ -11,7 +11,8 @@ A calm, minimal desktop media player built exclusively for Jellyfin.
 - Movies and TV Shows grids (all libraries merged), sorted by added/name/release
 - Instant search: movies and shows filter locally, episodes stream in from the server
 - Player: HTML5/HLS with direct play when Chromium can decode it, silent server
-  transcode when it can't
+  transcode when it can't — or hand off to a local `mpv` for direct play with no
+  transcoding at all
 - Audio and subtitle track switching, subtitle delay and styling (text subs)
 - Picture-in-Picture, fullscreen, playback speed, keyboard-first controls
 - Watch progress synced back to Jellyfin

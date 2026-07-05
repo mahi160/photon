@@ -1,10 +1,15 @@
 {
-  "name": "famto",
+  "name": "photon",
   "version": "1.0.0",
   "description": "A calm, minimal desktop media player built exclusively for Jellyfin",
   "main": "./out/main/index.js",
+  "license": "MIT",
   "author": "Salauddin Omar Sifat",
-  "homepage": "https://electron-vite.org",
+  "homepage": "https://github.com/mahi160/photon",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mahi160/photon.git"
+  },
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
@@ -20,8 +25,8 @@
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder --win",
-    "build:mac": "electron-vite build && electron-builder --mac",
-    "build:linux": "electron-vite build && electron-builder --linux"
+    "build:mac": "electron-vite build && electron-builder --mac --arm64",
+    "build:linux": "electron-vite build && electron-builder --linux flatpak"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

@@ -58,6 +58,6 @@ export const useSettings = create<SettingsState>()(
       colorScheme: 'rose-pine',
       set: (partial) => set(partial)
     }),
-    { name: 'famto.settings' }
+    { name: 'photon.settings' }
   )
 )

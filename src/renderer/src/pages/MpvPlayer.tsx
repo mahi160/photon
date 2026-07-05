@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { itemQuery } from '../lib/queries'
-import { directStreamUrl, type BaseItem } from '../lib/jellyfin'
-import { resolvePlayable, type StartParams } from '../player/usePlayback'
+import { directStreamUrl, itemTitle } from '../lib/jellyfin'
+import { resolvePlayable } from '../player/usePlayback'
 import {
   reportProgress,
   reportStart,
@@ -13,17 +13,12 @@ import {
 } from '../player/session'
 import styles from './Player.module.css'
 
-function titleOf(item: BaseItem): string {
-  return item.Type === 'Episode'
-    ? `${item.SeriesName} · S${item.ParentIndexNumber}E${item.IndexNumber} · ${item.Name}`
-    : item.Name
-}
-
-// External-player mode: mpv owns the window and all controls; Famto starts the
+// External-player mode: mpv owns the window and all controls; Photon starts the
 // session, hands mpv the untranscoded stream and reports progress to Jellyfin.
 // ponytail: audio/subtitle choice happens inside mpv; server-side external
 // subtitle files aren't passed along. Autoplay-next doesn't apply here.
 interface Props {
+  startOverride?: number // web → mpv handoff resumes at the built-in player's position
   onFallback?: () => void
   // mpv has no OS-integrated Picture-in-Picture (no libmpv hook into the
   // system PiP surface) — the honest way to get real PiP is to hand off to
@@ -31,9 +26,55 @@ interface Props {
   onRequestPiP?: (positionSeconds: number) => void
 }
 
-export function MpvPlayer({ onFallback, onRequestPiP }: Props): React.JSX.Element {
+// mpv window knobs, driven over the IPC socket. State is optimistic — mpv has
+// no failure mode here worth round-tripping for, and mpv's own UI can't
+// change these behind our back (no keybindings for ontop/window-scale by
+// default; fullscreen falls back in sync on the next toggle).
+function MpvWindowControls(): React.JSX.Element {
+  const [onTop, setOnTop] = useState(false)
+  const [scale, setScale] = useState(1)
+  const [fullscreen, setFullscreen] = useState(false)
+  return (
+    <div className={styles.mpvControls}>
+      <button
+        className={`${styles.mpvBtn} ${onTop ? styles.mpvBtnActive : ''}`}
+        onClick={() => {
+          setOnTop(!onTop)
+          void window.api.mpvSet('ontop', !onTop)
+        }}
+      >
+        Always on top
+      </button>
+      {([0.5, 1, 2] as const).map((s) => (
+        <button
+          key={s}
+          className={`${styles.mpvBtn} ${!fullscreen && scale === s ? styles.mpvBtnActive : ''}`}
+          onClick={() => {
+            setScale(s)
+            setFullscreen(false)
+            void window.api.mpvSet('fullscreen', false)
+            void window.api.mpvSet('window-scale', s)
+          }}
+        >
+          {s * 100}%
+        </button>
+      ))}
+      <button
+        className={`${styles.mpvBtn} ${fullscreen ? styles.mpvBtnActive : ''}`}
+        onClick={() => {
+          setFullscreen(!fullscreen)
+          void window.api.mpvSet('fullscreen', !fullscreen)
+        }}
+      >
+        Fullscreen
+      </button>
+    </div>
+  )
+}
+
+export function MpvPlayer({ startOverride, onFallback, onRequestPiP }: Props): React.JSX.Element {
   const { itemId } = useParams({ from: '/app/player/$itemId' })
-  const search = useSearch({ strict: false }) as StartParams
+  const search = useSearch({ from: '/app/player/$itemId' })
   const navigate = useNavigate()
   const item = useQuery(itemQuery(itemId))
 
@@ -51,8 +92,8 @@ export function MpvPlayer({ onFallback, onRequestPiP }: Props): React.JSX.Elemen
     void (async () => {
       try {
         const playable = await resolvePlayable(it)
-        const sess = await startPlayback(playable, { startSeconds: search.start })
-        const t = titleOf(playable)
+        const sess = await startPlayback(playable, { startSeconds: startOverride ?? search.start })
+        const t = itemTitle(playable)
         setTitle(t)
         lastPos.current = sess.startSeconds
         // mpv decodes anything locally — always hand it the direct stream
@@ -71,7 +112,7 @@ export function MpvPlayer({ onFallback, onRequestPiP }: Props): React.JSX.Elemen
         setError('Playback failed.')
       }
     })()
-  }, [item.data, search.start])
+  }, [item.data, search.start, startOverride])
 
   // progress every 5s; when the mpv window closes, report stopped and go home
   useEffect(() => {
@@ -124,9 +165,12 @@ export function MpvPlayer({ onFallback, onRequestPiP }: Props): React.JSX.Elemen
             )}
           </>
         ) : (
-          <p className={styles.errorText}>
-            {title ? `Playing in mpv — ${title}` : 'Starting mpv…'}
-          </p>
+          <>
+            <p className={styles.errorText}>
+              {title ? `Playing in mpv — ${title}` : 'Starting mpv…'}
+            </p>
+            {title && <MpvWindowControls />}
+          </>
         )}
         <button onClick={() => navigate({ to: '/' })} className={styles.errorBack}>
           Back to Home

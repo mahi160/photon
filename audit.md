@@ -1,4 +1,4 @@
-# Famto — Thermo-Nuclear Code Quality Audit
+# Photon — Thermo-Nuclear Code Quality Audit
 
 Date: 2026-07-03 · Scope: full codebase (`src/`, ~4.8k lines incl. CSS)
 

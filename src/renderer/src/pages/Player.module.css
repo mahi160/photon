@@ -61,3 +61,31 @@
   font-size: 0.875rem;
   color: color-mix(in oklch, white 45%, transparent);
 }
+
+.mpvControls {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.mpvBtn {
+  padding-block: 0.45rem;
+  padding-inline: 0.8rem;
+  border: 1px solid color-mix(in oklch, white 20%, transparent);
+  border-radius: var(--radius-s);
+
+  font-size: 0.8rem;
+  color: color-mix(in oklch, white 70%, transparent);
+
+  background: color-mix(in oklch, white 8%, transparent);
+}
+
+.mpvBtn:hover {
+  background: color-mix(in oklch, white 15%, transparent);
+}
+
+.mpvBtnActive {
+  border-color: var(--accent);
+  color: var(--accent-fg);
+  background: var(--accent);
+}

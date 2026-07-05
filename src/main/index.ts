@@ -23,16 +23,30 @@ if (readPrefs().disableHwAccel) app.disableHardwareAcceleration()
 // --- secure session storage (token never touches plaintext disk) ---
 const sessionFile = (): string => join(app.getPath('userData'), 'session.bin')
 
+// the signed-in server's origin — scopes the subtitle:fetch proxy below so
+// the renderer can't use main as an arbitrary URL fetcher
+let serverOrigin: string | null = null
+function rememberOrigin(sessionJson: string): void {
+  try {
+    serverOrigin = new URL(JSON.parse(sessionJson).server).origin
+  } catch {
+    serverOrigin = null
+  }
+}
+
 ipcMain.handle('session:get', () => {
   try {
     if (!safeStorage.isEncryptionAvailable()) return null
-    return safeStorage.decryptString(readFileSync(sessionFile()))
+    const value = safeStorage.decryptString(readFileSync(sessionFile()))
+    rememberOrigin(value)
+    return value
   } catch {
     return null
   }
 })
 
 ipcMain.handle('session:set', (_e, value: string) => {
+  rememberOrigin(value)
   // ponytail: no plaintext fallback — if keychain unavailable, session is memory-only
   if (!safeStorage.isEncryptionAvailable()) return false
   writeFileSync(sessionFile(), safeStorage.encryptString(value))
@@ -40,6 +54,7 @@ ipcMain.handle('session:set', (_e, value: string) => {
 })
 
 ipcMain.handle('session:clear', () => {
+  serverOrigin = null
   try {
     rmSync(sessionFile())
   } catch {
@@ -66,6 +81,8 @@ ipcMain.handle('app:getHwAccel', () => !readPrefs().disableHwAccel)
 // CORS (needs Access-Control-Allow-Origin from the user's server/reverse
 // proxy); a Node-side fetch has no such restriction. Text only, small files.
 ipcMain.handle('subtitle:fetch', async (_e, url: string): Promise<string> => {
+  if (!serverOrigin || new URL(url).origin !== serverOrigin)
+    throw new Error('Subtitle URL not on the signed-in server')
   const res = await fetch(url)
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.text()
@@ -80,7 +97,7 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#0e0e10',
-    title: 'Famto',
+    title: 'Photon',
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -105,7 +122,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
-  electronApp.setAppUserModelId('dev.famto')
+  electronApp.setAppUserModelId('dev.photon')
 
   if (!is.dev) {
     void import('electron-updater')

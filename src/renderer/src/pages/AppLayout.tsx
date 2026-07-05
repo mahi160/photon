@@ -93,7 +93,7 @@ export function AppLayout(): React.JSX.Element {
     <div className={styles.shell}>
       <header className={styles.header}>
         <Link to="/" className={styles.brand}>
-          Famto
+          Photon
         </Link>
         <nav className={styles.nav}>
           {navItems.map((item) => (
