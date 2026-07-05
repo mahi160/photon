@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { CaretRightIcon } from '@phosphor-icons/react'
 import { Card } from './Card'
 import type { BaseItem } from '../lib/jellyfin'
 import styles from './Row.module.css'
@@ -21,15 +22,7 @@ export function Row({
         {to ? (
           <Link to={to} className={styles.headingLink}>
             {title}
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className={styles.chevron}
-            >
-              <path d="M9 6l6 6-6 6" />
-            </svg>
+            <CaretRightIcon weight="bold" className={styles.chevron} />
           </Link>
         ) : (
           title

@@ -128,6 +128,11 @@ export interface MediaSource {
   DefaultSubtitleStreamIndex?: number
 }
 
+export interface ChapterInfo {
+  StartPositionTicks: number
+  Name?: string
+}
+
 export interface BaseItem {
   Id: string
   Name: string
@@ -146,6 +151,7 @@ export interface BaseItem {
   BackdropImageTags?: string[]
   UserData?: UserData
   MediaSources?: MediaSource[]
+  Chapters?: ChapterInfo[]
 }
 
 // display title: episodes get their series/episode context
