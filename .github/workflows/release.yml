@@ -1,7 +1,8 @@
 name: Release
 
-# ponytail: no manual `git tag` step — push to `prod` and electron-builder
-# tags/creates the GitHub release itself from package.json's version.
+# ponytail: no manual `git tag` step — push to `prod` and this workflow
+# tags + releases from package.json's version. Linux/flatpak dropped:
+# slow, appId gymnastics, more surface to break. Re-add if actually needed.
 on:
   push:
     branches: [prod]
@@ -11,20 +12,33 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: v${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "v${{ steps.version.outputs.version }}" \
+            --draft --notes ""
+
+  build:
+    needs: create-release
     strategy:
       fail-fast: false
-      # ponytail: electron-builder creates the GitHub release on first publish;
-      # running platforms in parallel races and creates duplicate draft releases.
-      max-parallel: 1
       matrix:
         include:
           - os: windows-latest
             builderArgs: --win
           - os: macos-latest
             builderArgs: --mac --arm64
-          - os: ubuntu-latest
-            builderArgs: --linux flatpak
     runs-on: ${{ matrix.os }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -42,14 +56,13 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-
-      - name: Install flatpak-builder
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder
-          flatpak remote-add --if-not-exists --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-
       - run: pnpm build
-
       - run: pnpm exec electron-builder ${{ matrix.builderArgs }} --publish always
+
+  publish-release:
+    needs: [create-release, build]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ needs.create-release.outputs.tag }}" --repo "${{ github.repository }}" --draft=false
