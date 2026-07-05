@@ -218,7 +218,10 @@ function WebPlayer({
   // PiP window's own transport shows prev/next track buttons when these are set
   useEffect(() => {
     const ms = navigator.mediaSession
-    ms.setActionHandler('previoustrack', prevEp.data ? () => void player.playItem(prevEp.data!) : null)
+    ms.setActionHandler(
+      'previoustrack',
+      prevEp.data ? () => void player.playItem(prevEp.data!) : null
+    )
     ms.setActionHandler('nexttrack', nextEp.data ? () => void player.playItem(nextEp.data!) : null)
     return () => {
       ms.setActionHandler('previoustrack', null)
@@ -322,11 +325,8 @@ function WebPlayer({
           onBack={() => navigate({ to: '/' })}
           onTogglePlay={engine.togglePlay}
           onSeek={engine.seek}
-          onSkip={(d) => {
-            engine.seekBy(d)
-            poke()
-          }}
           onVolume={engine.changeVolume}
+          onVolumeStep={bumpVolume}
           onMute={engine.toggleMute}
           onRate={player.changeRate}
           onSelectAudio={player.selectAudio}
