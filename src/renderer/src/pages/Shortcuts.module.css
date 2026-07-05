@@ -1,13 +1,9 @@
+/* Backdrop and Popup are siblings (base-ui), not parent/child — this only
+   dims the screen, .card centers itself independently via fixed+translate. */
 .overlay {
   position: fixed;
   z-index: 50;
   inset: 0;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  padding: 2rem;
 
   background: var(--scrim);
 
@@ -25,7 +21,15 @@
 }
 
 .card {
+  position: fixed;
+  z-index: 51;
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  translate: -50% -50%;
+
   inline-size: min(38rem, 100%);
+  max-block-size: calc(100vh - 4rem);
+  overflow-y: auto;
   padding: 2rem 2.25rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-l);
