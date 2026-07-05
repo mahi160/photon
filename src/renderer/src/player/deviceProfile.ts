@@ -8,6 +8,10 @@ function supported(type: string): boolean {
   return typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(type)
 }
 
+function rangeCondition(value: string): object {
+  return { Condition: 'EqualsAny', Property: 'VideoRangeType', Value: value, IsRequired: false }
+}
+
 export function buildDeviceProfile(maxBitrate: number): object {
   const h264 = 'h264'
   const videoCodecs = [h264]
@@ -18,8 +22,24 @@ export function buildDeviceProfile(maxBitrate: number): object {
   if (supported('video/mp4; codecs="av01.0.05M.08"')) videoCodecs.push('av1')
   if (supported('video/mp4; codecs="hvc1.1.6.L93.B0"')) videoCodecs.push('hevc')
 
+  // permissive video-range declaration per codec (SDR/HDR10/HLG, no Dolby
+  // Vision — Chromium <video> has no DOVI path worth claiming). Omitting this
+  // makes the server assume the client can't handle non-SDR and insert an
+  // HDR->SDR tonemap filter before encoding; combined with subtitle burn-in
+  // that silently drops the subtitle overlay on some transcode paths, even
+  // though the negotiation still reports SubtitleMethod=Encode.
+  const hdrRanges = 'SDR|HDR10|HDR10Plus|HLG'
+  const codecProfiles: object[] = [
+    { Type: 'Video', Codec: 'h264', Conditions: [rangeCondition('SDR')] }
+  ]
+  for (const codec of ['hevc', 'vp9', 'av1']) {
+    if (videoCodecs.includes(codec))
+      codecProfiles.push({ Type: 'Video', Codec: codec, Conditions: [rangeCondition(hdrRanges)] })
+  }
+
   return {
     MaxStreamingBitrate: maxBitrate,
+    CodecProfiles: codecProfiles,
     DirectPlayProfiles: [
       {
         // mkv: Chromium demuxes Matroska — codec lists below still gate it,
@@ -32,6 +52,23 @@ export function buildDeviceProfile(maxBitrate: number): object {
       { Container: 'webm', Type: 'Video', VideoCodec: 'vp8,vp9,av1', AudioCodec: 'vorbis,opus' }
     ],
     TranscodingProfiles: [
+      // fmp4 first, same codec list as direct play: lets the server keep the
+      // source video codec (stream copy) when only audio/subtitle need work,
+      // instead of always burning a full h264 re-encode. Restricting this to
+      // 'ts'+h264 only (the old profile) is what pushed the server onto its
+      // coarse DirectPlayError fallback path, which never evaluates whether
+      // the requested subtitle needs burning in — so subs silently dropped.
+      {
+        Container: 'mp4',
+        Type: 'Video',
+        VideoCodec: videoCodecs.join(','),
+        AudioCodec: 'aac,mp3',
+        Protocol: 'hls',
+        Context: 'Streaming',
+        MaxAudioChannels: '2',
+        MinSegments: 2,
+        BreakOnNonKeyFrames: true
+      },
       {
         Container: 'ts',
         Type: 'Video',
