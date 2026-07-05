@@ -17,11 +17,11 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            script: build:win
+            builderArgs: --win
           - os: macos-latest
-            script: build:mac
+            builderArgs: --mac --arm64
           - os: ubuntu-latest
-            script: build:linux
+            builderArgs: --linux flatpak
     runs-on: ${{ matrix.os }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -47,6 +47,6 @@ jobs:
           sudo apt-get install -y flatpak flatpak-builder
           flatpak remote-add --if-not-exists --user flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
-      - run: pnpm ${{ matrix.script }} -- --publish always
-        env:
-          DEBUG: ${{ matrix.os == 'ubuntu-latest' && '@malept/flatpak-bundler' || '' }}
+      - run: pnpm build
+
+      - run: pnpm exec electron-builder ${{ matrix.builderArgs }} --publish always
