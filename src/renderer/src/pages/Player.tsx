@@ -125,6 +125,15 @@ function WebPlayer({
     }
   }, [])
 
+  // PiP floats its own always-on-top window — minimize the app behind it on
+  // enter, bring it back on exit
+  const prevPip = useRef(false)
+  useEffect(() => {
+    if (engine.pip && !prevPip.current) void window.api.minimizeWindow()
+    else if (!engine.pip && prevPip.current) void window.api.restoreWindow()
+    prevPip.current = engine.pip
+  }, [engine.pip])
+
   const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen()
     else void document.documentElement.requestFullscreen()
