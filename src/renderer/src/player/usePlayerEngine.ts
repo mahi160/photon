@@ -10,10 +10,17 @@ export interface EngineHandlers {
   onBeforeDestroy?: (positionSeconds: number) => void
 }
 
+export interface EngineInitial {
+  rate: number
+  volume: number
+  muted: boolean
+}
+
 export interface PlayerEngineApi {
   state: 'playing' | 'paused' | 'buffering'
   time: number
   duration: number
+  bufferedEnd: number
   volume: number
   muted: boolean
   rate: number
@@ -36,25 +43,27 @@ export interface PlayerEngineApi {
 
 export function usePlayerEngine(
   videoRef: React.RefObject<HTMLVideoElement | null>,
-  initialRate: number,
+  initial: EngineInitial,
   handlers: EngineHandlers
 ): PlayerEngineApi {
   const handlersRef = useRef(handlers)
   useEffect(() => {
     handlersRef.current = handlers
   })
+  const initialRef = useRef(initial) // applied once, at engine creation
 
   const engineRef = useRef<PlaybackEngine | null>(null)
   const [state, setState] = useState<'playing' | 'paused' | 'buffering'>('buffering')
   const [time, setTime] = useState(0)
   const [duration, setDuration] = useState(0)
-  const [volume, setVolume] = useState(1)
-  const [muted, setMuted] = useState(false)
-  const [rate, setRate] = useState(initialRate)
+  const [bufferedEnd, setBufferedEnd] = useState(0)
+  const [volume, setVolume] = useState(initial.volume)
+  const [muted, setMuted] = useState(initial.muted)
+  const [rate, setRate] = useState(initial.rate)
   const [pip, setPip] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const rateRef = useRef(initialRate)
-  const volumeRef = useRef(1) // mirror for stable adjustVolume
+  const rateRef = useRef(initial.rate)
+  const volumeRef = useRef(initial.volume) // mirror for stable adjustVolume
 
   const ensureEngine = useCallback((): PlaybackEngine | null => {
     if (!engineRef.current && videoRef.current) {
@@ -62,11 +71,21 @@ export function usePlayerEngine(
       e.on('time', (t) => {
         setTime(t)
         setDuration(e.duration())
+        setBufferedEnd(e.buffered())
       })
       e.on('state', setState)
       e.on('error', setError)
       e.on('pip', setPip)
+      // volumechange is the single source of truth — covers slider, hotkeys,
+      // and anything outside our UI (media keys, PiP window)
+      e.on('volume', (v, m) => {
+        volumeRef.current = v
+        setVolume(v)
+        setMuted(m)
+      })
       e.on('ended', () => handlersRef.current.onEnded?.(e.currentTime()))
+      e.setVolume(initialRef.current.volume)
+      e.setMuted(initialRef.current.muted)
       engineRef.current = e
     }
     return engineRef.current
@@ -95,12 +114,14 @@ export function usePlayerEngine(
 
   const currentTime = useCallback(() => engineRef.current?.currentTime() ?? 0, [])
 
+  // decide off the element, not mirrored state — during 'buffering' the mirror
+  // can't tell playing-but-stalled from paused, and pause would be unreachable
   const togglePlay = useCallback(() => {
     const e = engineRef.current
     if (!e) return
-    if (state === 'playing') e.pause()
-    else e.play()
-  }, [state])
+    if (e.paused()) e.play()
+    else e.pause()
+  }, [])
 
   const seek = useCallback((seconds: number) => engineRef.current?.seek(seconds), [])
   const seekBy = useCallback((delta: number) => {
@@ -109,10 +130,13 @@ export function usePlayerEngine(
   }, [])
 
   const changeVolume = useCallback((v: number) => {
+    const e = engineRef.current
     const clamped = Math.max(0, Math.min(1, v))
-    engineRef.current?.setVolume(clamped)
     volumeRef.current = clamped
+    e?.setVolume(clamped)
+    if (clamped > 0) e?.setMuted(false) // raising volume implies "I want sound"
     setVolume(clamped)
+    if (clamped > 0) setMuted(false)
   }, [])
   const adjustVolume = useCallback(
     (delta: number) => changeVolume(volumeRef.current + delta),
@@ -120,9 +144,16 @@ export function usePlayerEngine(
   )
 
   const toggleMute = useCallback(() => {
-    engineRef.current?.setMuted(!muted)
+    const e = engineRef.current
+    if (!e) return
+    if (muted && volumeRef.current === 0) {
+      // ponytail: unmuting at zero restores an audible level instead of staying silent
+      changeVolume(0.5)
+      return
+    }
+    e.setMuted(!muted)
     setMuted(!muted)
-  }, [muted])
+  }, [muted, changeVolume])
 
   const changeRate = useCallback((r: number) => {
     engineRef.current?.setRate(r)
@@ -147,6 +178,7 @@ export function usePlayerEngine(
     state,
     time,
     duration,
+    bufferedEnd,
     volume,
     muted,
     rate,

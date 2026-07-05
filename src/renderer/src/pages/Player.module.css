@@ -11,22 +11,38 @@
   block-size: 100%;
 }
 
+/* glass pill above the dock — transient hotkey/track feedback */
 .toast {
   pointer-events: none;
 
   position: absolute;
-  inset-block-start: 1.5rem;
+  z-index: 2;
+  inset-block-end: 9rem;
   inset-inline-start: 50%;
   transform: translateX(-50%);
 
-  padding-block: 0.5rem;
-  padding-inline: 1rem;
-  border-radius: var(--radius-s);
+  padding-block: 0.45rem;
+  padding-inline: 0.9rem;
+  border: 1px solid var(--player-border);
+  border-radius: var(--radius-full);
 
-  font-size: 0.875rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   color: white;
 
-  background: color-mix(in oklch, black 80%, transparent);
+  background: var(--player-glass-strong);
+  backdrop-filter: blur(16px);
+  box-shadow: var(--shadow-2);
+
+  animation: toast-in 180ms var(--ease);
+}
+
+@keyframes toast-in {
+  from {
+    transform: translate(-50%, 0.4rem);
+    opacity: 0;
+  }
 }
 
 .errorLayer {
@@ -35,31 +51,57 @@
 
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.1rem;
   align-items: center;
   justify-content: center;
 
-  background: color-mix(in oklch, black 80%, transparent);
+  background:
+    radial-gradient(
+      42rem 42rem at 50% 42%,
+      color-mix(in oklch, var(--accent-2) 7%, transparent),
+      transparent 70%
+    ),
+    color-mix(in oklch, black 82%, transparent);
 }
 
 .errorText {
-  color: var(--player-fg-muted);
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-style: italic;
+  color: var(--player-fg);
 }
 
 .errorRetry {
   padding-block: 0.6rem;
-  padding-inline: 1.1rem;
-  border-radius: var(--radius-s);
+  padding-inline: 1.4rem;
+  border-radius: var(--radius-full);
 
   font-size: 0.875rem;
+  font-weight: 600;
   color: var(--accent-fg);
 
-  background: var(--accent);
+  background: linear-gradient(
+    140deg,
+    var(--accent),
+    color-mix(in oklch, var(--accent) 68%, var(--accent-2))
+  );
+  box-shadow: 0 6px 20px -6px color-mix(in oklch, var(--accent) 60%, transparent);
+
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.errorRetry:hover {
+  transform: scale(1.04);
 }
 
 .errorBack {
   font-size: 0.875rem;
   color: color-mix(in oklch, white 45%, transparent);
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.errorBack:hover {
+  color: color-mix(in oklch, white 75%, transparent);
 }
 
 .mpvControls {
