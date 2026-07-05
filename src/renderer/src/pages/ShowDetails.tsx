@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams, useRouter } from '@tanstack/react-router'
+import { CaretLeftIcon, CheckIcon, PlayIcon } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
 import { episodesQuery, itemQuery, nextUpQuery, seasonsQuery } from '../lib/queries'
 import { backdropUrl, imageUrl, ticksToSeconds, type BaseItem } from '../lib/jellyfin'
@@ -19,9 +20,7 @@ function EpisodeRow({ ep, onPlay }: { ep: BaseItem; onPlay: () => void }): React
         )}
         {ep.UserData?.Played && (
           <div className={styles.watchedBadge}>
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z" />
-            </svg>
+            <CheckIcon weight="bold" />
           </div>
         )}
       </div>
@@ -86,16 +85,7 @@ export function ShowDetails(): React.JSX.Element {
         {backdrop && <img src={backdrop} alt="" className={styles.heroImg} />}
         <div className={styles.heroScrim} />
         <button onClick={() => router.history.back()} className={styles.back}>
-          <svg
-            viewBox="0 0 20 20"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <polyline points="12,4 5,10 12,16" />
-          </svg>
+          <CaretLeftIcon weight="bold" />
           Back
         </button>
       </div>
@@ -119,9 +109,7 @@ export function ShowDetails(): React.JSX.Element {
             {next && (
               <div className={styles.actions}>
                 <button onClick={() => play(next)} className={styles.playPrimary}>
-                  <svg viewBox="0 0 16 16">
-                    <polygon points="3,1.5 14,8 3,14.5" fill="currentColor" />
-                  </svg>
+                  <PlayIcon weight="fill" />
                   {nextResumable ? 'Resume' : 'Play Next Episode'}
                 </button>
                 <span className={styles.nextLabel}>

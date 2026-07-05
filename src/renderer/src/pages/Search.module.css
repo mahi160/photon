@@ -1,6 +1,15 @@
 .page {
   max-inline-size: 66rem;
-  padding: 2.75rem;
+  padding-block: 2.5rem 3rem;
+  padding-inline: var(--gutter);
+  animation: rise var(--dur-slow) var(--ease-out) backwards;
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(1rem);
+    opacity: 0;
+  }
 }
 
 .input {
@@ -9,11 +18,10 @@
   border: none;
   border-block-end: 1px solid var(--border);
 
-  font-family: var(--font-display);
-  font-size: 1.625rem;
-  font-weight: 600;
+  font-size: clamp(1.35rem, 2.5vw, 1.75rem);
+  font-weight: 700;
   color: var(--fg);
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
 
   background: none;
   outline: none;
@@ -61,10 +69,14 @@
 }
 
 .groupTitle {
-  margin-block-end: 0.9rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
+  margin-block-end: 1rem;
+
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 500;
   color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
 }
 
 .grid {
@@ -76,8 +88,8 @@
 .epHead {
   display: flex;
   gap: 0.65rem;
-  align-items: center;
-  margin-block-end: 0.9rem;
+  align-items: baseline;
+  margin-block-end: 1rem;
 }
 
 .epHead .groupTitle {
@@ -85,12 +97,13 @@
 }
 
 .searching {
-  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
   color: var(--fg-faint);
-  animation: searchPulse 1.4s var(--ease) infinite;
+  animation: search-pulse 1.4s var(--ease) infinite;
 }
 
-@keyframes searchPulse {
+@keyframes search-pulse {
   0%,
   100% {
     opacity: 0.35;
@@ -114,7 +127,7 @@
   inline-size: 100%;
   margin-inline: -0.75rem;
   padding: 0.6rem 0.75rem;
-  border-radius: var(--radius-s);
+  border-radius: var(--radius-m);
 
   text-align: start;
 
@@ -152,6 +165,8 @@
 }
 
 .epSub {
-  font-size: 0.8125rem;
+  margin-block-start: 0.1rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
   color: var(--fg-muted);
 }
