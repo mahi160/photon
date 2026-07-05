@@ -1,6 +1,5 @@
-@import url('@fontsource-variable/fraunces/opsz.css');
-@import url('@fontsource-variable/fraunces/opsz-italic.css');
-@import url('@fontsource-variable/hanken-grotesk/wght.css');
+@import url('@fontsource-variable/schibsted-grotesk/index.css');
+@import url('@fontsource-variable/spline-sans-mono/index.css');
 
 *,
 *::before,
@@ -15,20 +14,12 @@ body,
   block-size: 100%;
 }
 
-html {
-  font-size: 16px;
-}
-
 body {
   user-select: none;
 
-  isolation: isolate;
-  position: relative;
-
   margin: 0;
 
-  font-family: var(--font-body);
-  font-optical-sizing: auto;
+  font-family: var(--font-sans);
   color: var(--fg);
 
   background: var(--bg);
@@ -36,27 +27,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* a whisper of film grain — static, low-opacity, never animated */
-body::before {
-  pointer-events: none;
-  content: '';
-
-  position: fixed;
-  z-index: 9999;
-  inset: 0;
-
-  opacity: 0.035;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  mix-blend-mode: overlay;
-}
-
 h1,
 h2,
 h3 {
   margin: 0;
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.015em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 p {
@@ -88,6 +64,10 @@ video {
   max-inline-size: 100%;
 }
 
+kbd {
+  font-family: var(--font-mono);
+}
+
 ::selection {
   color: var(--accent-fg);
   background: var(--accent);
@@ -109,4 +89,14 @@ video {
 
 ::-webkit-scrollbar-thumb {
   border-radius: var(--radius-full);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

@@ -1,18 +1,26 @@
-/* Design tokens. Each color scheme only supplies 6 primitives per theme
+/* Design tokens. Each color scheme supplies 6 primitives
    (bg, fg, fg-muted, accent, accent-2, accent-3, accent-4) — every surface,
    border, glow and soft fill is derived from those with color-mix so
    swapping or adding a scheme is a six-line edit. */
 
 :root {
-  --font-display: 'Fraunces Variable', ui-serif, georgia, serif;
-  --font-body: 'Hanken Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Schibsted Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Spline Sans Mono Variable', ui-monospace, 'SF Mono', monospace;
   --radius-s: 0.5rem;
   --radius-m: 0.875rem;
   --radius-l: 1.5rem;
   --radius-full: 999rem;
+  --gutter: clamp(1.5rem, 4vw, 3rem);
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --dur-fast: 120ms;
-  --dur-med: 220ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 140ms;
+  --dur-med: 260ms;
+  --dur-slow: 500ms;
+
+  /* one small z scale — nothing else in the app sets z-index above these */
+  --z-nav: 10;
+  --z-overlay: 20;
+  --z-toast: 30;
 }
 
 /* accent colors are always chosen light (dark themes) or dark (light
@@ -58,26 +66,25 @@
   --border-strong: color-mix(in oklch, var(--fg) 30%, var(--bg));
   --border: color-mix(in oklch, var(--border-strong) 60%, transparent);
   --fg-faint: color-mix(in oklch, var(--fg-muted) 65%, var(--bg));
-  --accent-soft: color-mix(in oklch, var(--accent) 16%, transparent);
   --accent-border: color-mix(in oklch, var(--accent) 45%, transparent);
   --accent-hover: color-mix(in oklch, var(--accent) 85%, black);
-  --accent-2-soft: color-mix(in oklch, var(--accent-2) 18%, transparent);
-  --accent-3-soft: color-mix(in oklch, var(--accent-3) 18%, transparent);
-  --glass: color-mix(in oklch, var(--surface-1) 70%, transparent);
-  --glass-strong: color-mix(in oklch, var(--bg) 62%, transparent);
   --scrim: color-mix(in oklch, black 60%, transparent);
   --scrim-soft: color-mix(in oklch, black 35%, transparent);
   --shadow-1: 0 1px 2px color-mix(in oklch, black 30%, transparent);
   --shadow-2:
     0 8px 24px -8px color-mix(in oklch, black 55%, transparent),
     0 1px 1px color-mix(in oklch, black 20%, transparent);
-  --shadow-glow: 0 16px 36px -12px color-mix(in oklch, var(--accent-2) 45%, transparent);
+
+  /* the beam — Photon's signature light line. Used in exactly three places:
+     active nav underline, card progress, player timeline. */
+  --beam: linear-gradient(90deg, var(--accent), var(--accent-2));
+  --beam-glow: 0 0 10px color-mix(in oklch, var(--accent) 55%, transparent);
 
   /* the video canvas is always black, in either theme, so the player's own
      chrome stays dark glass regardless of --bg/--surface */
-  --player-glass: color-mix(in oklch, black 62%, var(--accent-2) 6%);
-  --player-glass-strong: color-mix(in oklch, black 70%, var(--accent-2) 8%);
-  --player-fg: #d4be98;
-  --player-fg-muted: color-mix(in oklch, #d4be98 65%, transparent);
+  --player-glass: color-mix(in oklch, black 58%, var(--accent-2) 5%);
+  --player-glass-strong: color-mix(in oklch, black 72%, var(--accent-2) 7%);
+  --player-fg: #e8dcc3;
+  --player-fg-muted: color-mix(in oklch, #e8dcc3 60%, transparent);
   --player-border: color-mix(in oklch, white 12%, transparent);
 }
