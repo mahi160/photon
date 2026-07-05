@@ -21,6 +21,7 @@ export interface EngineEvents {
   ended: () => void
   error: (message: string) => void
   pip: (active: boolean) => void
+  volume: (volume: number, muted: boolean) => void
 }
 
 export interface PlaybackEngine {
@@ -37,6 +38,8 @@ export interface PlaybackEngine {
   exitPiP(): Promise<void>
   currentTime(): number
   duration(): number
+  paused(): boolean
+  buffered(): number
   destroy(): void
   on<K extends keyof EngineEvents>(event: K, cb: EngineEvents[K]): () => void
 }

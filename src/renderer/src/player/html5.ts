@@ -17,7 +17,8 @@ export class Html5Engine implements PlaybackEngine {
     state: new Set(),
     ended: new Set(),
     error: new Set(),
-    pip: new Set()
+    pip: new Set(),
+    volume: new Set()
   }
 
   constructor(private video: HTMLVideoElement) {
@@ -36,6 +37,7 @@ export class Html5Engine implements PlaybackEngine {
     video.addEventListener('error', this.onError, { signal })
     video.addEventListener('enterpictureinpicture', this.onPipEnter, { signal })
     video.addEventListener('leavepictureinpicture', this.onPipLeave, { signal })
+    video.addEventListener('volumechange', this.onVolume, { signal })
   }
 
   private emit<K extends keyof EngineEvents>(event: K, ...args: Parameters<EngineEvents[K]>): void {
@@ -53,6 +55,7 @@ export class Html5Engine implements PlaybackEngine {
   }
   private onPipEnter = (): void => this.emit('pip', true)
   private onPipLeave = (): void => this.emit('pip', false)
+  private onVolume = (): void => this.emit('volume', this.video.volume, this.video.muted)
 
   async load(req: LoadRequest): Promise<void> {
     this.hls?.destroy()
@@ -203,6 +206,15 @@ export class Html5Engine implements PlaybackEngine {
 
   duration(): number {
     return this.video.duration || 0
+  }
+
+  paused(): boolean {
+    return this.video.paused
+  }
+
+  buffered(): number {
+    const b = this.video.buffered
+    return b.length ? b.end(b.length - 1) : 0
   }
 
   on<K extends keyof EngineEvents>(event: K, cb: EngineEvents[K]): () => void {
