@@ -101,6 +101,9 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
+      // contextIsolation stays on (default) and the preload only exposes the
+      // whitelisted `api`/`electron` bridges above — sandbox is off solely
+      // because @electron-toolkit/preload needs non-sandboxed Node APIs at load time
       sandbox: false
     }
   })

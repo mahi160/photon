@@ -99,16 +99,14 @@ video {
   outline-offset: 2px;
 }
 
-::-webkit-scrollbar {
-  inline-size: 8px;
-  block-size: 8px;
+/* Electron bundles a fixed, modern Chromium — no ::-webkit-scrollbar fallback needed.
+   The ::-webkit-scrollbar-thumb rule below isn't a compat fallback, standard
+   scrollbar-color has no radius control, so it's kept for the rounded thumb only. */
+* {
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-width: thin;
 }
 
 ::-webkit-scrollbar-thumb {
   border-radius: var(--radius-full);
-  background: var(--border-strong);
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
 }
