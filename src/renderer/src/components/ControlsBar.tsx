@@ -1,0 +1,303 @@
+import { Menu as BaseMenu } from '@base-ui/react/menu'
+import { Select as BaseSelect } from '@base-ui/react/select'
+import { Popover as BasePopover } from '@base-ui/react/popover'
+import {
+  ArrowSquareOutIcon,
+  ClosedCaptioningIcon,
+  ClockClockwiseIcon,
+  CornersInIcon,
+  CornersOutIcon,
+  HeadphonesIcon,
+  PauseIcon,
+  PictureInPictureIcon,
+  PlayIcon,
+  SkipForwardIcon,
+  SpeakerHighIcon,
+  SpeakerSlashIcon
+} from '@phosphor-icons/react'
+import type { MediaStream, BaseItem } from '../lib/jellyfin'
+import { Stepper, type StepperClasses } from './Stepper'
+import { Tip } from './Tip'
+import { TrackSelectMenu } from './TrackSelectMenu'
+import styles from './PlayerControls.module.css'
+
+const stepperClasses: StepperClasses = {
+  group: styles.stepperGroup,
+  btn: styles.stepBtn,
+  input: styles.stepInput
+}
+
+const speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
+
+export interface ControlsBarProps {
+  state: 'playing' | 'paused' | 'buffering'
+  rate: number
+  volume: number
+  muted: boolean
+  pip: boolean
+  fullscreen: boolean
+  audioStreams: MediaStream[]
+  audioIndex?: number
+  subtitleStreams: MediaStream[]
+  subtitleIndex: number | null
+  subtitleDelay: number
+  subtitleDelayEnabled: boolean
+  nextEpisode?: BaseItem
+  menuOpen: 'audio' | 'subs' | 'speed' | 'sync' | null
+  onToggleMenu: (menu: 'audio' | 'subs' | 'speed' | 'sync', open: boolean) => void
+  onTogglePlay: () => void
+  onPlayNext?: () => void
+  onVolume: (v: number) => void
+  onVolumeStep: (delta: number) => void
+  onMute: () => void
+  onRate: (r: number) => void
+  onSelectAudio: (i: number) => void
+  onSelectSubtitle: (i: number | null) => void
+  onSubtitleDelay: (s: number) => void
+  onFullscreen: () => void
+  onPiP: () => void
+  onOpenMpv?: () => void
+  onEndsAt?: (endsAt: Date) => void
+}
+
+function EndTimeDisplay({ duration, currentTime, rate, onEndsAt }: {
+  duration: number
+  currentTime: number
+  rate: number
+  onEndsAt?: (endsAt: Date) => void
+}): React.JSX.Element | null {
+  if (duration <= 0) return null
+  const endsAt = new Date(Date.now() + ((duration - currentTime) / (rate || 1)) * 1000)
+  onEndsAt?.(endsAt)
+  return (
+    <span className={styles.endsAt}>
+      ends at {endsAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+    </span>
+  )
+}
+
+export function ControlsBar({
+  state,
+  rate,
+  volume,
+  muted,
+  pip,
+  fullscreen,
+  audioStreams,
+  audioIndex,
+  subtitleStreams,
+  subtitleIndex,
+  subtitleDelay,
+  subtitleDelayEnabled,
+  nextEpisode,
+  menuOpen,
+  onToggleMenu,
+  onTogglePlay,
+  onPlayNext,
+  onVolume,
+  onVolumeStep,
+  onMute,
+  onRate,
+  onSelectAudio,
+  onSelectSubtitle,
+  onSubtitleDelay,
+  onFullscreen,
+  onPiP,
+  onOpenMpv,
+  onEndsAt
+}: ControlsBarProps): React.JSX.Element {
+  return (
+    <div className={styles.controlsRow}>
+      <Tip label={state === 'playing' ? 'Pause' : 'Play'} kbd="Space">
+        <button className={styles.playBtn} onClick={onTogglePlay} aria-label="Play or pause">
+          {state === 'playing' ? (
+            <PauseIcon weight="fill" className={styles.icon} />
+          ) : (
+            <PlayIcon weight="fill" className={styles.icon} />
+          )}
+        </button>
+      </Tip>
+
+      {onPlayNext && (
+        <Tip label={nextEpisode ? `Next: ${nextEpisode.Name}` : 'Next episode'}>
+          <button
+            className={styles.iconBtn}
+            onClick={onPlayNext}
+            aria-label="Next episode"
+          >
+            <SkipForwardIcon weight="fill" className={styles.icon} />
+          </button>
+        </Tip>
+      )}
+
+      <div className={styles.volumeGroup}>
+        <Tip label={muted ? 'Unmute' : 'Mute'} kbd="M">
+          <button className={styles.iconBtn} onClick={onMute} aria-label="Mute">
+            {muted || volume === 0 ? (
+              <SpeakerSlashIcon className={styles.icon} />
+            ) : (
+              <SpeakerHighIcon className={styles.icon} />
+            )}
+          </button>
+        </Tip>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={muted ? 0 : volume}
+          onChange={(e) => onVolume(Number(e.target.value))}
+          className={styles.volume}
+          style={{ '--vol': `${(muted ? 0 : volume) * 100}%` } as React.CSSProperties}
+          aria-label="Volume"
+          onWheel={(e) => onVolumeStep(e.deltaY < 0 ? 0.05 : -0.05)}
+        />
+      </div>
+
+      <EndTimeDisplay
+        duration={0}
+        currentTime={0}
+        rate={rate}
+        onEndsAt={onEndsAt}
+      />
+
+      <div className={styles.grow} />
+
+      <BaseMenu.Root open={menuOpen === 'speed'} onOpenChange={(open) => onToggleMenu('speed', open)}>
+        <Tip label="Playback speed">
+          <BaseMenu.Trigger className={styles.iconBtn} aria-label="Playback speed">
+            <span className={styles.rateLabel}>{rate}×</span>
+          </BaseMenu.Trigger>
+        </Tip>
+        <BaseMenu.Portal>
+          <BaseMenu.Positioner side="top" align="end" sideOffset={10}>
+            <BaseMenu.Popup className={styles.menu}>
+              {speeds.map((s) => (
+                <BaseMenu.Item
+                  key={s}
+                  onClick={() => {
+                    onRate(s)
+                    onToggleMenu('speed', false)
+                  }}
+                  className={`${styles.menuItem} ${rate === s ? styles.menuItemActive : ''}`}
+                >
+                  {s}×
+                </BaseMenu.Item>
+              ))}
+            </BaseMenu.Popup>
+          </BaseMenu.Positioner>
+        </BaseMenu.Portal>
+      </BaseMenu.Root>
+
+      <TrackSelectMenu
+        label={<HeadphonesIcon className={styles.icon} />}
+        ariaLabel="Audio track"
+        open={menuOpen === 'audio'}
+        onOpenChange={(open) => onToggleMenu('audio', open)}
+        value={audioIndex}
+        tracks={audioStreams}
+        onSelect={onSelectAudio}
+        defaultLabel="Default"
+      />
+
+      <BaseSelect.Root
+        value={subtitleIndex}
+        onValueChange={(v) => onSelectSubtitle(v)}
+        open={menuOpen === 'subs'}
+        onOpenChange={(open) => onToggleMenu('subs', open)}
+      >
+        <Tip label="Subtitles">
+          <BaseSelect.Trigger className={styles.iconBtn} aria-label="Subtitles">
+            <ClosedCaptioningIcon
+              weight={subtitleIndex !== null ? 'fill' : 'regular'}
+              className={styles.icon}
+            />
+          </BaseSelect.Trigger>
+        </Tip>
+        <BaseSelect.Portal>
+          <BaseSelect.Positioner alignItemWithTrigger side="top" sideOffset={10}>
+            <BaseSelect.Popup className={styles.menu}>
+              <BaseSelect.Item value={null} className={styles.menuItem}>
+                <BaseSelect.ItemText>Off</BaseSelect.ItemText>
+              </BaseSelect.Item>
+              {subtitleStreams.map((s) => (
+                <BaseSelect.Item key={s.Index} value={s.Index} className={styles.menuItem}>
+                  <BaseSelect.ItemText>
+                    {s.DisplayTitle ?? `Subtitle ${s.Index}`}
+                    {s.DeliveryMethod !== 'External' && ' (burned-in)'}
+                  </BaseSelect.ItemText>
+                </BaseSelect.Item>
+              ))}
+            </BaseSelect.Popup>
+          </BaseSelect.Positioner>
+        </BaseSelect.Portal>
+      </BaseSelect.Root>
+
+      <BasePopover.Root open={menuOpen === 'sync'} onOpenChange={(open) => onToggleMenu('sync', open)}>
+        <Tip label="Subtitle sync" kbd="[ ]">
+          <BasePopover.Trigger
+            className={styles.iconBtn}
+            disabled={!subtitleDelayEnabled}
+            aria-label="Subtitle sync"
+          >
+            <ClockClockwiseIcon className={styles.icon} />
+          </BasePopover.Trigger>
+        </Tip>
+        <BasePopover.Portal>
+          <BasePopover.Positioner side="top" align="center" sideOffset={10}>
+            <BasePopover.Popup className={styles.syncPopup}>
+              <div className={styles.syncLabel}>Subtitle sync</div>
+              <Stepper
+                min={-10}
+                max={10}
+                step={0.5}
+                disabled={!subtitleDelayEnabled}
+                value={subtitleDelay}
+                onChange={onSubtitleDelay}
+                format={{
+                  style: 'unit',
+                  unit: 'second',
+                  unitDisplay: 'narrow',
+                  signDisplay: 'exceptZero'
+                }}
+                label="Subtitle delay"
+                decrementLabel="Advance subtitles (show earlier)"
+                incrementLabel="Delay subtitles (show later)"
+                classes={stepperClasses}
+              />
+              <div className={styles.syncHint}>[ earlier · later ]</div>
+            </BasePopover.Popup>
+          </BasePopover.Positioner>
+        </BasePopover.Portal>
+      </BasePopover.Root>
+
+      {onOpenMpv && (
+        <Tip label="Open in mpv">
+          <button className={styles.iconBtn} onClick={onOpenMpv} aria-label="Open in mpv">
+            <ArrowSquareOutIcon className={styles.icon} />
+          </button>
+        </Tip>
+      )}
+
+      <Tip label={pip ? 'Exit Picture in Picture' : 'Picture in Picture'} kbd="P">
+        <button
+          className={`${styles.iconBtn} ${pip ? styles.iconBtnActive : ''}`}
+          onClick={onPiP}
+          aria-label="Picture in Picture"
+        >
+          <PictureInPictureIcon weight={pip ? 'fill' : 'regular'} className={styles.icon} />
+        </button>
+      </Tip>
+
+      <Tip label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'} kbd="F">
+        <button className={styles.iconBtn} onClick={onFullscreen} aria-label="Fullscreen">
+          {fullscreen ? (
+            <CornersInIcon className={styles.icon} />
+          ) : (
+            <CornersOutIcon className={styles.icon} />
+          )}
+        </button>
+      </Tip>
+    </div>
+  )
+}

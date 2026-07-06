@@ -9,6 +9,10 @@ import { useSettings } from '../stores/settings'
 import { PlayerControls } from '../components/PlayerControls'
 import { SubtitleStyleTag } from '../components/SubtitleStyleTag'
 import { useHotkeys } from '../lib/useHotkeys'
+import { useToast } from '../hooks/useToast'
+import { useMediaSession } from '../hooks/useMediaSession'
+import { useAutoHideControls } from '../hooks/useAutoHideControls'
+import { queryKeys } from '../lib/queryKeys'
 import { MpvPlayer } from './MpvPlayer'
 import styles from './Player.module.css'
 
@@ -105,13 +109,9 @@ function WebPlayer({
     void window.api.mpvCheck().then(setMpvOk)
   }, [])
 
-  const [toast, setToast] = useState<string | null>(null)
-  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const showToast = useCallback((msg: string) => {
-    setToast(msg)
-    clearTimeout(toastTimer.current)
-    toastTimer.current = setTimeout(() => setToast(null), 1200)
-  }, [])
+  // extract toast and auto-hide controls
+  const { message: toast, show: showToast } = useToast(1200)
+  const { visible, setPinned, poke } = useAutoHideControls(engine.state)
 
   // real fullscreen state (Esc exits natively; icon must follow), and never
   // strand the app in fullscreen when leaving the player
@@ -138,28 +138,6 @@ function WebPlayer({
     if (document.fullscreenElement) void document.exitFullscreen()
     else void document.documentElement.requestFullscreen()
   }, [])
-
-  // auto-hide controls: pointer activity arms a 3s timer; paused playback,
-  // open menus, scrubbing and a pointer resting on the chrome all pin them
-  const [controlsVisible, setControlsVisible] = useState(true)
-  const [pinned, setPinned] = useState(false)
-  const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const poke = useCallback(() => {
-    setControlsVisible(true)
-    clearTimeout(hideTimer.current)
-    hideTimer.current = setTimeout(() => setControlsVisible(false), 3000)
-  }, [])
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot initial reveal
-    poke()
-    return () => clearTimeout(hideTimer.current)
-  }, [poke])
-  useEffect(() => {
-    // resume grants a grace period instead of vanishing controls instantly
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- timer re-arm on resume
-    if (engine.state === 'playing') poke()
-  }, [engine.state, poke])
-  const visible = controlsVisible || pinned || engine.state === 'paused'
 
   function bumpVolume(delta: number): void {
     const v = Math.max(0, Math.min(1, engine.volume + delta))
@@ -200,7 +178,7 @@ function WebPlayer({
   // used here — mid-episode it still points at the current one
   const playing = player.session?.item
   const nextEp = useQuery({
-    queryKey: ['episodeAfter', playing?.Id],
+    queryKey: [...queryKeys.item.adjacent(playing?.Id ?? ''), 'next'],
     enabled: playing?.Type === 'Episode' && !!playing.SeriesId,
     staleTime: Infinity,
     queryFn: async () => {
@@ -212,7 +190,7 @@ function WebPlayer({
     }
   })
   const prevEp = useQuery({
-    queryKey: ['episodeBefore', playing?.Id],
+    queryKey: [...queryKeys.item.adjacent(playing?.Id ?? ''), 'prev'],
     enabled: playing?.Type === 'Episode' && !!playing.SeriesId,
     staleTime: Infinity,
     queryFn: async () => {
@@ -224,19 +202,14 @@ function WebPlayer({
     }
   })
 
-  // PiP window's own transport shows prev/next track buttons when these are set
-  useEffect(() => {
-    const ms = navigator.mediaSession
-    ms.setActionHandler(
-      'previoustrack',
-      prevEp.data ? () => void player.playItem(prevEp.data!) : null
-    )
-    ms.setActionHandler('nexttrack', nextEp.data ? () => void player.playItem(nextEp.data!) : null)
-    return () => {
-      ms.setActionHandler('previoustrack', null)
-      ms.setActionHandler('nexttrack', null)
-    }
-  }, [prevEp.data, nextEp.data, player.playItem])
+  // OS media keys / overlay buttons with explicit handlers
+  useMediaSession({
+    togglePlay: engine.togglePlay,
+    seekBy: engine.seekBy,
+    playItem: player.playItem,
+    prevEpisode: prevEp.data ?? null,
+    nextEpisode: nextEp.data ?? null
+  })
 
   // keyboard shortcuts (PRD: Navigation); repeat-guarded where holding the
   // key would flap the state instead of progressing it

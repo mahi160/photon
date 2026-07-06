@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- queryOptions types are inferred */
 import { queryOptions } from '@tanstack/react-query'
 import { currentSession, jf, type BaseItem, type ItemsResult } from './jellyfin'
+import { queryKeys } from './queryKeys'
 
 function userId(): string {
   const s = currentSession()
@@ -9,7 +10,7 @@ function userId(): string {
 }
 
 export const resumeItemsQuery = queryOptions({
-  queryKey: ['resume'],
+  queryKey: queryKeys.resume(),
   queryFn: () =>
     jf<ItemsResult>(`/Users/${userId()}/Items/Resume`, {
       query: {
@@ -23,7 +24,7 @@ export const resumeItemsQuery = queryOptions({
 
 // next episodes across all in-progress shows (home row)
 export const nextUpItemsQuery = queryOptions({
-  queryKey: ['nextUp', 'all'],
+  queryKey: queryKeys.nextUp.allSeries(),
   queryFn: () =>
     jf<ItemsResult>('/Shows/NextUp', {
       query: { userId: userId(), Limit: 12 }
@@ -31,7 +32,7 @@ export const nextUpItemsQuery = queryOptions({
 })
 
 export const latestMoviesQuery = queryOptions({
-  queryKey: ['latest', 'movies'],
+  queryKey: queryKeys.latest.movies(),
   queryFn: () =>
     jf<BaseItem[]>(`/Users/${userId()}/Items/Latest`, {
       query: { IncludeItemTypes: 'Movie', Limit: 20 }
@@ -39,7 +40,7 @@ export const latestMoviesQuery = queryOptions({
 })
 
 export const latestShowsQuery = queryOptions({
-  queryKey: ['latest', 'shows'],
+  queryKey: queryKeys.latest.shows(),
   queryFn: () =>
     jf<BaseItem[]>(`/Users/${userId()}/Items/Latest`, {
       query: { IncludeItemTypes: 'Series', Limit: 20 }
@@ -57,7 +58,7 @@ const sortParams: Record<SortKey, { SortBy: string; SortOrder: string }> = {
 // merged across all libraries of the type — library boundaries are invisible (see PRD)
 export const libraryQuery = (type: 'Movie' | 'Series', sort: SortKey) =>
   queryOptions({
-    queryKey: ['library', type, sort],
+    queryKey: type === 'Movie' ? queryKeys.library.movies(sort) : queryKeys.library.shows(sort),
     queryFn: () =>
       jf<ItemsResult>(`/Items`, {
         query: {
@@ -72,7 +73,7 @@ export const libraryQuery = (type: 'Movie' | 'Series', sort: SortKey) =>
 
 // lightweight local search index: all movies + series, once per launch (ADR-0001)
 export const searchIndexQuery = queryOptions({
-  queryKey: ['searchIndex'],
+  queryKey: queryKeys.search.index(),
   staleTime: Infinity,
   queryFn: () =>
     jf<ItemsResult>(`/Items`, {
@@ -88,7 +89,7 @@ export const searchIndexQuery = queryOptions({
 // episodes searched server-side (ADR-0001)
 export const episodeSearchQuery = (term: string) =>
   queryOptions({
-    queryKey: ['episodeSearch', term],
+    queryKey: queryKeys.search.episodes(term),
     enabled: term.length >= 2,
     queryFn: () =>
       jf<ItemsResult>(`/Items`, {
@@ -104,7 +105,7 @@ export const episodeSearchQuery = (term: string) =>
 
 export const itemQuery = (itemId: string) =>
   queryOptions({
-    queryKey: ['item', itemId],
+    queryKey: queryKeys.item.detail(itemId),
     queryFn: () =>
       jf<BaseItem>(`/Users/${userId()}/Items/${itemId}`, {
         query: { Fields: 'Overview,MediaSources,Chapters' }
@@ -113,7 +114,7 @@ export const itemQuery = (itemId: string) =>
 
 export const seasonsQuery = (seriesId: string) =>
   queryOptions({
-    queryKey: ['seasons', seriesId],
+    queryKey: queryKeys.seasons.detail(seriesId),
     queryFn: () =>
       jf<ItemsResult>(`/Shows/${seriesId}/Seasons`, {
         query: { userId: userId() }
@@ -122,7 +123,7 @@ export const seasonsQuery = (seriesId: string) =>
 
 export const episodesQuery = (seriesId: string, seasonId: string) =>
   queryOptions({
-    queryKey: ['episodes', seriesId, seasonId],
+    queryKey: queryKeys.episodes.detail(seriesId, seasonId),
     queryFn: () =>
       jf<ItemsResult>(`/Shows/${seriesId}/Episodes`, {
         query: { userId: userId(), seasonId, Fields: 'Overview' }
@@ -131,7 +132,7 @@ export const episodesQuery = (seriesId: string, seasonId: string) =>
 
 export const nextUpQuery = (seriesId: string) =>
   queryOptions({
-    queryKey: ['nextUp', seriesId],
+    queryKey: queryKeys.nextUp.series(seriesId),
     queryFn: () =>
       jf<ItemsResult>(`/Shows/NextUp`, {
         query: { userId: userId(), seriesId, Limit: 1 }

@@ -9,8 +9,8 @@ import {
 } from '../lib/jellyfin'
 import { useSettings } from '../stores/settings'
 import { useTrackMemory } from '../stores/trackMemory'
+import { useSubtitleSelection } from '../hooks/useSubtitleSelection'
 import {
-  isTextTrack,
   reportProgress,
   reportStart,
   reportStopped,
@@ -110,9 +110,9 @@ export function usePlayback(
   const [session, setSession] = useState<PlaybackSession | null>(null)
   const sessionRef = useRef<PlaybackSession | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [subtitleIndex, setSubtitleIndex] = useState<number | null>(null)
   const [audioIndex, setAudioIndex] = useState<number | undefined>(undefined)
   const [subtitleDelay, setSubtitleDelay] = useState(0)
+  const { index: subtitleIndex, isText: subtitleIsText, select: selectSubtitleLogic } = useSubtitleSelection(session)
 
   const initial = useSettings.getState()
   const engine = usePlayerEngine(
@@ -186,7 +186,7 @@ export function usePlayback(
         reportStart(sess, sess.startSeconds)
 
         const sel = resolveSubtitleSelection(sess, opts.subtitleStreamIndex, settings)
-        setSubtitleIndex(sel.display)
+        selectSubtitleLogic(sel.display)
         if (sel.textTrack !== null) setTextTrack(sel.textTrack)
 
         // restore last subtitle sync offset, text tracks only
@@ -338,45 +338,18 @@ export function usePlayback(
   function selectSubtitle(index: number | null): void {
     const sess = sessionRef.current
     if (!sess) return
-    const settings = useSettings.getState()
-    // a burned-in sub lives in the video pixels — leaving it (off or to a text
-    // track) requires a reload without the burn-in
-    const burnedIn = subtitleIndex !== null && !isTextTrack(sess, subtitleIndex)
-    if (index === null) {
-      settings.set({ subtitlesEnabled: false })
-      setSubtitleIndex(null)
-      useTrackMemory.getState().remember(sess.item.Id, { subtitleStreamIndex: -1 })
-      if (burnedIn) {
-        void loadFor(sess.item, {
-          startSeconds: engine.currentTime(),
-          audioStreamIndex: audioIndex,
-          subtitleStreamIndex: -1,
-          mediaSourceId: sess.mediaSource.Id
-        })
-      } else {
-        engine.setTextTrack(null)
-      }
-      return
-    }
-    const language = sess.subtitleStreams.find((s) => s.Index === index)?.Language
-    settings.set({
-      subtitlesEnabled: true,
-      ...(language ? { preferredSubtitleLanguage: language } : {})
-    })
-    useTrackMemory.getState().remember(sess.item.Id, { subtitleStreamIndex: index })
-    if (!burnedIn && isTextTrack(sess, index)) {
-      engine.setTextTrack(index)
-      setSubtitleIndex(index)
-    } else {
-      // burn-in (or leaving one): new session at the current position
-      setSubtitleIndex(index)
+    const action = selectSubtitleLogic(index)
+    if (action === 'reload') {
       void loadFor(sess.item, {
         startSeconds: engine.currentTime(),
         audioStreamIndex: audioIndex,
-        subtitleStreamIndex: index,
+        subtitleStreamIndex: index ?? -1,
         mediaSourceId: sess.mediaSource.Id
       })
+    } else if (action === 'setTextTrack') {
+      engine.setTextTrack(index)
     }
+    // else: 'disable' needs no engine action
   }
 
   function selectAudio(index: number): void {
@@ -421,8 +394,7 @@ export function usePlayback(
     subtitleIndex,
     audioIndex,
     subtitleDelay,
-    subtitleIsText:
-      subtitleIndex === null || (session !== null && isTextTrack(session, subtitleIndex)),
+    subtitleIsText,
     selectAudio,
     selectSubtitle,
     changeDelay,
