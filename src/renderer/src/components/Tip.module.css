@@ -1,0 +1,40 @@
+.positioner {
+  z-index: var(--z-toast);
+}
+
+.tip {
+  display: flex;
+  gap: 0.45rem;
+  align-items: center;
+
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--player-border);
+  border-radius: var(--radius-s);
+
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: white;
+  white-space: nowrap;
+
+  background: color-mix(in oklch, black 78%, transparent);
+  backdrop-filter: blur(12px);
+
+  animation: tip-in var(--dur-fast) var(--ease-out);
+}
+
+.kbd {
+  padding-inline: 0.3rem;
+  border: 1px solid color-mix(in oklch, white 25%, transparent);
+  border-radius: 0.25rem;
+
+  font-size: 0.625rem;
+  line-height: 1.5;
+  color: color-mix(in oklch, white 65%, transparent);
+}
+
+@keyframes tip-in {
+  from {
+    transform: translateY(0.2rem);
+    opacity: 0;
+  }
+}

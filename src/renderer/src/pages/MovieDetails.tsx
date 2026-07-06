@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams, useRouter } from '@tanstack/react-router'
+import { CaretLeftIcon, PlayIcon } from '@phosphor-icons/react'
 import { useQuery } from '@tanstack/react-query'
 import { itemQuery } from '../lib/queries'
 import { backdropUrl, imageUrl, ticksToSeconds } from '../lib/jellyfin'
@@ -14,16 +15,7 @@ function BackButton(): React.JSX.Element {
   const router = useRouter()
   return (
     <button onClick={() => router.history.back()} className={styles.back}>
-      <svg
-        viewBox="0 0 20 20"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <polyline points="12,4 5,10 12,16" />
-      </svg>
+      <CaretLeftIcon weight="bold" />
       Back
     </button>
   )
@@ -99,9 +91,7 @@ export function MovieDetails(): React.JSX.Element {
             <div className={styles.actions}>
               {position > 60 && (
                 <button onClick={() => play(position)} className={styles.playPrimary}>
-                  <svg viewBox="0 0 16 16">
-                    <polygon points="3,1.5 14,8 3,14.5" fill="currentColor" />
-                  </svg>
+                  <PlayIcon weight="fill" />
                   Resume
                 </button>
               )}
@@ -109,11 +99,7 @@ export function MovieDetails(): React.JSX.Element {
                 onClick={() => play(0)}
                 className={position > 60 ? styles.playSecondary : styles.playPrimary}
               >
-                {position <= 60 && (
-                  <svg viewBox="0 0 16 16">
-                    <polygon points="3,1.5 14,8 3,14.5" fill="currentColor" />
-                  </svg>
-                )}
+                {position <= 60 && <PlayIcon weight="fill" />}
                 {position > 60 ? 'Play from start' : 'Play'}
               </button>
             </div>

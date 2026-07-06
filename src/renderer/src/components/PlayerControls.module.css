@@ -17,19 +17,23 @@
 /* full-bleed gradient scrims instead of floating cards — the video stays
    the subject, controls just sit legibly on top of it */
 .topScrim {
-  padding: 1.25rem 1.75rem;
-  background: linear-gradient(
-    to bottom,
-    color-mix(in oklch, black 70%, transparent) 0%,
-    transparent 100%
-  );
+  padding: 1.25rem 1.5rem;
+  background: linear-gradient(to bottom, color-mix(in oklch, black 65%, transparent), transparent);
 }
 
 .topBar {
   display: flex;
   gap: 0.85rem;
   align-items: center;
-  max-inline-size: 70%;
+}
+
+.titleBlock {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.1rem;
+
+  min-inline-size: 0;
 }
 
 .iconBtn {
@@ -41,7 +45,7 @@
   block-size: 2.5rem;
   border-radius: var(--radius-full);
 
-  color: color-mix(in oklch, white 88%, transparent);
+  color: color-mix(in oklch, white 85%, transparent);
 
   transition:
     color var(--dur-fast) var(--ease),
@@ -61,8 +65,11 @@
 
 .iconBtn:disabled {
   pointer-events: none;
-  cursor: not-allowed;
   opacity: 0.35;
+}
+
+.iconBtnActive {
+  color: var(--accent);
 }
 
 .icon {
@@ -73,28 +80,70 @@
 .titleText {
   overflow: hidden;
 
-  font-family: var(--font-display);
-  font-size: 1.05rem;
-  font-style: italic;
+  font-size: 1.0625rem;
+  font-weight: 600;
   color: white;
   text-overflow: ellipsis;
   text-shadow: 0 1px 8px color-mix(in oklch, black 60%, transparent);
   white-space: nowrap;
 }
 
-.methodBadge {
-  flex-shrink: 0;
+.titleSub {
+  overflow: hidden;
 
-  padding: 0.15rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: color-mix(in oklch, white 55%, transparent);
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 8px color-mix(in oklch, black 60%, transparent);
+  white-space: nowrap;
+}
+
+.topRight {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.85rem;
+  align-items: center;
+}
+
+.methodBadge {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+
+  padding: 0.25rem 0.65rem;
   border: 1px solid var(--player-border);
   border-radius: var(--radius-full);
 
-  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
   color: var(--player-fg-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
 
   background: var(--player-glass);
+}
+
+.methodDot {
+  inline-size: 0.4rem;
+  block-size: 0.4rem;
+  border-radius: var(--radius-full);
+}
+
+.methodDot[data-method='direct'] {
+  background: var(--accent-3);
+  box-shadow: 0 0 6px color-mix(in oklch, var(--accent-3) 70%, transparent);
+}
+
+.methodDot[data-method='transcode'] {
+  background: var(--accent-4);
+  box-shadow: 0 0 6px color-mix(in oklch, var(--accent-4) 70%, transparent);
+}
+
+.clock {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: color-mix(in oklch, white 75%, transparent);
+  text-shadow: 0 1px 8px color-mix(in oklch, black 60%, transparent);
 }
 
 .spinner {
@@ -164,13 +213,28 @@
 }
 
 .dock {
-  padding: 3.5rem 1.75rem 1.5rem;
+  padding: 3.5rem 1.5rem 1.25rem;
   background: linear-gradient(
     to top,
-    color-mix(in oklch, black 78%, transparent) 0%,
+    color-mix(in oklch, black 78%, transparent),
     color-mix(in oklch, black 45%, transparent) 55%,
-    transparent 100%
+    transparent
   );
+
+  /* subtle glass — the blur fades out with the scrim so there's no hard edge */
+  backdrop-filter: blur(10px);
+  mask-image: linear-gradient(to top, black 55%, transparent);
+}
+
+/* dock rises with the fade when controls return */
+.layer:not(.hidden) .dock {
+  animation: dock-rise var(--dur-med) var(--ease-out);
+}
+
+@keyframes dock-rise {
+  from {
+    transform: translateY(0.5rem);
+  }
 }
 
 .dockInner {
@@ -178,21 +242,94 @@
   margin-inline: auto;
 }
 
-/* custom range: crisp accent-colored fill instead of relying on
-   inconsistent native accent-color rendering */
+.timelineRow {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.timelineWrap {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+}
+
+/* hover timestamp (and chapter) preview — near-opaque so it stays legible
+   over bright video frames */
+.previewBubble {
+  pointer-events: none;
+
+  position: absolute;
+  inset-block-end: 1.25rem;
+  inset-inline-start: clamp(2.5rem, var(--x, 0px), calc(100% - 2.5rem));
+  transform: translateX(-50%);
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  align-items: center;
+
+  padding: 0.4rem 0.75rem;
+  border: 1px solid color-mix(in oklch, white 18%, transparent);
+  border-radius: var(--radius-s);
+
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: white;
+  white-space: nowrap;
+
+  background: color-mix(in oklch, black 94%, var(--accent-2));
+  box-shadow: var(--shadow-2);
+}
+
+.previewChapter {
+  overflow: hidden;
+
+  max-inline-size: 14rem;
+
+  font-size: 0.625rem;
+  color: var(--accent);
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* chapter marks on the beam */
+.chapterTick {
+  pointer-events: none;
+
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-start: var(--x);
+  transform: translate(-50%, -50%);
+
+  inline-size: 0.2rem;
+  block-size: 0.2rem;
+  border-radius: var(--radius-full);
+
+  background: color-mix(in oklch, white 65%, transparent);
+}
+
+/* signature: the timeline is a beam of light. Layered backgrounds — played
+   beam (glowing), buffered (faint), track. All sized by --pct/--buf. */
 .timeline {
   cursor: pointer;
 
-  inline-size: 100%;
-  block-size: 0.3rem;
+  flex: 1;
+
+  block-size: 0.25rem;
   border-radius: var(--radius-full);
 
   appearance: none;
-  background: linear-gradient(
-    to right,
-    var(--accent) var(--pct, 0%),
-    color-mix(in oklch, white 25%, transparent) var(--pct, 0%)
-  );
+  background:
+    var(--beam) 0 0 / var(--pct, 0%) 100% no-repeat,
+    linear-gradient(
+        color-mix(in oklch, white 22%, transparent),
+        color-mix(in oklch, white 22%, transparent)
+      )
+      0 0 / var(--buf, 0%) 100% no-repeat,
+    color-mix(in oklch, white 13%, transparent);
 
   transition: block-size var(--dur-fast) var(--ease);
 }
@@ -201,22 +338,23 @@
   block-size: 0.4rem;
 }
 
+/* the photon — a luminous playhead */
 .timeline::-webkit-slider-thumb {
   inline-size: 0.85rem;
   block-size: 0.85rem;
   border-radius: var(--radius-full);
 
   appearance: none;
-  background: var(--accent);
+  background: white;
   box-shadow:
-    0 0 0 3px color-mix(in oklch, black 45%, transparent),
-    0 0 14px color-mix(in oklch, var(--accent) 65%, transparent);
+    0 0 0 3px color-mix(in oklch, var(--accent) 40%, transparent),
+    0 0 14px 2px color-mix(in oklch, var(--accent) 75%, transparent);
 
   transition: transform var(--dur-fast) var(--ease);
 }
 
 .timeline:hover::-webkit-slider-thumb {
-  transform: scale(1.2);
+  transform: scale(1.15);
 }
 
 .controlsRow {
@@ -238,11 +376,60 @@
   background: var(--accent);
 }
 
+/* volume slider unfolds from the mute button on hover */
+.volumeGroup {
+  display: flex;
+  align-items: center;
+}
+
+.volume {
+  cursor: pointer;
+
+  inline-size: 0;
+  block-size: 0.25rem;
+  border-radius: var(--radius-full);
+
+  appearance: none;
+  opacity: 0;
+  background:
+    linear-gradient(white, white) 0 0 / var(--vol, 100%) 100% no-repeat,
+    color-mix(in oklch, white 15%, transparent);
+
+  transition:
+    inline-size var(--dur-med) var(--ease),
+    opacity var(--dur-med) var(--ease);
+}
+
+.volumeGroup:hover .volume,
+.volumeGroup:focus-within .volume {
+  inline-size: 5rem;
+  margin-inline-end: 0.5rem;
+  opacity: 1;
+}
+
+.volume::-webkit-slider-thumb {
+  inline-size: 0.7rem;
+  block-size: 0.7rem;
+  border-radius: var(--radius-full);
+
+  appearance: none;
+  background: white;
+}
+
 .time {
-  margin-inline-start: 0.75rem;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-  color: color-mix(in oklch, white 65%, transparent);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: color-mix(in oklch, white 85%, transparent);
+  white-space: nowrap;
+}
+
+.endsAt {
+  margin-inline-start: 0.6rem;
+
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: color-mix(in oklch, white 50%, transparent);
+  white-space: nowrap;
 }
 
 .grow {
@@ -250,15 +437,17 @@
 }
 
 .rateLabel {
+  font-family: var(--font-mono);
   font-size: 0.75rem;
-  font-weight: 600;
-  color: color-mix(in oklch, white 88%, transparent);
+  font-weight: 500;
+  color: currentColor;
 }
 
 .menu {
   overflow-y: auto;
 
-  inline-size: 16rem;
+  min-inline-size: 10rem;
+  max-inline-size: 18rem;
   max-block-size: 18rem;
   padding: 0.4rem;
   border: 1px solid var(--player-border);
@@ -267,6 +456,15 @@
   background: var(--player-glass-strong);
   backdrop-filter: blur(20px);
   box-shadow: var(--shadow-2);
+
+  animation: menu-in var(--dur-fast) var(--ease-out);
+}
+
+@keyframes menu-in {
+  from {
+    transform: translateY(0.35rem);
+    opacity: 0;
+  }
 }
 
 .menuItem {
@@ -274,7 +472,7 @@
   display: block;
 
   inline-size: 100%;
-  padding-block: 0.4rem;
+  padding-block: 0.45rem;
   padding-inline: 0.75rem;
   border-radius: var(--radius-s);
 
@@ -287,34 +485,54 @@
   transition: background-color var(--dur-fast) var(--ease);
 }
 
-.menuItem:hover {
+.menuItem:hover,
+.menuItem[data-highlighted] {
   color: var(--player-fg);
   background: color-mix(in oklch, white 10%, transparent);
 }
 
-.menuItem:disabled {
-  opacity: 0.4;
-}
-
 .menuItemActive,
 .menuItem[data-selected] {
-  color: var(--accent-2);
-  background: var(--accent-2-soft);
+  color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 14%, transparent);
+}
+
+/* subtitle sync popover — everything on one centered axis */
+.syncPopup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  align-items: center;
+
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--player-border);
+  border-radius: var(--radius-m);
+
+  background: var(--player-glass-strong);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-2);
+
+  animation: menu-in var(--dur-fast) var(--ease-out);
 }
 
 .syncLabel {
-  padding-inline: 0.75rem;
-  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
   color: var(--player-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.syncHint {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: color-mix(in oklch, white 35%, transparent);
 }
 
 .stepperGroup {
   display: flex;
   gap: 0.4rem;
   align-items: center;
-
-  margin-block-start: 0.5rem;
-  padding-inline: 0.75rem;
 }
 
 .stepBtn {
@@ -330,11 +548,13 @@
   font-size: 1rem;
   color: var(--player-fg);
 
-  background: var(--player-glass);
+  background: color-mix(in oklch, white 6%, transparent);
+
+  transition: background-color var(--dur-fast) var(--ease);
 }
 
 .stepBtn:hover {
-  background: color-mix(in oklch, white 10%, transparent);
+  background: color-mix(in oklch, white 12%, transparent);
 }
 
 .stepBtn:disabled {
@@ -348,14 +568,109 @@
   border: 1px solid var(--player-border);
   border-radius: var(--radius-s);
 
+  font-family: var(--font-mono);
   font-size: 0.8rem;
-  font-variant-numeric: tabular-nums;
   color: var(--player-fg);
   text-align: center;
 
-  background: var(--player-glass);
+  background: color-mix(in oklch, white 6%, transparent);
 }
 
 .stepInput:disabled {
   opacity: 0.4;
+}
+
+/* next-up card — lives outside the auto-hiding layer so the countdown
+   stays visible even when the controls have faded */
+.nextUp {
+  position: absolute;
+  z-index: 1;
+  inset-block-end: 7rem;
+  inset-inline-end: 1.5rem;
+
+  display: flex;
+  gap: 0.85rem;
+
+  max-inline-size: 22rem;
+  padding: 0.75rem;
+  border: 1px solid var(--player-border);
+  border-radius: var(--radius-m);
+
+  background: var(--player-glass-strong);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-2);
+
+  animation: menu-in var(--dur-med) var(--ease-out);
+}
+
+.nextUpThumb {
+  flex-shrink: 0;
+
+  aspect-ratio: 16 / 9;
+  inline-size: 7rem;
+  border-radius: var(--radius-s);
+
+  object-fit: cover;
+}
+
+.nextUpInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-inline-size: 0;
+}
+
+.nextUpEyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.nextUpTitle {
+  overflow: hidden;
+
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: white;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nextUpActions {
+  display: flex;
+  gap: 0.5rem;
+  margin-block-start: auto;
+}
+
+.nextUpPlay {
+  padding: 0.3rem 0.8rem;
+  border-radius: var(--radius-full);
+
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-fg);
+
+  background: var(--accent);
+
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.nextUpPlay:hover {
+  background: var(--accent-hover);
+}
+
+.nextUpDismiss {
+  padding: 0.3rem 0.8rem;
+  border-radius: var(--radius-full);
+
+  font-size: 0.75rem;
+  color: var(--player-fg-muted);
+
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.nextUpDismiss:hover {
+  background: color-mix(in oklch, white 10%, transparent);
 }

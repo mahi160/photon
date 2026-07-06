@@ -142,8 +142,12 @@ describe('pickInitialTracks', () => {
     )
   })
 
-  it('subtitles on, no preference → undefined lets the server pick', () => {
+  it('subtitles on, no preference, no server default → undefined lets the server pick', () => {
     expect(pickInitialTracks(withLangs, subsOn, {}).subtitleStreamIndex).toBeUndefined()
+  })
+
+  it('subtitles on, no preference → falls back to the server default (burn-in needs it up front)', () => {
+    expect(pickInitialTracks(withLangs, subsOn, {}, 4).subtitleStreamIndex).toBe(4)
   })
 
   it('preferred subtitle language is requested up front (burn-in needs it)', () => {

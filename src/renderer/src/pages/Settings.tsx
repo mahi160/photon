@@ -3,8 +3,6 @@ import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSession } from '../stores/session'
 import { useSettings } from '../stores/settings'
-import { colorSchemes } from '../lib/colorSchemes'
-import { resolvedDark } from '../lib/theme'
 import { Stepper, type StepperClasses } from '../components/Stepper'
 import styles from './Settings.module.css'
 
@@ -95,39 +93,8 @@ function ThemeSlabs(): React.JSX.Element {
   )
 }
 
-function ColorSchemeSlabs(): React.JSX.Element {
-  const scheme = useSettings((s) => s.colorScheme)
-  const theme = useSettings((s) => s.theme)
-  const set = useSettings((s) => s.set)
-  const themeAttr = resolvedDark(theme) ? 'dark' : 'light'
-  return (
-    <div className={styles.schemeGrid}>
-      {colorSchemes.map((s) => (
-        // data-scheme/data-theme on the slab itself: the tokens.css cascade
-        // hands each slab its own scheme's variables — no duplicated palette data
-        <button
-          key={s.key}
-          data-scheme={s.key}
-          data-theme={themeAttr}
-          className={`${styles.schemeSlab} ${scheme === s.key ? styles.schemeSlabActive : ''}`}
-          style={{ background: 'var(--bg)', color: 'var(--fg)' }}
-          onClick={() => set({ colorScheme: s.key })}
-        >
-          <span className={styles.schemeDots}>
-            <i style={{ background: 'var(--accent)' }} />
-            <i style={{ background: 'var(--accent-2)' }} />
-            <i style={{ background: 'var(--accent-3)' }} />
-            <i style={{ background: 'var(--accent-4)' }} />
-          </span>
-          <span className={styles.schemeLabel}>{s.label}</span>
-        </button>
-      ))}
-    </div>
-  )
-}
-
 // the persisted subtitle color must be a concrete hex (it feeds video::cue),
-// so accent swatches resolve the active scheme's CSS variables at render time
+// so accent swatches resolve the active theme's CSS variables at render time
 function subtitleSwatches(): { label: string; value: string }[] {
   const root = getComputedStyle(document.documentElement)
   const accent = (name: string): string => root.getPropertyValue(name).trim()
@@ -148,8 +115,7 @@ function SubtitleColorSwatches({
   value: string
   onChange: (v: string) => void
 }): React.JSX.Element {
-  // subscribe so swatches re-resolve when scheme or theme changes
-  useSettings((s) => s.colorScheme)
+  // subscribe so swatches re-resolve when the theme (dark/light) changes
   useSettings((s) => s.theme)
   const swatches = subtitleSwatches()
   return (
@@ -207,9 +173,6 @@ export function Settings(): React.JSX.Element {
       <Section title="Appearance">
         <Row label="Theme">
           <ThemeSlabs />
-        </Row>
-        <Row label="Color scheme">
-          <ColorSchemeSlabs />
         </Row>
       </Section>
 
@@ -379,6 +342,18 @@ export function Settings(): React.JSX.Element {
               Logout
             </button>
           </div>
+        </Row>
+        <Row label="Reset settings" hint="Restores all preferences above to defaults">
+          <button
+            className={styles.dangerBtn}
+            onClick={() => {
+              if (confirm('Reset all settings to defaults? This does not sign you out.')) {
+                settings.reset()
+              }
+            }}
+          >
+            Reset
+          </button>
         </Row>
       </Section>
 

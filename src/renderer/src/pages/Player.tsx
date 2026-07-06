@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { itemQuery } from '../lib/queries'
-import { itemTitle, ticksToSeconds } from '../lib/jellyfin'
+import { currentSession, jf, ticksToSeconds, type ItemsResult } from '../lib/jellyfin'
 import { resolvePlayable, usePlayback } from '../player/usePlayback'
 import { canDirectPlay } from '../player/session'
 import { useSettings } from '../stores/settings'
@@ -113,10 +113,65 @@ function WebPlayer({
     toastTimer.current = setTimeout(() => setToast(null), 1200)
   }, [])
 
+  // real fullscreen state (Esc exits natively; icon must follow), and never
+  // strand the app in fullscreen when leaving the player
+  const [fullscreen, setFullscreen] = useState(false)
+  useEffect(() => {
+    const onFs = (): void => setFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', onFs)
+    return () => {
+      document.removeEventListener('fullscreenchange', onFs)
+      if (document.fullscreenElement) void document.exitFullscreen()
+    }
+  }, [])
+
+  // PiP floats its own always-on-top window — minimize the app behind it on
+  // enter, bring it back on exit
+  const prevPip = useRef(false)
+  useEffect(() => {
+    if (engine.pip && !prevPip.current) void window.api.minimizeWindow()
+    else if (!engine.pip && prevPip.current) void window.api.restoreWindow()
+    prevPip.current = engine.pip
+  }, [engine.pip])
+
   const toggleFullscreen = useCallback(() => {
     if (document.fullscreenElement) void document.exitFullscreen()
     else void document.documentElement.requestFullscreen()
   }, [])
+
+  // auto-hide controls: pointer activity arms a 3s timer; paused playback,
+  // open menus, scrubbing and a pointer resting on the chrome all pin them
+  const [controlsVisible, setControlsVisible] = useState(true)
+  const [pinned, setPinned] = useState(false)
+  const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const poke = useCallback(() => {
+    setControlsVisible(true)
+    clearTimeout(hideTimer.current)
+    hideTimer.current = setTimeout(() => setControlsVisible(false), 3000)
+  }, [])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot initial reveal
+    poke()
+    return () => clearTimeout(hideTimer.current)
+  }, [poke])
+  useEffect(() => {
+    // resume grants a grace period instead of vanishing controls instantly
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- timer re-arm on resume
+    if (engine.state === 'playing') poke()
+  }, [engine.state, poke])
+  const visible = controlsVisible || pinned || engine.state === 'paused'
+
+  function bumpVolume(delta: number): void {
+    const v = Math.max(0, Math.min(1, engine.volume + delta))
+    engine.changeVolume(v)
+    showToast(`Volume ${Math.round(v * 100)}%`)
+  }
+
+  function toggleMuteWithToast(): void {
+    const next = !engine.muted
+    engine.toggleMute()
+    showToast(next ? 'Muted' : 'Unmuted')
+  }
 
   // subtitle sync: shift delay by the same step as the slider, text subs only
   function shiftSubtitleDelay(step: number): void {
@@ -141,36 +196,79 @@ function WebPlayer({
     )
   }
 
-  // keyboard shortcuts (PRD: Navigation)
+  // the episode after the one playing (dock's next button); NextUp can't be
+  // used here — mid-episode it still points at the current one
+  const playing = player.session?.item
+  const nextEp = useQuery({
+    queryKey: ['episodeAfter', playing?.Id],
+    enabled: playing?.Type === 'Episode' && !!playing.SeriesId,
+    staleTime: Infinity,
+    queryFn: async () => {
+      const r = await jf<ItemsResult>(`/Shows/${playing!.SeriesId}/Episodes`, {
+        query: { userId: currentSession()?.userId ?? '', adjacentTo: playing!.Id }
+      })
+      const i = r.Items.findIndex((x) => x.Id === playing!.Id)
+      return i >= 0 ? (r.Items[i + 1] ?? null) : null
+    }
+  })
+  const prevEp = useQuery({
+    queryKey: ['episodeBefore', playing?.Id],
+    enabled: playing?.Type === 'Episode' && !!playing.SeriesId,
+    staleTime: Infinity,
+    queryFn: async () => {
+      const r = await jf<ItemsResult>(`/Shows/${playing!.SeriesId}/Episodes`, {
+        query: { userId: currentSession()?.userId ?? '', adjacentTo: playing!.Id }
+      })
+      const i = r.Items.findIndex((x) => x.Id === playing!.Id)
+      return i > 0 ? (r.Items[i - 1] ?? null) : null
+    }
+  })
+
+  // PiP window's own transport shows prev/next track buttons when these are set
+  useEffect(() => {
+    const ms = navigator.mediaSession
+    ms.setActionHandler(
+      'previoustrack',
+      prevEp.data ? () => void player.playItem(prevEp.data!) : null
+    )
+    ms.setActionHandler('nexttrack', nextEp.data ? () => void player.playItem(nextEp.data!) : null)
+    return () => {
+      ms.setActionHandler('previoustrack', null)
+      ms.setActionHandler('nexttrack', null)
+    }
+  }, [prevEp.data, nextEp.data, player.playItem])
+
+  // keyboard shortcuts (PRD: Navigation); repeat-guarded where holding the
+  // key would flap the state instead of progressing it
   useHotkeys(
     {
-      space: () => engine.togglePlay(),
-      arrowleft: () => engine.seekBy(-10),
-      arrowright: () => engine.seekBy(10),
-      arrowup: () => engine.adjustVolume(0.05),
-      arrowdown: () => engine.adjustVolume(-0.05),
-      f: () => toggleFullscreen(),
-      p: () => engine.togglePiP(),
-      m: () => engine.toggleMute(),
+      space: (e) => {
+        if (!e.repeat) engine.togglePlay()
+      },
+      arrowleft: () => {
+        engine.seekBy(-10)
+        poke()
+      },
+      arrowright: () => {
+        engine.seekBy(10)
+        poke()
+      },
+      arrowup: () => bumpVolume(0.05),
+      arrowdown: () => bumpVolume(-0.05),
+      f: (e) => {
+        if (!e.repeat) toggleFullscreen()
+      },
+      p: (e) => {
+        if (!e.repeat) engine.togglePiP()
+      },
+      m: (e) => {
+        if (!e.repeat) toggleMuteWithToast()
+      },
       '[': () => shiftSubtitleDelay(-0.5),
       ']': () => shiftSubtitleDelay(0.5)
     },
     [engine, toggleFullscreen, player.subtitleIndex, player.subtitleDelay, player.subtitleIsText]
   )
-
-  // auto-hide controls
-  const [controlsVisible, setControlsVisible] = useState(true)
-  const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  const poke = useCallback(() => {
-    setControlsVisible(true)
-    clearTimeout(hideTimer.current)
-    hideTimer.current = setTimeout(() => setControlsVisible(false), 3000)
-  }, [])
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot initial reveal
-    poke()
-    return () => clearTimeout(hideTimer.current)
-  }, [poke])
 
   const displayDuration = engine.duration || ticksToSeconds(session?.mediaSource.RunTimeTicks)
 
@@ -178,11 +276,21 @@ function WebPlayer({
     <div
       className={styles.stage}
       onMouseMove={poke}
-      style={{ cursor: controlsVisible ? 'default' : 'none' }}
+      onClick={() => {
+        // controls hidden = their click layer is inert; don't eat the click
+        if (!visible) {
+          engine.togglePlay()
+          poke()
+        }
+      }}
+      onDoubleClick={(e) => {
+        const t = e.target as HTMLElement
+        if (t === e.currentTarget || t.tagName === 'VIDEO') toggleFullscreen()
+      }}
+      style={{ cursor: visible ? 'default' : 'none' }}
     >
       <SubtitleStyleTag />
       <video ref={videoRef} className={styles.video} />
-      {toast && <div className={styles.toast}>{toast}</div>}
       {player.error && (
         <div className={styles.errorLayer}>
           <p className={styles.errorText}>{player.error}</p>
@@ -202,26 +310,32 @@ function WebPlayer({
       )}
       {!player.error && session && (
         <PlayerControls
-          visible={controlsVisible}
-          title={itemTitle(session.item)}
+          visible={visible}
+          item={session.item}
           playMethod={session.playMethod}
           state={engine.state}
           time={engine.time}
           duration={displayDuration}
+          bufferedEnd={engine.bufferedEnd}
           volume={engine.volume}
           muted={engine.muted}
           rate={engine.rate}
           pip={engine.pip}
+          fullscreen={fullscreen}
           audioStreams={session.audioStreams}
           subtitleStreams={session.subtitleStreams}
           audioIndex={player.audioIndex ?? session.mediaSource.DefaultAudioStreamIndex}
           subtitleIndex={player.subtitleIndex}
           subtitleDelay={player.subtitleDelay}
           subtitleDelayEnabled={player.subtitleIsText && player.subtitleIndex !== null}
+          nextEpisode={nextEp.data ?? undefined}
+          onPlayNext={nextEp.data ? () => void player.playItem(nextEp.data!) : undefined}
+          onPinChange={setPinned}
           onBack={() => navigate({ to: '/' })}
           onTogglePlay={engine.togglePlay}
           onSeek={engine.seek}
           onVolume={engine.changeVolume}
+          onVolumeStep={bumpVolume}
           onMute={engine.toggleMute}
           onRate={player.changeRate}
           onSelectAudio={player.selectAudio}
@@ -232,6 +346,7 @@ function WebPlayer({
           onOpenMpv={onOpenMpv && mpvOk ? () => onOpenMpv(engine.currentTime()) : undefined}
         />
       )}
+      {toast && <div className={styles.toast}>{toast}</div>}
     </div>
   )
 }

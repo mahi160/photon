@@ -6,6 +6,8 @@ const api = {
   sessionSet: (value: string): Promise<boolean> => ipcRenderer.invoke('session:set', value),
   sessionClear: (): Promise<void> => ipcRenderer.invoke('session:clear'),
   appVersion: (): Promise<string> => ipcRenderer.invoke('app:version'),
+  minimizeWindow: (): Promise<void> => ipcRenderer.invoke('app:minimize'),
+  restoreWindow: (): Promise<void> => ipcRenderer.invoke('app:restore'),
   setLoginItem: (enabled: boolean): Promise<void> =>
     ipcRenderer.invoke('app:setLoginItem', enabled),
   getLoginItem: (): Promise<boolean> => ipcRenderer.invoke('app:getLoginItem'),

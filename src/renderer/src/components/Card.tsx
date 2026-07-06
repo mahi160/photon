@@ -1,4 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
+import { PlayIcon } from '@phosphor-icons/react'
 import { imageUrl, type BaseItem } from '../lib/jellyfin'
 import styles from './Card.module.css'
 
@@ -47,9 +48,7 @@ export function Card({
         )}
         <div className={styles.playScrim}>
           <span className={styles.playButton}>
-            <svg viewBox="0 0 24 24" fill="currentColor">
-              <path d="M8 5v14l11-7z" />
-            </svg>
+            <PlayIcon weight="fill" />
           </span>
         </div>
         {pct !== undefined && pct > 0 && pct < 100 && (

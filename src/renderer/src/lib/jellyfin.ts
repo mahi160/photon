@@ -13,7 +13,7 @@ export function configure(s: Session | null): void {
   session = s
 }
 
-function deviceId(): string {
+export function deviceId(): string {
   let id = localStorage.getItem('photon.deviceId')
   if (!id) {
     id = crypto.randomUUID()
@@ -128,6 +128,11 @@ export interface MediaSource {
   DefaultSubtitleStreamIndex?: number
 }
 
+export interface ChapterInfo {
+  StartPositionTicks: number
+  Name?: string
+}
+
 export interface BaseItem {
   Id: string
   Name: string
@@ -146,6 +151,7 @@ export interface BaseItem {
   BackdropImageTags?: string[]
   UserData?: UserData
   MediaSources?: MediaSource[]
+  Chapters?: ChapterInfo[]
 }
 
 // display title: episodes get their series/episode context

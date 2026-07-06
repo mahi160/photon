@@ -107,7 +107,7 @@ export const itemQuery = (itemId: string) =>
     queryKey: ['item', itemId],
     queryFn: () =>
       jf<BaseItem>(`/Users/${userId()}/Items/${itemId}`, {
-        query: { Fields: 'Overview,MediaSources' }
+        query: { Fields: 'Overview,MediaSources,Chapters' }
       })
   })
 

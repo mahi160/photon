@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { jf, type BaseItem, type ItemsResult, type MediaStream } from '../lib/jellyfin'
+import {
+  jf,
+  ticksToSeconds,
+  type BaseItem,
+  type ItemsResult,
+  type MediaStream
+} from '../lib/jellyfin'
 import { useSettings } from '../stores/settings'
+import { useTrackMemory } from '../stores/trackMemory'
 import {
   isTextTrack,
   reportProgress,
@@ -9,6 +16,7 @@ import {
   reportStopped,
   resolveSubtitleSelection,
   startPlayback,
+  stopActiveEncoding,
   type PlaybackSession
 } from './session'
 import { usePlayerEngine, type PlayerEngineApi } from './usePlayerEngine'
@@ -36,6 +44,7 @@ export interface PlaybackApi {
   selectSubtitle: (index: number | null) => void
   changeDelay: (seconds: number) => void
   changeRate: (rate: number) => void
+  playItem: (item: BaseItem) => Promise<void>
   retry: () => void
 }
 
@@ -55,9 +64,10 @@ export async function resolvePlayable(item: BaseItem): Promise<BaseItem> {
 // Audio: explicit request, else preferred language, else English, else the
 // container default (matching it keeps direct play possible), else first.
 // Subtitle preference must be in the *initial* request: PGS/ASS need a server
-// burn-in, which only happens when the index is sent up front. -1 keeps the
-// server from burning in its own default when subs are off; undefined lets
-// the server pick its default.
+// burn-in, which only happens when the index is sent up front — so a burn-in
+// server default (defaultSubtitleIndex) must be requested explicitly too, not
+// left for the server to "pick", or it silently never gets burned in.
+// -1 keeps the server from burning in its own default when subs are off.
 export function pickInitialTracks(
   streams: MediaStream[],
   settings: {
@@ -65,7 +75,8 @@ export function pickInitialTracks(
     preferredSubtitleLanguage?: string
     subtitlesEnabled: boolean
   },
-  params: StartParams
+  params: StartParams,
+  defaultSubtitleIndex?: number
 ): { audioStreamIndex?: number; subtitleStreamIndex?: number } {
   const audioStreams = streams.filter((s) => s.Type === 'Audio')
   const defaultAudio =
@@ -78,12 +89,12 @@ export function pickInitialTracks(
   let subtitleStreamIndex = params.sub
   if (subtitleStreamIndex === undefined) {
     subtitleStreamIndex = settings.subtitlesEnabled
-      ? streams.find(
+      ? (streams.find(
           (s) =>
             s.Type === 'Subtitle' &&
             !!settings.preferredSubtitleLanguage &&
             s.Language === settings.preferredSubtitleLanguage
-        )?.Index
+        )?.Index ?? defaultSubtitleIndex)
       : -1
   }
   return { audioStreamIndex: params.audio ?? defaultAudio?.Index, subtitleStreamIndex }
@@ -104,27 +115,61 @@ export function usePlayback(
   const [subtitleDelay, setSubtitleDelay] = useState(0)
 
   const initial = useSettings.getState()
-  const engine = usePlayerEngine(videoRef, initial.rememberSpeed ? initial.lastSpeed : 1, {
-    onEnded: (pos) => {
-      const sess = sessionRef.current
-      if (sess) reportStopped(sess, pos)
-      void handleEnded()
+  const engine = usePlayerEngine(
+    videoRef,
+    {
+      rate: initial.rememberSpeed ? initial.lastSpeed : 1,
+      volume: initial.lastVolume,
+      muted: initial.lastMuted
     },
-    onBeforeDestroy: (pos) => {
-      const sess = sessionRef.current
-      if (sess) reportStopped(sess, pos)
+    {
+      onEnded: (pos) => {
+        const sess = sessionRef.current
+        if (sess) {
+          reportStopped(sess, pos)
+          sessionRef.current = null // handled — loadFor must not re-report it
+        }
+        void handleEnded(sess?.item)
+      },
+      onBeforeDestroy: (pos) => {
+        const sess = sessionRef.current
+        if (sess) reportStopped(sess, pos)
+      }
     }
-  })
+  )
 
   // stable engine commands, so loadFor (and the initial-load effect) stay stable
-  const { load: engineLoad, setTextTrack, setSubtitleDelay: engineSetDelay } = engine
+  const {
+    load: engineLoad,
+    setTextTrack,
+    setSubtitleDelay: engineSetDelay,
+    currentTime: engineCurrentTime
+  } = engine
 
   const loadFor = useCallback(
     async (
       playable: BaseItem,
-      opts: { startSeconds?: number; audioStreamIndex?: number; subtitleStreamIndex?: number }
+      opts: {
+        startSeconds?: number
+        audioStreamIndex?: number
+        subtitleStreamIndex?: number
+        mediaSourceId?: string
+      }
     ): Promise<boolean> => {
       const settings = useSettings.getState()
+      // a new PlaySessionId replaces the old one (track switch, next episode):
+      // close the old session first so the server stops its transcode/progress
+      const prev = sessionRef.current
+      if (prev) {
+        sessionRef.current = null
+        reportStopped(prev, engineCurrentTime())
+        // Stopped only updates progress tracking, not the ffmpeg job itself —
+        // without this the old encode keeps running and a track-switch reload
+        // can still resolve against it (stale audio/subtitles). Must be
+        // awaited: starting the new one while the old is still alive is
+        // exactly the race this is meant to avoid.
+        if (prev.playMethod === 'Transcode') await stopActiveEncoding(prev)
+      }
       try {
         const sess = await startPlayback(playable, {
           ...opts,
@@ -160,25 +205,32 @@ export function usePlayback(
         return false
       }
     },
-    [engineLoad, setTextTrack, engineSetDelay]
+    [engineLoad, setTextTrack, engineSetDelay, engineCurrentTime]
   )
 
-  async function handleEnded(): Promise<void> {
-    const playable = sessionRef.current?.item
-    if (useSettings.getState().autoplayNext && playable?.Type === 'Episode' && playable.SeriesId) {
+  // play a different item in place (next-episode button, autoplay-next).
+  // resets per-item track state — stream indexes don't carry across files.
+  async function playItem(next: BaseItem): Promise<void> {
+    loadedKey.current = `${next.Id}#${attempt}`
+    setError(null)
+    setAudioIndex(undefined)
+    // on failure stay put — the error layer (with retry) is already showing
+    if (await loadFor(next, { startSeconds: 0 })) {
+      navigate({ to: '/player/$itemId', params: { itemId: next.Id }, search: {}, replace: true })
+    }
+  }
+
+  async function handleEnded(prev?: BaseItem): Promise<void> {
+    if (useSettings.getState().autoplayNext && prev?.Type === 'Episode' && prev.SeriesId) {
       // ponytail: relies on the server having processed the Stopped report; if the
       // same episode comes back we bail to avoid a loop
       const next = await jf<ItemsResult>('/Shows/NextUp', {
-        query: { seriesId: playable.SeriesId, Limit: 1 }
+        query: { seriesId: prev.SeriesId, Limit: 1 }
       })
         .then((r) => r.Items[0] ?? null)
         .catch(() => null)
-      if (next && next.Id !== playable.Id) {
-        loadedKey.current = `${next.Id}#${attempt}`
-        // on failure stay put — the error layer (with retry) is already showing
-        if (await loadFor(next, { startSeconds: 0 })) {
-          navigate({ to: '/player/$itemId', params: { itemId: next.Id }, replace: true })
-        }
+      if (next && next.Id !== prev.Id) {
+        await playItem(next)
         return
       }
     }
@@ -196,18 +248,26 @@ export function usePlayback(
     setError(null)
     resolvePlayable(item)
       .then((playable) => {
+        // remembered pick for this item wins over language prefs/server
+        // default, but an explicit URL param (deep link) still wins over that
+        const remembered = useTrackMemory.getState().byItem[playable.Id]
         // track picking only sees stream info if the playable item carries it
         // (movies/episodes fetched with MediaSources)
         const { audioStreamIndex, subtitleStreamIndex } = pickInitialTracks(
           playable.MediaSources?.[0]?.MediaStreams ?? [],
           useSettings.getState(),
-          { audio, sub }
+          {
+            audio: audio ?? remembered?.audioStreamIndex,
+            sub: sub ?? remembered?.subtitleStreamIndex
+          },
+          playable.MediaSources?.[0]?.DefaultSubtitleStreamIndex
         )
         if (audioStreamIndex !== undefined) setAudioIndex(audioStreamIndex)
         return loadFor(playable, {
           startSeconds: start,
           audioStreamIndex,
-          subtitleStreamIndex
+          subtitleStreamIndex,
+          mediaSourceId: playable.MediaSources?.[0]?.Id
         })
       })
       .catch((e) => {
@@ -221,10 +281,49 @@ export function usePlayback(
   useEffect(() => {
     const id = setInterval(() => {
       const sess = sessionRef.current
-      if (sess) reportProgress(sess, currentTime(), engineState === 'paused')
+      if (!sess) return
+      reportProgress(sess, currentTime(), engineState === 'paused')
+      // keep the OS media overlay's progress bar roughly honest
+      const dur = ticksToSeconds(sess.mediaSource.RunTimeTicks)
+      if (dur > 0) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: dur,
+            position: Math.min(currentTime(), dur)
+          })
+        } catch {
+          /* stale metadata can make position > duration — not worth surfacing */
+        }
+      }
     }, 10_000)
     return () => clearInterval(id)
   }, [engineState, currentTime])
+
+  // OS media keys / overlay buttons
+  const { togglePlay: engineTogglePlay, seekBy: engineSeekBy } = engine
+  useEffect(() => {
+    const ms = navigator.mediaSession
+    ms.setActionHandler('play', () => engineTogglePlay())
+    ms.setActionHandler('pause', () => engineTogglePlay())
+    ms.setActionHandler('seekbackward', () => engineSeekBy(-10))
+    ms.setActionHandler('seekforward', () => engineSeekBy(10))
+    return () => {
+      for (const a of ['play', 'pause', 'seekbackward', 'seekforward'] as MediaSessionAction[])
+        ms.setActionHandler(a, null)
+      ms.metadata = null
+    }
+  }, [engineTogglePlay, engineSeekBy])
+
+  // volume/mute survive across sessions; debounced — a slider drag is dozens of
+  // changes and each settings.set() writes localStorage
+  const { volume: engineVolume, muted: engineMuted } = engine
+  useEffect(() => {
+    const id = setTimeout(
+      () => useSettings.getState().set({ lastVolume: engineVolume, lastMuted: engineMuted }),
+      500
+    )
+    return () => clearTimeout(id)
+  }, [engineVolume, engineMuted])
 
   const prevState = useRef(engineState)
   useEffect(() => {
@@ -246,11 +345,13 @@ export function usePlayback(
     if (index === null) {
       settings.set({ subtitlesEnabled: false })
       setSubtitleIndex(null)
+      useTrackMemory.getState().remember(sess.item.Id, { subtitleStreamIndex: -1 })
       if (burnedIn) {
         void loadFor(sess.item, {
           startSeconds: engine.currentTime(),
           audioStreamIndex: audioIndex,
-          subtitleStreamIndex: -1
+          subtitleStreamIndex: -1,
+          mediaSourceId: sess.mediaSource.Id
         })
       } else {
         engine.setTextTrack(null)
@@ -262,6 +363,7 @@ export function usePlayback(
       subtitlesEnabled: true,
       ...(language ? { preferredSubtitleLanguage: language } : {})
     })
+    useTrackMemory.getState().remember(sess.item.Id, { subtitleStreamIndex: index })
     if (!burnedIn && isTextTrack(sess, index)) {
       engine.setTextTrack(index)
       setSubtitleIndex(index)
@@ -271,7 +373,8 @@ export function usePlayback(
       void loadFor(sess.item, {
         startSeconds: engine.currentTime(),
         audioStreamIndex: audioIndex,
-        subtitleStreamIndex: index
+        subtitleStreamIndex: index,
+        mediaSourceId: sess.mediaSource.Id
       })
     }
   }
@@ -282,12 +385,14 @@ export function usePlayback(
     setAudioIndex(index)
     const language = sess.audioStreams.find((s) => s.Index === index)?.Language
     if (language) useSettings.getState().set({ preferredAudioLanguage: language })
+    useTrackMemory.getState().remember(sess.item.Id, { audioStreamIndex: index })
     // HTML5 can't switch embedded audio tracks: reload stream with the new
     // index, keeping the current subtitle selection (text, burn-in, or off)
     void loadFor(sess.item, {
       startSeconds: engine.currentTime(),
       audioStreamIndex: index,
-      subtitleStreamIndex: subtitleIndex ?? -1
+      subtitleStreamIndex: subtitleIndex ?? -1,
+      mediaSourceId: sess.mediaSource.Id
     })
   }
 
@@ -322,6 +427,7 @@ export function usePlayback(
     selectSubtitle,
     changeDelay,
     changeRate,
+    playItem,
     retry
   }
 }

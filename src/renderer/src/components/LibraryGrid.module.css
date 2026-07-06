@@ -1,22 +1,32 @@
 .page {
-  padding: 2.75rem;
+  padding-block: 2rem 3rem;
+  padding-inline: var(--gutter);
+  animation: rise var(--dur-slow) var(--ease-out) backwards;
+}
+
+@keyframes rise {
+  from {
+    transform: translateY(1rem);
+    opacity: 0;
+  }
 }
 
 .head {
   display: flex;
-  gap: 1.5rem;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
   align-items: baseline;
+
   margin-block-end: 2rem;
 }
 
 .title {
-  font-family: var(--font-display);
-  font-size: 2.25rem;
-  font-weight: 600;
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
 }
 
 .count {
-  font-size: 0.8125rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
   color: var(--fg-faint);
 }
 
@@ -27,16 +37,23 @@
 .sort {
   display: flex;
   gap: 0.25rem;
+
+  padding: 0.2rem;
+  border-radius: var(--radius-full);
+
+  background: var(--surface-1);
 }
 
 .sortBtn {
   padding-block: 0.3rem;
-  padding-inline: 0.65rem;
-  border-radius: var(--radius-s);
+  padding-inline: 0.7rem;
+  border-radius: var(--radius-full);
 
-  font-size: 0.8125rem;
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
   color: var(--fg-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 
   transition:
     color var(--dur-fast) var(--ease),
@@ -50,7 +67,7 @@
 .sortBtnActive,
 .sortBtnActive:hover {
   color: var(--fg);
-  background: var(--surface-1);
+  background: var(--surface-3);
 }
 
 .status {
@@ -67,6 +84,6 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
-  gap: 1.75rem 1.1rem;
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  gap: 1.75rem 1rem;
 }

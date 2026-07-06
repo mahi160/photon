@@ -64,6 +64,16 @@ ipcMain.handle('session:clear', () => {
 
 ipcMain.handle('app:version', () => app.getVersion())
 
+// PiP: the floating video window survives a minimized main window, so the
+// player minimizes on PiP enter and restores on exit
+ipcMain.handle('app:minimize', (e) => BrowserWindow.fromWebContents(e.sender)?.minimize())
+
+ipcMain.handle('app:restore', (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender)
+  if (win?.isMinimized()) win.restore()
+  win?.focus()
+})
+
 ipcMain.handle('app:setLoginItem', (_e, enabled: boolean) => {
   app.setLoginItemSettings({ openAtLogin: enabled })
 })
@@ -101,6 +111,9 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
+      // contextIsolation stays on (default) and the preload only exposes the
+      // whitelisted `api`/`electron` bridges above — sandbox is off solely
+      // because @electron-toolkit/preload needs non-sandboxed Node APIs at load time
       sandbox: false
     }
   })

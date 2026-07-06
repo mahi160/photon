@@ -30,7 +30,9 @@ export function Login(): React.JSX.Element {
   return (
     <div className={styles.page}>
       <form onSubmit={submit} className={styles.form}>
-        <h1 className={styles.brand}>Photon</h1>
+        <h1 className={styles.brand}>
+          ph<span className={styles.brandO}>o</span>ton
+        </h1>
         <p className={styles.tagline}>Sign in to your Jellyfin server.</p>
         <label className={styles.label} htmlFor="login-server">
           Server

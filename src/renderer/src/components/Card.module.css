@@ -1,10 +1,7 @@
+/* fluid by default — grids size cards via their cells; horizontal rows pin
+   a fixed basis on track children instead (Row.module.css) */
 .card {
   flex-shrink: 0;
-  inline-size: 10rem;
-}
-
-.card.wide {
-  inline-size: 16rem;
 }
 
 .poster {
@@ -20,7 +17,9 @@
   background: var(--surface-2);
   box-shadow: var(--shadow-1);
 
-  transition: box-shadow var(--dur-med) var(--ease);
+  transition:
+    box-shadow var(--dur-med) var(--ease),
+    translate var(--dur-med) var(--ease);
 }
 
 .poster.wide {
@@ -29,7 +28,8 @@
 
 .poster:hover,
 .poster:focus-visible {
-  box-shadow: var(--shadow-2), var(--shadow-glow);
+  translate: 0 -0.2rem;
+  box-shadow: var(--shadow-2);
 }
 
 .image {
@@ -115,9 +115,11 @@
   background: color-mix(in oklch, black 45%, transparent);
 }
 
+/* signature: the beam marks how far the light got */
 .progressFill {
   block-size: 100%;
-  background: var(--accent);
+  background: var(--beam);
+  box-shadow: var(--beam-glow);
 }
 
 .title {
@@ -127,7 +129,8 @@
   inline-size: 100%;
   margin-block-start: 0.6rem;
 
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
+  font-weight: 500;
   color: var(--fg);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -137,12 +140,15 @@
 
 .title:hover,
 .title:focus-visible {
-  color: var(--accent-3);
+  color: var(--accent);
 }
 
 .subtitle {
   overflow: hidden;
 
+  margin-block-start: 0.15rem;
+
+  font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--fg-faint);
   text-overflow: ellipsis;
