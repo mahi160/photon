@@ -31,6 +31,8 @@ const speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 
 export interface ControlsBarProps {
   state: 'playing' | 'paused' | 'buffering'
+  time: number
+  duration: number
   rate: number
   volume: number
   muted: boolean
@@ -78,6 +80,8 @@ function EndTimeDisplay({ duration, currentTime, rate, onEndsAt }: {
 
 export function ControlsBar({
   state,
+  time,
+  duration,
   rate,
   volume,
   muted,
@@ -155,8 +159,8 @@ export function ControlsBar({
       </div>
 
       <EndTimeDisplay
-        duration={0}
-        currentTime={0}
+        duration={duration}
+        currentTime={time}
         rate={rate}
         onEndsAt={onEndsAt}
       />

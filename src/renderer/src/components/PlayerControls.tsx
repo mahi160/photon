@@ -164,6 +164,8 @@ export function PlayerControls(p: Props): React.JSX.Element {
             />
             <ControlsBar
               state={p.state}
+              time={p.time}
+              duration={p.duration}
               rate={p.rate}
               volume={p.volume}
               muted={p.muted}
