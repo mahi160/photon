@@ -19,11 +19,15 @@ export function useMediaSession(handlers: MediaSessionHandlers): void {
     ms.setActionHandler('seekforward', () => handlers.seekBy(10))
     ms.setActionHandler(
       'previoustrack',
-      handlers.prevEpisode && handlers.playItem ? () => handlers.playItem!(handlers.prevEpisode!) : null
+      handlers.prevEpisode && handlers.playItem
+        ? () => handlers.playItem!(handlers.prevEpisode!)
+        : null
     )
     ms.setActionHandler(
       'nexttrack',
-      handlers.nextEpisode && handlers.playItem ? () => handlers.playItem!(handlers.nextEpisode!) : null
+      handlers.nextEpisode && handlers.playItem
+        ? () => handlers.playItem!(handlers.nextEpisode!)
+        : null
     )
 
     return () => {

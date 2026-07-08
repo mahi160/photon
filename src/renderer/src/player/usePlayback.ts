@@ -112,7 +112,11 @@ export function usePlayback(
   const [error, setError] = useState<string | null>(null)
   const [audioIndex, setAudioIndex] = useState<number | undefined>(undefined)
   const [subtitleDelay, setSubtitleDelay] = useState(0)
-  const { index: subtitleIndex, isText: subtitleIsText, select: selectSubtitleLogic } = useSubtitleSelection(session)
+  const {
+    index: subtitleIndex,
+    isText: subtitleIsText,
+    select: selectSubtitleLogic
+  } = useSubtitleSelection(session)
 
   const initial = useSettings.getState()
   const engine = usePlayerEngine(

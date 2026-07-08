@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CheckIcon, HeartIcon, PlayIcon } from '@phosphor-icons/react'
@@ -22,7 +23,10 @@ export function Card({
   const pct = item.UserData?.PlayedPercentage
   const played = item.UserData?.Played ?? false
   const favorite = item.UserData?.IsFavorite ?? false
-  const isNew = !!item.DateCreated && Date.now() - Date.parse(item.DateCreated) < 7 * 86_400_000
+  // lazy initializer: the sanctioned place to read the wall clock during
+  // render — a "new" badge doesn't need per-render freshness
+  const [now] = useState(() => Date.now())
+  const isNew = !!item.DateCreated && now - Date.parse(item.DateCreated) < 7 * 86_400_000
 
   const toggleWatched = useMutation({
     mutationFn: (next: boolean) => setPlayed(item.Id, next),

@@ -10,7 +10,9 @@ function userId(): string {
 }
 
 export function setPlayed(itemId: string, played: boolean): Promise<void> {
-  return jf<void>(`/Users/${userId()}/PlayedItems/${itemId}`, { method: played ? 'POST' : 'DELETE' })
+  return jf<void>(`/Users/${userId()}/PlayedItems/${itemId}`, {
+    method: played ? 'POST' : 'DELETE'
+  })
 }
 
 export function setFavorite(itemId: string, favorite: boolean): Promise<void> {

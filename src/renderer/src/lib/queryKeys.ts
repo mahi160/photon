@@ -35,6 +35,11 @@ export const queryKeys = {
   },
   episodes: {
     all: () => [...queryKeys.all(), 'episodes'],
-    detail: (seriesId: string, seasonId: string) => [...queryKeys.episodes.all(), 'detail', seriesId, seasonId]
+    detail: (seriesId: string, seasonId: string) => [
+      ...queryKeys.episodes.all(),
+      'detail',
+      seriesId,
+      seasonId
+    ]
   }
 } as const

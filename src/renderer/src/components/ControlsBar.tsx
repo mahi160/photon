@@ -59,18 +59,22 @@ export interface ControlsBarProps {
   onFullscreen: () => void
   onPiP: () => void
   onOpenMpv?: () => void
-  onEndsAt?: (endsAt: Date) => void
 }
 
-function EndTimeDisplay({ duration, currentTime, rate, onEndsAt }: {
+function EndTimeDisplay({
+  duration,
+  currentTime,
+  rate
+}: {
   duration: number
   currentTime: number
   rate: number
-  onEndsAt?: (endsAt: Date) => void
 }): React.JSX.Element | null {
   if (duration <= 0) return null
+  // ponytail: genuinely needs the wall clock every render (playback ticks
+  // currentTime forward) — no pure/lazy-init substitute exists for "now"
+  // eslint-disable-next-line react-hooks/purity
   const endsAt = new Date(Date.now() + ((duration - currentTime) / (rate || 1)) * 1000)
-  onEndsAt?.(endsAt)
   return (
     <span className={styles.endsAt}>
       ends at {endsAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
@@ -107,8 +111,7 @@ export function ControlsBar({
   onSubtitleDelay,
   onFullscreen,
   onPiP,
-  onOpenMpv,
-  onEndsAt
+  onOpenMpv
 }: ControlsBarProps): React.JSX.Element {
   return (
     <div className={styles.controlsRow}>
@@ -124,11 +127,7 @@ export function ControlsBar({
 
       {onPlayNext && (
         <Tip label={nextEpisode ? `Next: ${nextEpisode.Name}` : 'Next episode'}>
-          <button
-            className={styles.iconBtn}
-            onClick={onPlayNext}
-            aria-label="Next episode"
-          >
+          <button className={styles.iconBtn} onClick={onPlayNext} aria-label="Next episode">
             <SkipForwardIcon weight="fill" className={styles.icon} />
           </button>
         </Tip>
@@ -158,16 +157,14 @@ export function ControlsBar({
         />
       </div>
 
-      <EndTimeDisplay
-        duration={duration}
-        currentTime={time}
-        rate={rate}
-        onEndsAt={onEndsAt}
-      />
+      <EndTimeDisplay duration={duration} currentTime={time} rate={rate} />
 
       <div className={styles.grow} />
 
-      <BaseMenu.Root open={menuOpen === 'speed'} onOpenChange={(open) => onToggleMenu('speed', open)}>
+      <BaseMenu.Root
+        open={menuOpen === 'speed'}
+        onOpenChange={(open) => onToggleMenu('speed', open)}
+      >
         <Tip label="Playback speed">
           <BaseMenu.Trigger className={styles.iconBtn} aria-label="Playback speed">
             <span className={styles.rateLabel}>{rate}×</span>
@@ -237,7 +234,10 @@ export function ControlsBar({
         </BaseSelect.Portal>
       </BaseSelect.Root>
 
-      <BasePopover.Root open={menuOpen === 'sync'} onOpenChange={(open) => onToggleMenu('sync', open)}>
+      <BasePopover.Root
+        open={menuOpen === 'sync'}
+        onOpenChange={(open) => onToggleMenu('sync', open)}
+      >
         <Tip label="Subtitle sync" kbd="[ ]">
           <BasePopover.Trigger
             className={styles.iconBtn}

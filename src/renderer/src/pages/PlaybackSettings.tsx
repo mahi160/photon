@@ -17,8 +17,6 @@ const playerModes = [
   { value: 'mpv', label: 'Always mpv' }
 ] as const
 
-
-
 export function PlaybackSettings(): React.JSX.Element {
   const settings = useSettings()
   const [hwAccel, setHwAccel] = useState(true)

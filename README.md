@@ -17,6 +17,18 @@ A calm, minimal desktop media player built exclusively for Jellyfin.
 - Picture-in-Picture, fullscreen, playback speed, keyboard-first controls
 - Watch progress synced back to Jellyfin
 
+## macOS: "Photon.app is damaged and can't be opened"
+
+Photon's macOS build is ad-hoc signed, not notarized (that requires a paid
+Apple Developer account). Gatekeeper blocks any downloaded app in that state.
+This is a false positive, not a corrupt download — one-time fix:
+
+```bash
+xattr -cr /Applications/Photon.app
+```
+
+Run it after moving Photon to Applications, then launch normally.
+
 ## Keyboard shortcuts
 
 | Key      | Action             |

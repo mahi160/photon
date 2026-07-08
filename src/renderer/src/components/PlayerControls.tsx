@@ -66,7 +66,10 @@ export function PlayerControls(p: Props): React.JSX.Element {
     const prev = prevState.current
     prevState.current = p.state
     if (prev === p.state) return
-    if ((p.state === 'playing' || p.state === 'paused') && (prev === 'playing' || prev === 'paused')) {
+    if (
+      (p.state === 'playing' || p.state === 'paused') &&
+      (prev === 'playing' || prev === 'paused')
+    ) {
       setPulse({ kind: p.state, id: Date.now() })
     }
   }, [p.state])
@@ -97,11 +100,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
         {pulse && (
           <div key={pulse.id} className={styles.pulse}>
             <span className={styles.pulseIcon} onAnimationEnd={() => setPulse(null)}>
-              {pulse.kind === 'playing' ? (
-                <PlayIcon weight="fill" />
-              ) : (
-                <PauseIcon weight="fill" />
-              )}
+              {pulse.kind === 'playing' ? <PlayIcon weight="fill" /> : <PauseIcon weight="fill" />}
             </span>
           </div>
         )}

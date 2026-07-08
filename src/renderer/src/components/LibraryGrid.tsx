@@ -59,7 +59,11 @@ export function LibraryGrid({
           // stagger only the first screenful — animating a full library's
           // worth of cards at once is just jank, not polish
           i < 12 ? (
-            <div key={item.Id} className={styles.gridItem} style={{ animationDelay: `${i * 30}ms` }}>
+            <div
+              key={item.Id}
+              className={styles.gridItem}
+              style={{ animationDelay: `${i * 30}ms` }}
+            >
               <Card item={item} />
             </div>
           ) : (

@@ -85,7 +85,8 @@ export function useSubtitleSelection(
 
   return {
     index: subtitleIndex,
-    isText: subtitleIndex === null || (session !== null && isSessionTextTrack(session, subtitleIndex)),
+    isText:
+      subtitleIndex === null || (session !== null && isSessionTextTrack(session, subtitleIndex)),
     select
   }
 }
