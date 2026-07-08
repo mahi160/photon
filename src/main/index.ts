@@ -9,7 +9,7 @@ registerMpv()
 
 const prefsFile = join(app.getPath('userData'), 'prefs.json')
 
-function readPrefs(): { disableHwAccel?: boolean } {
+function readPrefs(): { disableHwAccel?: boolean; disableAutoUpdate?: boolean } {
   try {
     return existsSync(prefsFile) ? JSON.parse(readFileSync(prefsFile, 'utf-8')) : {}
   } catch {
@@ -80,12 +80,22 @@ ipcMain.handle('app:setLoginItem', (_e, enabled: boolean) => {
 
 ipcMain.handle('app:getLoginItem', () => app.getLoginItemSettings().openAtLogin)
 
+function writePrefs(patch: Partial<ReturnType<typeof readPrefs>>): void {
+  writeFileSync(prefsFile, JSON.stringify({ ...readPrefs(), ...patch }))
+}
+
 ipcMain.handle('app:setHwAccel', (_e, enabled: boolean) => {
   // takes effect on next launch
-  writeFileSync(prefsFile, JSON.stringify({ disableHwAccel: !enabled }))
+  writePrefs({ disableHwAccel: !enabled })
 })
 
 ipcMain.handle('app:getHwAccel', () => !readPrefs().disableHwAccel)
+
+ipcMain.handle('app:setAutoUpdate', (_e, enabled: boolean) => {
+  writePrefs({ disableAutoUpdate: !enabled })
+})
+
+ipcMain.handle('app:getAutoUpdate', () => !readPrefs().disableAutoUpdate)
 
 // Subtitle VTT fetched from main: renderer <track> fetches are subject to
 // CORS (needs Access-Control-Allow-Origin from the user's server/reverse
@@ -137,7 +147,7 @@ function createWindow(): void {
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('dev.photon')
 
-  if (!is.dev) {
+  if (!is.dev && !readPrefs().disableAutoUpdate) {
     void import('electron-updater')
       .then(({ autoUpdater }) => autoUpdater.checkForUpdatesAndNotify())
       .catch(() => {})

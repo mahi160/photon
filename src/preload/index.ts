@@ -13,6 +13,9 @@ const api = {
   getLoginItem: (): Promise<boolean> => ipcRenderer.invoke('app:getLoginItem'),
   setHwAccel: (enabled: boolean): Promise<void> => ipcRenderer.invoke('app:setHwAccel', enabled),
   getHwAccel: (): Promise<boolean> => ipcRenderer.invoke('app:getHwAccel'),
+  setAutoUpdate: (enabled: boolean): Promise<void> =>
+    ipcRenderer.invoke('app:setAutoUpdate', enabled),
+  getAutoUpdate: (): Promise<boolean> => ipcRenderer.invoke('app:getAutoUpdate'),
   mpvPlay: (opts: { url: string; start: number; title: string }): Promise<boolean> =>
     ipcRenderer.invoke('mpv:play', opts),
   mpvStatus: (): Promise<{ running: boolean; timePos: number; paused: boolean }> =>
