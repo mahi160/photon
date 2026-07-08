@@ -1,10 +1,11 @@
 import { CaretLeftIcon, PauseIcon, PlayIcon } from '@phosphor-icons/react'
 import { useEffect, useRef, useState } from 'react'
-import { type BaseItem, type MediaStream } from '../lib/jellyfin'
+import { type BaseItem, type MediaSegment, type MediaStream } from '../lib/jellyfin'
 import { Tip } from './Tip'
 import { TimelinePreview } from './TimelinePreview'
 import { ControlsBar } from './ControlsBar'
 import { NextUpCard } from './NextUpCard'
+import { SkipSegmentButton } from './SkipSegmentButton'
 import styles from './PlayerControls.module.css'
 
 export interface Props {
@@ -28,6 +29,8 @@ export interface Props {
   subtitleDelayEnabled: boolean
   nextEpisode?: BaseItem
   onPlayNext?: () => void
+  activeSegment?: MediaSegment
+  onSkipSegment?: () => void
   onPinChange: (pinned: boolean) => void
   onBack: () => void
   onTogglePlay: () => void
@@ -196,6 +199,10 @@ export function PlayerControls(p: Props): React.JSX.Element {
           </div>
         </div>
       </div>
+
+      {p.activeSegment && p.onSkipSegment && (
+        <SkipSegmentButton segment={p.activeSegment} onSkip={p.onSkipSegment} />
+      )}
 
       {showNextUp && p.nextEpisode && (
         <NextUpCard

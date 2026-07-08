@@ -48,6 +48,7 @@ select {
 
 button {
   cursor: pointer;
+  padding: 0;
   border: none;
   text-align: inherit;
   background: none;

@@ -35,3 +35,17 @@
 
   color: var(--fg-faint);
 }
+
+.status {
+  padding-inline: var(--gutter);
+  margin-block-end: 1.5rem;
+  color: var(--fg-faint);
+}
+
+.retry {
+  color: var(--accent);
+}
+
+.retry:hover {
+  text-decoration: underline;
+}

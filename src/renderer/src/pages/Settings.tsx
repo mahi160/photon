@@ -19,10 +19,12 @@ export function Settings(): React.JSX.Element {
 
   const [version, setVersion] = useState('')
   const [loginItem, setLoginItem] = useState(false)
+  const [autoUpdate, setAutoUpdate] = useState(true)
 
   useEffect(() => {
     void window.api.appVersion().then(setVersion)
     void window.api.getLoginItem().then(setLoginItem)
+    void window.api.getAutoUpdate().then(setAutoUpdate)
   }, [])
 
   return (
@@ -39,6 +41,16 @@ export function Settings(): React.JSX.Element {
             onChange={(v) => {
               setLoginItem(v)
               void window.api.setLoginItem(v)
+            }}
+          />
+        </SettingsRow>
+        <SettingsRow label="Auto update" hint="Check for new versions on launch">
+          <ToggleSwitch
+            label="Auto update"
+            checked={autoUpdate}
+            onChange={(v) => {
+              setAutoUpdate(v)
+              void window.api.setAutoUpdate(v)
             }}
           />
         </SettingsRow>
@@ -89,6 +101,10 @@ export function Settings(): React.JSX.Element {
             GitHub
           </a>
         </SettingsRow>
+        <SettingsRow
+          label="Acknowledgements"
+          hint="Electron, React, TanStack, Zustand, mpv, and the Jellyfin project"
+        />
       </SettingsSection>
 
       <p className={styles.footnote}>

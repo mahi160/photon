@@ -35,12 +35,92 @@
 
 .input:focus-visible {
   border-block-end-color: var(--accent-border);
+  border-radius: 0;
+  outline: none;
 }
 
 .idle {
   margin-block-start: 3.5rem;
   font-size: 0.9375rem;
   color: var(--fg-faint);
+}
+
+.history {
+  margin-block-start: 2rem;
+}
+
+.historyClear {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--fg-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.historyClear:hover {
+  color: var(--fg);
+}
+
+.historyChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.historyChip {
+  display: flex;
+  align-items: center;
+
+  padding-inline-start: 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+
+  background: var(--surface-1);
+
+  transition: border-color var(--dur-fast) var(--ease);
+}
+
+.historyChip:hover {
+  border-color: var(--border-strong);
+}
+
+.historyChipLabel {
+  padding-block: 0.45rem;
+
+  font-size: 0.8125rem;
+  color: var(--fg-muted);
+}
+
+.historyChip:hover .historyChipLabel {
+  color: var(--fg);
+}
+
+.historyChipRemove {
+  display: grid;
+  place-items: center;
+
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+  margin-inline-end: 0.15rem;
+  border-radius: var(--radius-full);
+
+  color: var(--fg-faint);
+
+  transition:
+    color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.historyChipRemove:hover {
+  color: var(--fg);
+  background: var(--surface-2);
+}
+
+.historyChipRemove svg {
+  inline-size: 0.65rem;
+  block-size: 0.65rem;
 }
 
 .emptyState {

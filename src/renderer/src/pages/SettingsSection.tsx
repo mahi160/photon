@@ -17,7 +17,7 @@ export function SettingsSection({ title, children }: SettingsSectionProps): Reac
 
 export interface SettingsRowProps {
   label: string
-  children: React.ReactNode
+  children?: React.ReactNode
   hint?: string
 }
 

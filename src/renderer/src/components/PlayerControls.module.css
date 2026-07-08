@@ -582,6 +582,34 @@
 
 /* next-up card — lives outside the auto-hiding layer so the countdown
    stays visible even when the controls have faded */
+.skipSegment {
+  position: absolute;
+  z-index: 1;
+  inset-block-end: 7rem;
+  inset-inline-start: 1.5rem;
+
+  padding-block: 0.7rem;
+  padding-inline: 1.25rem;
+  border: 1px solid var(--player-border);
+  border-radius: var(--radius-full);
+
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--player-fg);
+
+  background: var(--player-glass-strong);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-2);
+
+  transition: background-color var(--dur-fast) var(--ease);
+
+  animation: menu-in var(--dur-med) var(--ease-out);
+}
+
+.skipSegment:hover {
+  background: var(--player-glass);
+}
+
 .nextUp {
   position: absolute;
   z-index: 1;

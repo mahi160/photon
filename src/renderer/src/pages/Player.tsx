@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { itemQuery } from '../lib/queries'
+import { itemQuery, mediaSegmentsQuery } from '../lib/queries'
 import { currentSession, jf, ticksToSeconds, type ItemsResult } from '../lib/jellyfin'
 import { resolvePlayable, usePlayback } from '../player/usePlayback'
 import { canDirectPlay } from '../player/session'
@@ -177,6 +177,12 @@ function WebPlayer({
   // the episode after the one playing (dock's next button); NextUp can't be
   // used here — mid-episode it still points at the current one
   const playing = player.session?.item
+  // server-detected intro/outro ranges (Jellyfin 10.9+, empty on older servers)
+  const segments = useQuery({ ...mediaSegmentsQuery(playing?.Id ?? ''), enabled: !!playing })
+  const timeTicks = engine.time * 10_000_000
+  const activeSegment = segments.data?.find(
+    (s) => s.Type !== 'Unknown' && timeTicks >= s.StartTicks && timeTicks < s.EndTicks
+  )
   const nextEp = useQuery({
     queryKey: [...queryKeys.item.adjacent(playing?.Id ?? ''), 'next'],
     enabled: playing?.Type === 'Episode' && !!playing.SeriesId,
@@ -303,6 +309,10 @@ function WebPlayer({
           subtitleDelayEnabled={player.subtitleIsText && player.subtitleIndex !== null}
           nextEpisode={nextEp.data ?? undefined}
           onPlayNext={nextEp.data ? () => void player.playItem(nextEp.data!) : undefined}
+          activeSegment={activeSegment}
+          onSkipSegment={
+            activeSegment ? () => engine.seek(ticksToSeconds(activeSegment.EndTicks)) : undefined
+          }
           onPinChange={setPinned}
           onBack={() => navigate({ to: '/' })}
           onTogglePlay={engine.togglePlay}

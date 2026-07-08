@@ -1,10 +1,12 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { XIcon } from '@phosphor-icons/react'
 import { searchIndexQuery, episodeSearchQuery } from '../lib/queries'
 import { Card } from '../components/Card'
 import { filterLocal } from '../lib/search'
 import { imageUrl, type BaseItem } from '../lib/jellyfin'
+import { useSearchHistory } from '../stores/searchHistory'
 import styles from './Search.module.css'
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -54,6 +56,17 @@ export function Search(): React.JSX.Element {
   const q = term.trim()
   const hasQuery = q.length >= 2
 
+  const history = useSearchHistory((s) => s.terms)
+  const addHistory = useSearchHistory((s) => s.add)
+  const removeHistory = useSearchHistory((s) => s.remove)
+  const clearHistory = useSearchHistory((s) => s.clear)
+  // longer, separate debounce than the live search — only save once the user
+  // has actually stopped, not just paused mid-word
+  const settled = useDebounced(q, 1000)
+  useEffect(() => {
+    if (settled.length >= 2) addHistory(settled)
+  }, [settled, addHistory])
+
   // instant: local index of movies + shows (ADR-0001)
   const index = useQuery(searchIndexQuery)
   const local = useMemo(
@@ -86,6 +99,33 @@ export function Search(): React.JSX.Element {
       {!hasQuery && (
         <div className={styles.idle}>
           Type to search. Movies and shows filter instantly; episodes stream in from the server.
+        </div>
+      )}
+
+      {!hasQuery && history.length > 0 && (
+        <div className={styles.history}>
+          <div className={styles.epHead}>
+            <h2 className={styles.groupTitle}>Recent searches</h2>
+            <button className={styles.historyClear} onClick={clearHistory}>
+              clear
+            </button>
+          </div>
+          <div className={styles.historyChips}>
+            {history.map((h) => (
+              <div key={h} className={styles.historyChip}>
+                <button onClick={() => setTerm(h)} className={styles.historyChipLabel}>
+                  {h}
+                </button>
+                <button
+                  onClick={() => removeHistory(h)}
+                  aria-label={`Remove ${h} from recent searches`}
+                  className={styles.historyChipRemove}
+                >
+                  <XIcon weight="bold" />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
