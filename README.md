@@ -53,6 +53,16 @@ npx vitest run  # tests
 pnpm build:mac  # package (also build:win, build:linux)
 ```
 
+## Releasing
+
+Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
+(`feat:`, `fix:`, `chore:`, etc.) — enforced by commitlint, both locally (a
+husky `commit-msg` hook) and in CI on pull requests. Merging a PR into `prod`
+runs [semantic-release](https://github.com/semantic-release/semantic-release):
+it computes the next version from those commit types, tags, updates
+`CHANGELOG.md`, and drafts a GitHub Release. Windows/macOS/Linux builds then
+attach to that release, which only goes public once all three succeed.
+
 ## Architecture
 
 - Electron + React + TypeScript + Vite, TanStack Router/Query, Zustand, Tailwind v4

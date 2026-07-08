@@ -1,37 +1,49 @@
 name: Release
 
-# ponytail: no manual `git tag` step — push to `prod` and this workflow
-# tags + releases from package.json's version.
+# semantic-release computes the version from conventional commits and tags/
+# releases (as a draft) on every push to prod — normally a PR merge. The
+# platform builds below only run once a release actually happens, and
+# undraft it only after all three succeed (never publish a release with
+# missing binaries).
 on:
   push:
     branches: [prod]
-  workflow_dispatch:
 
 permissions:
   contents: write
+  issues: write
+  pull-requests: write
 
 jobs:
-  create-release:
+  release:
     runs-on: ubuntu-latest
     outputs:
-      tag: v${{ steps.version.outputs.version }}
+      published: ${{ steps.semantic.outputs.new_release_published }}
+      tag: v${{ steps.semantic.outputs.new_release_version }}
     steps:
       - uses: actions/checkout@v4
-      - id: version
-        run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
-      - env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          tag="v${{ steps.version.outputs.version }}"
-          gh release view "$tag" --repo "${{ github.repository }}" >/dev/null 2>&1 && exit 0
-          gh release create "$tag" \
-            --repo "${{ github.repository }}" \
-            --target "${{ github.sha }}" \
-            --title "$tag" \
-            --draft --notes ""
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: cycjimmy/semantic-release-action@v4
+        id: semantic
+        with:
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build:
-    needs: create-release
+    needs: release
+    if: needs.release.outputs.published == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -48,6 +60,8 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
 
       - uses: pnpm/action-setup@v4
         with:
@@ -68,9 +82,9 @@ jobs:
       - run: pnpm exec electron-builder ${{ matrix.builderArgs }} --publish always
 
   publish-release:
-    needs: [create-release, build]
+    needs: [release, build]
     runs-on: ubuntu-latest
     steps:
       - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "${{ needs.create-release.outputs.tag }}" --repo "${{ github.repository }}" --draft=false
+        run: gh release edit "${{ needs.release.outputs.tag }}" --repo "${{ github.repository }}" --draft=false
