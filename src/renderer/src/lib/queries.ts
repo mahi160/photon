@@ -1,12 +1,22 @@
 /* eslint-disable @typescript-eslint/explicit-function-return-type -- queryOptions types are inferred */
 import { queryOptions } from '@tanstack/react-query'
-import { currentSession, jf, type BaseItem, type ItemsResult } from './jellyfin'
+import { currentSession, jf, type BaseItem, type ItemsResult, type MediaSegment } from './jellyfin'
 import { queryKeys } from './queryKeys'
 
 function userId(): string {
   const s = currentSession()
   if (!s) throw new Error('Not signed in')
   return s.userId
+}
+
+export function setPlayed(itemId: string, played: boolean): Promise<void> {
+  return jf<void>(`/Users/${userId()}/PlayedItems/${itemId}`, { method: played ? 'POST' : 'DELETE' })
+}
+
+export function setFavorite(itemId: string, favorite: boolean): Promise<void> {
+  return jf<void>(`/Users/${userId()}/FavoriteItems/${itemId}`, {
+    method: favorite ? 'POST' : 'DELETE'
+  })
 }
 
 export const resumeItemsQuery = queryOptions({
@@ -110,6 +120,18 @@ export const itemQuery = (itemId: string) =>
       jf<BaseItem>(`/Users/${userId()}/Items/${itemId}`, {
         query: { Fields: 'Overview,MediaSources,Chapters' }
       })
+  })
+
+// server-detected intro/outro ranges; retry:false — a 404 here just means
+// the server predates 10.9 or hasn't analyzed this item, not a real failure
+export const mediaSegmentsQuery = (itemId: string) =>
+  queryOptions({
+    queryKey: queryKeys.item.segments(itemId),
+    retry: false,
+    queryFn: () =>
+      jf<{ Items: MediaSegment[] }>(`/MediaSegments/${itemId}`)
+        .then((r) => r.Items)
+        .catch(() => [] as MediaSegment[])
   })
 
 export const seasonsQuery = (seriesId: string) =>

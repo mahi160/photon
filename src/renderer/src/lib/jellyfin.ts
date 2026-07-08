@@ -101,6 +101,7 @@ export interface UserData {
   PlaybackPositionTicks?: number
   PlayedPercentage?: number
   Played?: boolean
+  IsFavorite?: boolean
 }
 
 export interface MediaStream {
@@ -164,6 +165,15 @@ export function itemTitle(item: BaseItem): string {
 export interface ItemsResult {
   Items: BaseItem[]
   TotalRecordCount: number
+}
+
+// Jellyfin 10.9+ /MediaSegments — server-detected intro/outro/recap ranges.
+// Older servers 404 on this route; callers must treat that as "no segments".
+export interface MediaSegment {
+  ItemId: string
+  Type: 'Unknown' | 'Intro' | 'Outro' | 'Recap' | 'Preview' | 'Commercial'
+  StartTicks: number
+  EndTicks: number
 }
 
 export function imageUrl(

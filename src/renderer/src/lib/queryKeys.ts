@@ -26,7 +26,8 @@ export const queryKeys = {
   item: {
     all: () => [...queryKeys.all(), 'item'],
     detail: (itemId: string) => [...queryKeys.item.all(), 'detail', itemId],
-    adjacent: (itemId: string) => [...queryKeys.item.all(), 'adjacent', itemId]
+    adjacent: (itemId: string) => [...queryKeys.item.all(), 'adjacent', itemId],
+    segments: (itemId: string) => [...queryKeys.item.all(), 'segments', itemId]
   },
   seasons: {
     all: () => [...queryKeys.all(), 'seasons'],
