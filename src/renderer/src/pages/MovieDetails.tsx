@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useNavigate, useParams, useRouter } from '@tanstack/react-router'
-import { CaretLeftIcon, PlayIcon } from '@phosphor-icons/react'
-import { useQuery } from '@tanstack/react-query'
-import { itemQuery } from '../lib/queries'
+import { CaretLeftIcon, CheckIcon, HeartIcon, PlayIcon } from '@phosphor-icons/react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { itemQuery, setFavorite, setPlayed } from '../lib/queries'
+import { queryKeys } from '../lib/queryKeys'
 import { backdropUrl, imageUrl, ticksToSeconds } from '../lib/jellyfin'
+import { Tip } from '../components/Tip'
 import styles from './Details.module.css'
 
 function fmtRuntime(ticks?: number): string {
@@ -24,9 +26,20 @@ function BackButton(): React.JSX.Element {
 export function MovieDetails(): React.JSX.Element {
   const { itemId } = useParams({ from: '/app/shell/movies/$itemId' })
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { data: item, isPending, isError, refetch } = useQuery(itemQuery(itemId))
   const [audio, setAudio] = useState<number | undefined>()
   const [sub, setSub] = useState<number | undefined>()
+
+  const toggleWatched = useMutation({
+    mutationFn: (next: boolean) => setPlayed(itemId, next),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.all() })
+  })
+
+  const toggleFavorite = useMutation({
+    mutationFn: (next: boolean) => setFavorite(itemId, next),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.all() })
+  })
 
   if (isPending) return <div className={styles.loading}>Loading…</div>
   if (isError || !item)
@@ -81,7 +94,21 @@ export function MovieDetails(): React.JSX.Element {
             )}
           </div>
           <div className={styles.info}>
-            <h1 className={styles.title}>{item.Name}</h1>
+            <div className={styles.titleRow}>
+              <h1 className={styles.title}>{item.Name}</h1>
+              <Tip label={item.UserData?.IsFavorite ? 'Remove from favorites' : 'Add to favorites'}>
+                <button
+                  onClick={() => toggleFavorite.mutate(!item.UserData?.IsFavorite)}
+                  aria-label={
+                    item.UserData?.IsFavorite ? 'Remove from favorites' : 'Add to favorites'
+                  }
+                  aria-pressed={!!item.UserData?.IsFavorite}
+                  className={`${styles.favoriteBtn} ${item.UserData?.IsFavorite ? styles.favoriteBtnActive : ''}`}
+                >
+                  <HeartIcon weight={item.UserData?.IsFavorite ? 'fill' : 'regular'} />
+                </button>
+              </Tip>
+            </div>
             <div className={styles.meta}>
               {meta.map((m) => (
                 <span key={String(m)}>{m}</span>
@@ -102,6 +129,16 @@ export function MovieDetails(): React.JSX.Element {
                 {position <= 60 && <PlayIcon weight="fill" />}
                 {position > 60 ? 'Play from start' : 'Play'}
               </button>
+              <Tip label={item.UserData?.Played ? 'Mark unwatched' : 'Mark watched'}>
+                <button
+                  onClick={() => toggleWatched.mutate(!item.UserData?.Played)}
+                  aria-label={item.UserData?.Played ? 'Mark unwatched' : 'Mark watched'}
+                  aria-pressed={!!item.UserData?.Played}
+                  className={`${styles.iconToggle} ${item.UserData?.Played ? styles.iconToggleActive : ''}`}
+                >
+                  <CheckIcon weight="bold" />
+                </button>
+              </Tip>
             </div>
             {(audioStreams.length > 1 || subtitleStreams.length > 0) && (
               <div className={styles.tracks}>

@@ -125,9 +125,42 @@
   padding-block-start: 6.5rem;
 }
 
+.titleRow {
+  display: flex;
+  gap: 0.85rem;
+  align-items: center;
+}
+
 .title {
   font-size: clamp(1.75rem, 3.5vw, 2.5rem);
   line-height: 1.1;
+}
+
+.favoriteBtn {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  border-radius: var(--radius-full);
+
+  color: var(--fg-faint);
+
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.favoriteBtn:hover {
+  color: var(--fg);
+}
+
+.favoriteBtn svg {
+  inline-size: 1.15rem;
+  block-size: 1.15rem;
+}
+
+.favoriteBtnActive {
+  color: var(--accent);
 }
 
 .meta {
@@ -207,6 +240,42 @@
 
 .playSecondary:hover {
   background: var(--surface-3);
+}
+
+.iconToggle {
+  display: grid;
+  place-items: center;
+
+  inline-size: 2.85rem;
+  block-size: 2.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+
+  color: var(--fg-muted);
+
+  background: var(--surface-1);
+
+  transition:
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.iconToggle:hover {
+  color: var(--fg);
+  background: var(--surface-2);
+}
+
+.iconToggle svg {
+  inline-size: 1rem;
+  block-size: 1rem;
+}
+
+.iconToggleActive,
+.iconToggleActive:hover {
+  color: var(--accent-fg);
+  border-color: transparent;
+  background: var(--accent);
 }
 
 .nextLabel {
@@ -317,6 +386,7 @@
   padding: 0.75rem;
   border-radius: var(--radius-m);
 
+  cursor: pointer;
   text-align: start;
 
   transition: background-color var(--dur-fast) var(--ease);
@@ -360,7 +430,7 @@
   background: var(--beam);
 }
 
-.watchedBadge {
+.episodeWatchedToggle {
   position: absolute;
   inset-block-start: 0.35rem;
   inset-inline-end: 0.35rem;
@@ -368,17 +438,32 @@
   display: grid;
   place-items: center;
 
-  padding: 0.2rem;
+  inline-size: 1.4rem;
+  block-size: 1.4rem;
   border-radius: var(--radius-full);
 
-  color: var(--accent-3);
+  color: var(--fg);
 
-  background: color-mix(in oklch, black 55%, transparent);
+  opacity: 0;
+  background: var(--scrim-soft);
+
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
-.watchedBadge svg {
+.episodeRow:hover .episodeWatchedToggle,
+.episodeWatchedToggle:focus-visible {
+  opacity: 1;
+}
+
+.episodeWatchedToggle svg {
   inline-size: 0.75rem;
   block-size: 0.75rem;
+}
+
+.episodeWatchedToggleActive {
+  opacity: 1;
+  color: var(--accent);
+  background: var(--scrim-soft);
 }
 
 .episodeNum {

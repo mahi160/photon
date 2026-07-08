@@ -1,7 +1,61 @@
 /* fluid by default — grids size cards via their cells; horizontal rows pin
    a fixed basis on track children instead (Row.module.css) */
 .card {
+  position: relative;
   flex-shrink: 0;
+}
+
+/* quiet row: title + small watched/favorite toggles, tucked beside the
+   text instead of sitting on top of the artwork */
+.meta {
+  display: flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  justify-content: space-between;
+
+  margin-block-start: 0.6rem;
+}
+
+.quickActions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.1rem;
+}
+
+.actionBtn {
+  display: grid;
+  place-items: center;
+
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  border-radius: var(--radius-full);
+
+  color: var(--fg-faint);
+
+  opacity: 0;
+
+  transition:
+    opacity var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
+}
+
+.card:hover .actionBtn,
+.actionBtn:focus-visible {
+  opacity: 1;
+}
+
+.actionBtn:hover {
+  color: var(--fg);
+}
+
+.actionBtn svg {
+  inline-size: 0.85rem;
+  block-size: 0.85rem;
+}
+
+.actionBtnActive {
+  opacity: 1;
+  color: var(--accent);
 }
 
 .poster {
@@ -126,8 +180,8 @@
   overflow: hidden;
   display: block;
 
-  inline-size: 100%;
-  margin-block-start: 0.6rem;
+  flex: 1;
+  min-inline-size: 0;
 
   font-size: 0.9375rem;
   font-weight: 500;

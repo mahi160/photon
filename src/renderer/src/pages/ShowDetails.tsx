@@ -1,16 +1,44 @@
 import { useState } from 'react'
 import { useNavigate, useParams, useRouter } from '@tanstack/react-router'
-import { CaretLeftIcon, CheckIcon, PlayIcon } from '@phosphor-icons/react'
-import { useQuery } from '@tanstack/react-query'
-import { episodesQuery, itemQuery, nextUpQuery, seasonsQuery } from '../lib/queries'
+import { CaretLeftIcon, CheckIcon, HeartIcon, PlayIcon } from '@phosphor-icons/react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  episodesQuery,
+  itemQuery,
+  nextUpQuery,
+  seasonsQuery,
+  setFavorite,
+  setPlayed
+} from '../lib/queries'
+import { queryKeys } from '../lib/queryKeys'
 import { backdropUrl, imageUrl, ticksToSeconds, type BaseItem } from '../lib/jellyfin'
+import { Tip } from '../components/Tip'
 import styles from './Details.module.css'
 
 function EpisodeRow({ ep, onPlay }: { ep: BaseItem; onPlay: () => void }): React.JSX.Element {
+  const queryClient = useQueryClient()
   const pct = ep.UserData?.PlayedPercentage
+  const played = ep.UserData?.Played ?? false
   const img = imageUrl(ep, 320)
+
+  const toggleWatched = useMutation({
+    mutationFn: (next: boolean) => setPlayed(ep.Id, next),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.all() })
+  })
+
   return (
-    <button onClick={onPlay} className={styles.episodeRow}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onPlay}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onPlay()
+        }
+      }}
+      className={styles.episodeRow}
+    >
       <div className={styles.episodeThumb}>
         {img && <img src={img} alt="" loading="lazy" />}
         {pct !== undefined && pct > 0 && pct < 100 && (
@@ -18,18 +46,25 @@ function EpisodeRow({ ep, onPlay }: { ep: BaseItem; onPlay: () => void }): React
             <div className={styles.episodeProgressFill} style={{ inlineSize: `${pct}%` }} />
           </div>
         )}
-        {ep.UserData?.Played && (
-          <div className={styles.watchedBadge}>
+        <Tip label={played ? 'Mark unwatched' : 'Mark watched'}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleWatched.mutate(!played)
+            }}
+            aria-label={played ? 'Mark unwatched' : 'Mark watched'}
+            className={`${styles.episodeWatchedToggle} ${played ? styles.episodeWatchedToggleActive : ''}`}
+          >
             <CheckIcon weight="bold" />
-          </div>
-        )}
+          </button>
+        </Tip>
       </div>
       <div className={styles.episodeNum}>{ep.IndexNumber ?? ''}</div>
       <div className={styles.episodeInfo}>
         <div className={styles.episodeTitle}>{ep.Name}</div>
         <p className={styles.episodeOverview}>{ep.Overview}</p>
       </div>
-    </button>
+    </div>
   )
 }
 
@@ -37,10 +72,16 @@ export function ShowDetails(): React.JSX.Element {
   const { seriesId } = useParams({ from: '/app/shell/shows/$seriesId' })
   const navigate = useNavigate()
   const router = useRouter()
+  const queryClient = useQueryClient()
   const series = useQuery(itemQuery(seriesId))
   const seasons = useQuery(seasonsQuery(seriesId))
   const nextUp = useQuery(nextUpQuery(seriesId))
   const [seasonId, setSeasonId] = useState<string | null>(null)
+
+  const toggleFavorite = useMutation({
+    mutationFn: (next: boolean) => setFavorite(seriesId, next),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.all() })
+  })
 
   const activeSeason = seasonId ?? seasons.data?.[0]?.Id ?? null
   const episodes = useQuery({
@@ -99,7 +140,21 @@ export function ShowDetails(): React.JSX.Element {
             )}
           </div>
           <div className={styles.info}>
-            <h1 className={styles.title}>{item.Name}</h1>
+            <div className={styles.titleRow}>
+              <h1 className={styles.title}>{item.Name}</h1>
+              <Tip label={item.UserData?.IsFavorite ? 'Remove from favorites' : 'Add to favorites'}>
+                <button
+                  onClick={() => toggleFavorite.mutate(!item.UserData?.IsFavorite)}
+                  aria-label={
+                    item.UserData?.IsFavorite ? 'Remove from favorites' : 'Add to favorites'
+                  }
+                  aria-pressed={!!item.UserData?.IsFavorite}
+                  className={`${styles.favoriteBtn} ${item.UserData?.IsFavorite ? styles.favoriteBtnActive : ''}`}
+                >
+                  <HeartIcon weight={item.UserData?.IsFavorite ? 'fill' : 'regular'} />
+                </button>
+              </Tip>
+            </div>
             <div className={styles.meta}>
               {meta.map((m) => (
                 <span key={String(m)}>{m}</span>
