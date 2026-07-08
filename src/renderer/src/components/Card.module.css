@@ -159,6 +159,24 @@
   margin-inline-start: 0.1rem;
 }
 
+.newBadge {
+  position: absolute;
+  inset-block-start: 0.5rem;
+  inset-inline-end: 0.5rem;
+
+  padding-block: 0.2rem;
+  padding-inline: 0.4rem;
+  border-radius: var(--radius-s);
+
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: var(--accent-fg);
+  letter-spacing: 0.04em;
+
+  background: var(--accent);
+}
+
 .progress {
   position: absolute;
   inset-block-end: 0;

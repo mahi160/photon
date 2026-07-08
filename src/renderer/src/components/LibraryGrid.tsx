@@ -21,6 +21,7 @@ export function LibraryGrid({
   const { data, isPending, isError, refetch } = useQuery(libraryQuery(type, sort))
 
   const noun = type === 'Movie' ? 'movies' : 'shows'
+  const empty = !isPending && !isError && data?.length === 0
 
   return (
     <div className={styles.page}>
@@ -50,10 +51,21 @@ export function LibraryGrid({
           </button>
         </div>
       )}
+      {empty && (
+        <div className={styles.status}>{`No ${noun} yet. Add media to your Jellyfin library.`}</div>
+      )}
       <div className={styles.grid}>
-        {data?.map((item) => (
-          <Card key={item.Id} item={item} />
-        ))}
+        {data?.map((item, i) =>
+          // stagger only the first screenful — animating a full library's
+          // worth of cards at once is just jank, not polish
+          i < 12 ? (
+            <div key={item.Id} className={styles.gridItem} style={{ animationDelay: `${i * 30}ms` }}>
+              <Card item={item} />
+            </div>
+          ) : (
+            <Card key={item.Id} item={item} />
+          )
+        )}
       </div>
     </div>
   )

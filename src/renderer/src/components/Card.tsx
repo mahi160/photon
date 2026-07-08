@@ -22,6 +22,7 @@ export function Card({
   const pct = item.UserData?.PlayedPercentage
   const played = item.UserData?.Played ?? false
   const favorite = item.UserData?.IsFavorite ?? false
+  const isNew = !!item.DateCreated && Date.now() - Date.parse(item.DateCreated) < 7 * 86_400_000
 
   const toggleWatched = useMutation({
     mutationFn: (next: boolean) => setPlayed(item.Id, next),
@@ -83,6 +84,7 @@ export function Card({
             <div className={styles.progressFill} style={{ inlineSize: `${pct}%` }} />
           </div>
         )}
+        {isNew && <span className={styles.newBadge}>NEW</span>}
       </button>
       <div className={styles.meta}>
         <button onClick={details} className={styles.title} title={item.Name}>

@@ -45,7 +45,7 @@ export const latestMoviesQuery = queryOptions({
   queryKey: queryKeys.latest.movies(),
   queryFn: () =>
     jf<BaseItem[]>(`/Users/${userId()}/Items/Latest`, {
-      query: { IncludeItemTypes: 'Movie', Limit: 20 }
+      query: { IncludeItemTypes: 'Movie', Limit: 20, Fields: 'DateCreated' }
     })
 })
 
@@ -53,7 +53,7 @@ export const latestShowsQuery = queryOptions({
   queryKey: queryKeys.latest.shows(),
   queryFn: () =>
     jf<BaseItem[]>(`/Users/${userId()}/Items/Latest`, {
-      query: { IncludeItemTypes: 'Series', Limit: 20 }
+      query: { IncludeItemTypes: 'Series', Limit: 20, Fields: 'DateCreated' }
     })
 })
 
@@ -75,7 +75,7 @@ export const libraryQuery = (type: 'Movie' | 'Series', sort: SortKey) =>
           userId: userId(),
           IncludeItemTypes: type,
           Recursive: true,
-          Fields: 'ProductionYear',
+          Fields: 'ProductionYear,DateCreated',
           ...sortParams[sort]
         }
       }).then((r) => r.Items)

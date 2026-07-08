@@ -87,3 +87,14 @@
   grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
   gap: 1.75rem 1rem;
 }
+
+.gridItem {
+  animation: card-rise var(--dur-slow) var(--ease-out) backwards;
+}
+
+@keyframes card-rise {
+  from {
+    transform: translateY(0.75rem);
+    opacity: 0;
+  }
+}
