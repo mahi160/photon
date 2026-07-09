@@ -3,6 +3,7 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  lazyRouteComponent,
   Outlet,
   redirect
 } from '@tanstack/react-router'
@@ -13,10 +14,13 @@ import { Home } from './pages/Home'
 import { Movies } from './pages/Movies'
 import { Shows } from './pages/Shows'
 import { Search } from './pages/Search'
-import { MovieDetails } from './pages/MovieDetails'
-import { ShowDetails } from './pages/ShowDetails'
-import { Player } from './pages/Player'
-import { Settings } from './pages/Settings'
+// heavy pages load lazily — the shell (login/home/library/search) stays in the
+// entry chunk; defaultPreload:'intent' prefetches these on link hover anyway.
+// Player especially: it pulls the whole player/ dir and (transitively) hls.js.
+const MovieDetails = lazyRouteComponent(() => import('./pages/MovieDetails'), 'MovieDetails')
+const ShowDetails = lazyRouteComponent(() => import('./pages/ShowDetails'), 'ShowDetails')
+const Player = lazyRouteComponent(() => import('./pages/Player'), 'Player')
+const Settings = lazyRouteComponent(() => import('./pages/Settings'), 'Settings')
 
 const rootRoute = createRootRoute({
   component: Outlet

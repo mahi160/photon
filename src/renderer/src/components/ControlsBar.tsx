@@ -2,19 +2,19 @@ import { Menu as BaseMenu } from '@base-ui/react/menu'
 import { Select as BaseSelect } from '@base-ui/react/select'
 import { Popover as BasePopover } from '@base-ui/react/popover'
 import {
-  ArrowSquareOutIcon,
-  ClosedCaptioningIcon,
-  ClockClockwiseIcon,
-  CornersInIcon,
-  CornersOutIcon,
-  HeadphonesIcon,
-  PauseIcon,
-  PictureInPictureIcon,
-  PlayIcon,
-  SkipForwardIcon,
-  SpeakerHighIcon,
-  SpeakerSlashIcon
-} from '@phosphor-icons/react'
+  ArrowUpRightSquare,
+  Cc,
+  Headphones,
+  History,
+  Maximize,
+  Minimize,
+  Mute,
+  Pause,
+  Pip,
+  Play,
+  ForwardStep,
+  Volume
+} from 'reicon-react'
 import type { MediaStream, BaseItem } from '../lib/jellyfin'
 import { Stepper, type StepperClasses } from './Stepper'
 import { Tip } from './Tip'
@@ -118,9 +118,9 @@ export function ControlsBar({
       <Tip label={state === 'playing' ? 'Pause' : 'Play'} kbd="Space">
         <button className={styles.playBtn} onClick={onTogglePlay} aria-label="Play or pause">
           {state === 'playing' ? (
-            <PauseIcon weight="fill" className={styles.icon} />
+            <Pause weight="Filled" className={styles.icon} />
           ) : (
-            <PlayIcon weight="fill" className={styles.icon} />
+            <Play weight="Filled" className={styles.icon} />
           )}
         </button>
       </Tip>
@@ -128,7 +128,7 @@ export function ControlsBar({
       {onPlayNext && (
         <Tip label={nextEpisode ? `Next: ${nextEpisode.Name}` : 'Next episode'}>
           <button className={styles.iconBtn} onClick={onPlayNext} aria-label="Next episode">
-            <SkipForwardIcon weight="fill" className={styles.icon} />
+            <ForwardStep weight="Filled" className={styles.icon} />
           </button>
         </Tip>
       )}
@@ -137,9 +137,9 @@ export function ControlsBar({
         <Tip label={muted ? 'Unmute' : 'Mute'} kbd="M">
           <button className={styles.iconBtn} onClick={onMute} aria-label="Mute">
             {muted || volume === 0 ? (
-              <SpeakerSlashIcon className={styles.icon} />
+              <Mute className={styles.icon} />
             ) : (
-              <SpeakerHighIcon className={styles.icon} />
+              <Volume className={styles.icon} />
             )}
           </button>
         </Tip>
@@ -191,7 +191,7 @@ export function ControlsBar({
       </BaseMenu.Root>
 
       <TrackSelectMenu
-        label={<HeadphonesIcon className={styles.icon} />}
+        label={<Headphones className={styles.icon} />}
         ariaLabel="Audio track"
         open={menuOpen === 'audio'}
         onOpenChange={(open) => onToggleMenu('audio', open)}
@@ -209,10 +209,7 @@ export function ControlsBar({
       >
         <Tip label="Subtitles">
           <BaseSelect.Trigger className={styles.iconBtn} aria-label="Subtitles">
-            <ClosedCaptioningIcon
-              weight={subtitleIndex !== null ? 'fill' : 'regular'}
-              className={styles.icon}
-            />
+            <Cc weight={subtitleIndex !== null ? 'Filled' : 'Outline'} className={styles.icon} />
           </BaseSelect.Trigger>
         </Tip>
         <BaseSelect.Portal>
@@ -244,7 +241,7 @@ export function ControlsBar({
             disabled={!subtitleDelayEnabled}
             aria-label="Subtitle sync"
           >
-            <ClockClockwiseIcon className={styles.icon} />
+            <History className={styles.icon} />
           </BasePopover.Trigger>
         </Tip>
         <BasePopover.Portal>
@@ -278,7 +275,7 @@ export function ControlsBar({
       {onOpenMpv && (
         <Tip label="Open in mpv">
           <button className={styles.iconBtn} onClick={onOpenMpv} aria-label="Open in mpv">
-            <ArrowSquareOutIcon className={styles.icon} />
+            <ArrowUpRightSquare className={styles.icon} />
           </button>
         </Tip>
       )}
@@ -289,17 +286,13 @@ export function ControlsBar({
           onClick={onPiP}
           aria-label="Picture in Picture"
         >
-          <PictureInPictureIcon weight={pip ? 'fill' : 'regular'} className={styles.icon} />
+          <Pip weight={pip ? 'Filled' : 'Outline'} className={styles.icon} />
         </button>
       </Tip>
 
       <Tip label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'} kbd="F">
         <button className={styles.iconBtn} onClick={onFullscreen} aria-label="Fullscreen">
-          {fullscreen ? (
-            <CornersInIcon className={styles.icon} />
-          ) : (
-            <CornersOutIcon className={styles.icon} />
-          )}
+          {fullscreen ? <Minimize className={styles.icon} /> : <Maximize className={styles.icon} />}
         </button>
       </Tip>
     </div>

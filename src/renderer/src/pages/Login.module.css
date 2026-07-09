@@ -49,17 +49,16 @@
 }
 
 .brand {
+  display: flex;
+  gap: 0.35em;
+  align-items: center;
+
   margin-block-end: 0.35rem;
 
   font-family: var(--font-mono);
   font-size: 2rem;
   font-weight: 500;
   letter-spacing: -0.04em;
-}
-
-.brandO {
-  color: var(--accent);
-  text-shadow: 0 0 10px color-mix(in oklch, var(--accent) 70%, transparent);
 }
 
 .tagline {

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams, useRouter } from '@tanstack/react-router'
-import { CaretLeftIcon, CheckIcon, HeartIcon, PlayIcon } from '@phosphor-icons/react'
+import { CaretLeft, Check, Heart, Play } from 'reicon-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   episodesQuery,
@@ -55,7 +55,7 @@ function EpisodeRow({ ep, onPlay }: { ep: BaseItem; onPlay: () => void }): React
             aria-label={played ? 'Mark unwatched' : 'Mark watched'}
             className={`${styles.episodeWatchedToggle} ${played ? styles.episodeWatchedToggleActive : ''}`}
           >
-            <CheckIcon weight="bold" />
+            <Check />
           </button>
         </Tip>
       </div>
@@ -126,7 +126,7 @@ export function ShowDetails(): React.JSX.Element {
         {backdrop && <img src={backdrop} alt="" className={styles.heroImg} />}
         <div className={styles.heroScrim} />
         <button onClick={() => router.history.back()} className={styles.back}>
-          <CaretLeftIcon weight="bold" />
+          <CaretLeft />
           Back
         </button>
       </div>
@@ -151,7 +151,7 @@ export function ShowDetails(): React.JSX.Element {
                   aria-pressed={!!item.UserData?.IsFavorite}
                   className={`${styles.favoriteBtn} ${item.UserData?.IsFavorite ? styles.favoriteBtnActive : ''}`}
                 >
-                  <HeartIcon weight={item.UserData?.IsFavorite ? 'fill' : 'regular'} />
+                  <Heart weight={item.UserData?.IsFavorite ? 'Filled' : 'Outline'} />
                 </button>
               </Tip>
             </div>
@@ -164,7 +164,7 @@ export function ShowDetails(): React.JSX.Element {
             {next && (
               <div className={styles.actions}>
                 <button onClick={() => play(next)} className={styles.playPrimary}>
-                  <PlayIcon weight="fill" />
+                  <Play weight="Filled" />
                   {nextResumable ? 'Resume' : 'Play Next Episode'}
                 </button>
                 <span className={styles.nextLabel}>

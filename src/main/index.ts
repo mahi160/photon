@@ -118,7 +118,9 @@ function createWindow(): void {
     autoHideMenuBar: true,
     backgroundColor: '#0e0e10',
     title: 'Photon',
-    ...(process.platform === 'linux' ? { icon } : {}),
+    // macOS packaged app uses build/icon.icns from the bundle instead; the
+    // BrowserWindow icon option only does something on Linux/Windows
+    ...(process.platform !== 'darwin' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       // contextIsolation stays on (default) and the preload only exposes the
@@ -146,6 +148,10 @@ function createWindow(): void {
 
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('dev.photon')
+
+  // dev runs launch the bare Electron binary, so there's no .app bundle to
+  // read build/icon.icns from — set the Dock icon by hand or it shows Electron's
+  if (is.dev && process.platform === 'darwin') app.dock?.setIcon(icon)
 
   if (!is.dev && !readPrefs().disableAutoUpdate) {
     void import('electron-updater')

@@ -1,4 +1,4 @@
-import { CaretLeftIcon, PauseIcon, PlayIcon } from '@phosphor-icons/react'
+import { CaretLeft, Pause, Play } from 'reicon-react'
 import { useEffect, useRef, useState } from 'react'
 import { type BaseItem, type MediaSegment, type MediaStream } from '../lib/jellyfin'
 import { Tip } from './Tip'
@@ -100,7 +100,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
         {pulse && (
           <div key={pulse.id} className={styles.pulse}>
             <span className={styles.pulseIcon} onAnimationEnd={() => setPulse(null)}>
-              {pulse.kind === 'playing' ? <PlayIcon weight="fill" /> : <PauseIcon weight="fill" />}
+              {pulse.kind === 'playing' ? <Play weight="Filled" /> : <Pause weight="Filled" />}
             </span>
           </div>
         )}
@@ -113,7 +113,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
           <div className={styles.topBar}>
             <Tip label="Back">
               <button className={styles.iconBtn} onClick={p.onBack} aria-label="Back">
-                <CaretLeftIcon weight="bold" className={styles.icon} />
+                <CaretLeft className={styles.icon} />
               </button>
             </Tip>
             <div className={styles.titleBlock}>

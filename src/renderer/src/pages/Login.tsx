@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useSession } from '../stores/session'
 import { JellyfinError } from '../lib/jellyfin'
+import { PhotonMark } from '../components/PhotonMark'
 import styles from './Login.module.css'
 
 export function Login(): React.JSX.Element {
@@ -31,7 +32,7 @@ export function Login(): React.JSX.Element {
     <div className={styles.page}>
       <form onSubmit={submit} className={styles.form}>
         <h1 className={styles.brand}>
-          ph<span className={styles.brandO}>o</span>ton
+          <PhotonMark /> Photon
         </h1>
         <p className={styles.tagline}>Sign in to your Jellyfin server.</p>
         <label className={styles.label} htmlFor="login-server">

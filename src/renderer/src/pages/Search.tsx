@@ -1,7 +1,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { XIcon } from '@phosphor-icons/react'
+import { X } from 'reicon-react'
 import { searchIndexQuery, episodeSearchQuery } from '../lib/queries'
 import { Card } from '../components/Card'
 import { filterLocal } from '../lib/search'
@@ -121,7 +121,7 @@ export function Search(): React.JSX.Element {
                   aria-label={`Remove ${h} from recent searches`}
                   className={styles.historyChipRemove}
                 >
-                  <XIcon weight="bold" />
+                  <X />
                 </button>
               </div>
             ))}
