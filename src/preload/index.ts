@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
+export type UpdaterStatus =
+  | { state: 'idle' | 'checking' | 'not-available' | 'error' }
+  | { state: 'available' | 'downloaded'; version: string }
+
 const api = {
   sessionGet: (): Promise<string | null> => ipcRenderer.invoke('session:get'),
   sessionSet: (value: string): Promise<boolean> => ipcRenderer.invoke('session:set', value),
@@ -26,7 +30,14 @@ const api = {
     value: boolean | number
   ): Promise<boolean> => ipcRenderer.invoke('mpv:set', prop, value),
   mpvCheck: (): Promise<boolean> => ipcRenderer.invoke('mpv:check'),
-  fetchSubtitle: (url: string): Promise<string> => ipcRenderer.invoke('subtitle:fetch', url)
+  fetchSubtitle: (url: string): Promise<string> => ipcRenderer.invoke('subtitle:fetch', url),
+  getUpdaterStatus: (): Promise<UpdaterStatus> => ipcRenderer.invoke('updater:status'),
+  installUpdate: (): Promise<void> => ipcRenderer.invoke('updater:install'),
+  onUpdaterStatus: (cb: (status: UpdaterStatus) => void): (() => void) => {
+    const listener = (_e: unknown, status: UpdaterStatus): void => cb(status)
+    ipcRenderer.on('updater:status', listener)
+    return () => ipcRenderer.removeListener('updater:status', listener)
+  }
 }
 
 export type PreloadApi = typeof api

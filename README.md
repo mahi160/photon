@@ -1,33 +1,31 @@
 # Photon
 
-A calm, minimal desktop media player built exclusively for Jellyfin.
+A calm, minimal desktop media player for Jellyfin.
 
-> Photon is not a media manager. It is a media player.
+Sign in to your server, browse Movies and TV Shows, hit play. No dashboards,
+no library management, no clutter.
 
 ## Features
 
-- Sign in to one Jellyfin server; session persists in the OS keychain
-- Home: Continue Watching, Recently Added Movies, Recently Added Shows — nothing else
-- Movies and TV Shows grids (all libraries merged), sorted by added/name/release
-- Instant search: movies and shows filter locally, episodes stream in from the server
-- Player: HTML5/HLS with direct play when Chromium can decode it, silent server
-  transcode when it can't — or hand off to a local `mpv` for direct play with no
-  transcoding at all
-- Audio and subtitle track switching, subtitle delay and styling (text subs)
-- Picture-in-Picture, fullscreen, playback speed, keyboard-first controls
+- Continue Watching, Recently Added Movies, Recently Added Shows on Home
+- Movies and TV Shows grids, all libraries merged
+- Instant local search plus server-side episode search
+- Direct play via HTML5/HLS or a local `mpv` process, server transcodes when needed
+- Audio and subtitle track switching, subtitle delay and styling
+- Picture-in-Picture, fullscreen, playback speed
+- Keyboard-first controls
 - Watch progress synced back to Jellyfin
 
-## macOS: "Photon.app is damaged and can't be opened"
+## Install
 
-Photon's macOS build is ad-hoc signed, not notarized (that requires a paid
-Apple Developer account). Gatekeeper blocks any downloaded app in that state.
-This is a false positive, not a corrupt download — one-time fix:
+Download a build from [Releases](https://github.com/mahi160/photon/releases).
+
+macOS builds are ad-hoc signed, not notarized, so Gatekeeper will flag them
+after download. Fix once:
 
 ```bash
 xattr -cr /Applications/Photon.app
 ```
-
-Run it after moving Photon to Applications, then launch normally.
 
 ## Keyboard shortcuts
 
@@ -53,22 +51,7 @@ npx vitest run  # tests
 pnpm build:mac  # package (also build:win, build:linux)
 ```
 
-## Releasing
-
-Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
-(`feat:`, `fix:`, `chore:`, etc.) — enforced by commitlint, both locally (a
-husky `commit-msg` hook) and in CI on pull requests. Merging a PR into `prod`
-runs [semantic-release](https://github.com/semantic-release/semantic-release):
-it computes the next version from those commit types, tags, updates
-`CHANGELOG.md`, and drafts a GitHub Release. Windows/macOS/Linux builds then
-attach to that release, which only goes public once all three succeed.
-
-## Architecture
-
-- Electron + React + TypeScript + Vite, TanStack Router/Query, Zustand, Tailwind v4
-- The UI never touches `<video>` directly — see `src/renderer/src/player/engine.ts`
-  and [ADR-0002](docs/adr/0002-playback-engine-interface.md)
-- Domain language lives in [CONTEXT.md](CONTEXT.md); decisions in `docs/adr/`
+Contributor and architecture notes live in [AGENTS.md](AGENTS.md).
 
 ## License
 

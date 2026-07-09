@@ -1,3 +1,0 @@
-# PlaybackEngine interface from day one, despite a single implementation
-
-The UI never talks to the `<video>` element directly. A `PlaybackEngine` interface owns playback primitives only — load, play/pause, seek, rate, volume, track selection, subtitle delay, PiP enter/exit — and emits events (time, state, ended, error). Progress sync to Jellyfin, keyboard shortcuts, autoplay-next, and subtitle styling live outside the engine and consume its events. This is a deliberate one-implementation interface: the planned MPV backend is a native surface, and anything DOM-assuming leaked into the interface would make that swap a rewrite instead of a drop-in.

@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync, rmSync, existsSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerMpv } from './mpv'
+import type { UpdaterStatus } from '../preload/index'
 
 registerMpv()
 
@@ -97,6 +98,21 @@ ipcMain.handle('app:setAutoUpdate', (_e, enabled: boolean) => {
 
 ipcMain.handle('app:getAutoUpdate', () => !readPrefs().disableAutoUpdate)
 
+// pushed to Settings > About so update state is actually visible instead of
+// living only in a native OS notification the user can miss/dismiss
+let updaterStatus: UpdaterStatus = { state: 'idle' }
+
+function broadcastUpdaterStatus(status: UpdaterStatus): void {
+  updaterStatus = status
+  for (const win of BrowserWindow.getAllWindows()) win.webContents.send('updater:status', status)
+}
+
+ipcMain.handle('updater:status', () => updaterStatus)
+
+ipcMain.handle('updater:install', () => {
+  void import('electron-updater').then(({ autoUpdater }) => autoUpdater.quitAndInstall())
+})
+
 // Subtitle VTT fetched from main: renderer <track> fetches are subject to
 // CORS (needs Access-Control-Allow-Origin from the user's server/reverse
 // proxy); a Node-side fetch has no such restriction. Text only, small files.
@@ -155,8 +171,21 @@ app.whenReady().then(() => {
 
   if (!is.dev && !readPrefs().disableAutoUpdate) {
     void import('electron-updater')
-      .then(({ autoUpdater }) => autoUpdater.checkForUpdatesAndNotify())
-      .catch(() => {})
+      .then(({ autoUpdater }) => {
+        autoUpdater.on('checking-for-update', () => broadcastUpdaterStatus({ state: 'checking' }))
+        autoUpdater.on('update-not-available', () =>
+          broadcastUpdaterStatus({ state: 'not-available' })
+        )
+        autoUpdater.on('update-available', (info) =>
+          broadcastUpdaterStatus({ state: 'available', version: info.version })
+        )
+        autoUpdater.on('update-downloaded', (info) =>
+          broadcastUpdaterStatus({ state: 'downloaded', version: info.version })
+        )
+        autoUpdater.on('error', () => broadcastUpdaterStatus({ state: 'error' }))
+        return autoUpdater.checkForUpdates()
+      })
+      .catch(() => broadcastUpdaterStatus({ state: 'error' }))
   }
 
   app.on('browser-window-created', (_, window) => {
