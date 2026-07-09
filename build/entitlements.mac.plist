@@ -8,5 +8,9 @@
     <true/>
     <key>com.apple.security.cs.allow-dyld-environment-variables</key>
     <true/>
+    <!-- ad-hoc signed (no paid Apple cert) + hardenedRuntime: without this,
+         macOS's library validation kills the app on launch -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
   </dict>
 </plist>

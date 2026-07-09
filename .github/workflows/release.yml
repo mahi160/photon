@@ -49,7 +49,7 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            builderArgs: --win
+            builderArgs: --win --x64
           - os: macos-latest
             builderArgs: --mac --arm64
           - os: ubuntu-latest
