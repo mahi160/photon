@@ -35,48 +35,52 @@ export function Login(): React.JSX.Element {
           <PhotonMark /> Photon
         </h1>
         <p className={styles.tagline}>Sign in to your Jellyfin server.</p>
-        <label className={styles.label} htmlFor="login-server">
-          Server
-        </label>
-        <input
-          id="login-server"
-          className={styles.field}
-          placeholder="https://jellyfin.example.net"
-          spellCheck={false}
-          value={server}
-          onChange={(e) => setServer(e.target.value)}
-          autoFocus
-          required
-        />
-        <label className={styles.label} htmlFor="login-username">
-          Username
-        </label>
-        <input
-          id="login-username"
-          className={styles.field}
-          spellCheck={false}
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          required
-        />
-        <label className={styles.label} htmlFor="login-password">
-          Password
-        </label>
-        <input
-          id="login-password"
-          className={styles.field}
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        {error && (
-          <p className={styles.error} role="alert">
-            {error}
-          </p>
-        )}
-        <button type="submit" disabled={busy} className={styles.submit}>
-          {busy ? 'Signing in…' : 'Sign In'}
-        </button>
+        <div className={styles.panel}>
+          <label className={styles.label} htmlFor="login-server">
+            Server
+          </label>
+          <input
+            id="login-server"
+            className={styles.field}
+            placeholder="https://jellyfin.example.net"
+            spellCheck={false}
+            value={server}
+            onChange={(e) => setServer(e.target.value)}
+            autoFocus
+            required
+          />
+          <label className={styles.label} htmlFor="login-username">
+            Username
+          </label>
+          <input
+            id="login-username"
+            className={styles.field}
+            placeholder="Username"
+            spellCheck={false}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
+          <label className={styles.label} htmlFor="login-password">
+            Password
+          </label>
+          <input
+            id="login-password"
+            className={styles.field}
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          {error && (
+            <p className={styles.error} role="alert">
+              {error}
+            </p>
+          )}
+          <button type="submit" disabled={busy} className={styles.submit}>
+            {busy ? 'Signing in…' : 'Sign In'}
+          </button>
+        </div>
       </form>
     </div>
   )
