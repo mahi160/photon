@@ -18,7 +18,11 @@ const playerModes = [
 ] as const
 
 export function PlaybackSettings(): React.JSX.Element {
-  const settings = useSettings()
+  const maxBitrate = useSettings((s) => s.maxBitrate)
+  const playerMode = useSettings((s) => s.playerMode)
+  const autoplayNext = useSettings((s) => s.autoplayNext)
+  const rememberSpeed = useSettings((s) => s.rememberSpeed)
+  const set = useSettings((s) => s.set)
   const [hwAccel, setHwAccel] = useState(true)
 
   useEffect(() => {
@@ -30,8 +34,8 @@ export function PlaybackSettings(): React.JSX.Element {
       <SettingsRow label="Preferred quality" hint="Maximum streaming bitrate">
         <select
           className={styles.select}
-          value={settings.maxBitrate}
-          onChange={(e) => settings.set({ maxBitrate: Number(e.target.value) })}
+          value={maxBitrate}
+          onChange={(e) => set({ maxBitrate: Number(e.target.value) })}
           aria-label="Preferred quality"
         >
           {bitrates.map((b) => (
@@ -57,9 +61,9 @@ export function PlaybackSettings(): React.JSX.Element {
       >
         <select
           className={styles.select}
-          value={settings.playerMode}
+          value={playerMode}
           onChange={(e) =>
-            settings.set({ playerMode: e.target.value as (typeof playerModes)[number]['value'] })
+            set({ playerMode: e.target.value as (typeof playerModes)[number]['value'] })
           }
           aria-label="Player"
         >
@@ -73,15 +77,15 @@ export function PlaybackSettings(): React.JSX.Element {
       <SettingsRow label="Autoplay next episode">
         <ToggleSwitch
           label="Autoplay next episode"
-          checked={settings.autoplayNext}
-          onChange={(v) => settings.set({ autoplayNext: v })}
+          checked={autoplayNext}
+          onChange={(v) => set({ autoplayNext: v })}
         />
       </SettingsRow>
       <SettingsRow label="Remember playback speed">
         <ToggleSwitch
           label="Remember playback speed"
-          checked={settings.rememberSpeed}
-          onChange={(v) => settings.set({ rememberSpeed: v })}
+          checked={rememberSpeed}
+          onChange={(v) => set({ rememberSpeed: v })}
         />
       </SettingsRow>
     </SettingsSection>

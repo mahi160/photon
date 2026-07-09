@@ -1,10 +1,10 @@
-import Hls from 'hls.js'
+import type HlsType from 'hls.js'
 import type { EngineEvents, LoadRequest, PlaybackEngine } from './engine'
 
 type Listeners = { [K in keyof EngineEvents]: Set<EngineEvents[K]> }
 
 export class Html5Engine implements PlaybackEngine {
-  private hls: Hls | null = null
+  private hls: HlsType | null = null
   private hlsRecoveries = 0 // fatal-error recovery attempts for the current load
   private delay = 0 // desired subtitle shift, seconds
   // shift actually applied to each track's cues — tracks load cues lazily and
@@ -73,7 +73,11 @@ export class Html5Engine implements PlaybackEngine {
     // request keeps retrying in the background after this reload (harmless,
     // but noisy in devtools/network logs)
     this.video.removeAttribute('src')
-    if (req.hls && Hls.isSupported()) {
+    // hls.js only loads when a transcode actually starts — direct play (the
+    // common case) never pays its ~600KB parse cost, and the login/browse
+    // chunks don't carry it at all
+    const Hls = req.hls ? (await import('hls.js')).default : null
+    if (Hls?.isSupported()) {
       this.hlsRecoveries = 0
       // Jellyfin produces HLS segments on demand: a request for a segment the
       // transcoder hasn't encoded yet blocks until it exists. Slow transcodes

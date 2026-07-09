@@ -1,5 +1,5 @@
-import { CaretLeftIcon, PauseIcon, PlayIcon } from '@phosphor-icons/react'
-import { useEffect, useRef, useState } from 'react'
+import { CaretLeft, Pause, Play } from 'reicon-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { type BaseItem, type MediaSegment, type MediaStream } from '../lib/jellyfin'
 import { Tip } from './Tip'
 import { TimelinePreview } from './TimelinePreview'
@@ -49,6 +49,11 @@ export interface Props {
 
 export function PlayerControls(p: Props): React.JSX.Element {
   const [menu, setMenu] = useState<'audio' | 'subs' | 'speed' | 'sync' | null>(null)
+  // stable identity — ControlsBar's menu group is memoized against ticking time
+  const onToggleMenu = useCallback(
+    (m: 'audio' | 'subs' | 'speed' | 'sync', open: boolean) => setMenu(open ? m : null),
+    []
+  )
   const [hover, setHover] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const [dismissedFor, setDismissedFor] = useState<string | null>(null)
@@ -100,7 +105,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
         {pulse && (
           <div key={pulse.id} className={styles.pulse}>
             <span className={styles.pulseIcon} onAnimationEnd={() => setPulse(null)}>
-              {pulse.kind === 'playing' ? <PlayIcon weight="fill" /> : <PauseIcon weight="fill" />}
+              {pulse.kind === 'playing' ? <Play weight="Filled" /> : <Pause weight="Filled" />}
             </span>
           </div>
         )}
@@ -113,7 +118,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
           <div className={styles.topBar}>
             <Tip label="Back">
               <button className={styles.iconBtn} onClick={p.onBack} aria-label="Back">
-                <CaretLeftIcon weight="bold" className={styles.icon} />
+                <CaretLeft className={styles.icon} />
               </button>
             </Tip>
             <div className={styles.titleBlock}>
@@ -181,7 +186,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
               subtitleDelayEnabled={p.subtitleDelayEnabled}
               nextEpisode={p.nextEpisode}
               menuOpen={menu}
-              onToggleMenu={(m, open) => setMenu(open ? m : null)}
+              onToggleMenu={onToggleMenu}
               onTogglePlay={p.onTogglePlay}
               onPlayNext={p.onPlayNext}
               onVolume={p.onVolume}

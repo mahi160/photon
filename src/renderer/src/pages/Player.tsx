@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { itemQuery, mediaSegmentsQuery } from '../lib/queries'
@@ -139,40 +139,58 @@ function WebPlayer({
     else void document.documentElement.requestFullscreen()
   }, [])
 
-  function bumpVolume(delta: number): void {
-    const v = Math.max(0, Math.min(1, engine.volume + delta))
-    engine.changeVolume(v)
-    showToast(`Volume ${Math.round(v * 100)}%`)
-  }
+  // stable identities: these feed the player's track-select menus, which are
+  // memoized to skip re-rendering on every playback tick (base-ui popovers
+  // aren't cheap to reconcile dozens of times a minute for nothing)
+  const bumpVolume = useCallback(
+    (delta: number): void => {
+      const v = Math.max(0, Math.min(1, engine.volume + delta))
+      engine.changeVolume(v)
+      showToast(`Volume ${Math.round(v * 100)}%`)
+    },
+    [engine.volume, engine.changeVolume, showToast]
+  )
 
-  function toggleMuteWithToast(): void {
+  const toggleMuteWithToast = useCallback((): void => {
     const next = !engine.muted
     engine.toggleMute()
     showToast(next ? 'Muted' : 'Unmuted')
-  }
+  }, [engine.muted, engine.toggleMute, showToast])
 
   // subtitle sync: shift delay by the same step as the slider, text subs only
-  function shiftSubtitleDelay(step: number): void {
-    if (player.subtitleIndex === null || !player.subtitleIsText) return
-    const d = Math.max(-10, Math.min(10, player.subtitleDelay + step))
-    player.changeDelay(d)
-    showToast(`Subtitle delay: ${d > 0 ? '+' : ''}${d.toFixed(1)}s`)
-  }
+  const shiftSubtitleDelay = useCallback(
+    (step: number): void => {
+      if (player.subtitleIndex === null || !player.subtitleIsText) return
+      const d = Math.max(-10, Math.min(10, player.subtitleDelay + step))
+      player.changeDelay(d)
+      showToast(`Subtitle delay: ${d > 0 ? '+' : ''}${d.toFixed(1)}s`)
+    },
+    [
+      player.subtitleIndex,
+      player.subtitleIsText,
+      player.subtitleDelay,
+      player.changeDelay,
+      showToast
+    ]
+  )
 
   // a burned-in pick reloads the stream (server transcode start can take a
   // few seconds) — say so, instead of leaving the picker looking unresponsive
-  function selectSubtitle(index: number | null): void {
-    player.selectSubtitle(index)
-    if (index === null) {
-      showToast('Subtitles off')
-      return
-    }
-    const stream = session?.subtitleStreams.find((s) => s.Index === index)
-    const label = stream?.DisplayTitle ?? `Subtitle ${index}`
-    showToast(
-      stream?.DeliveryMethod !== 'External' ? `Switching to ${label}…` : `Subtitles: ${label}`
-    )
-  }
+  const selectSubtitle = useCallback(
+    (index: number | null): void => {
+      player.selectSubtitle(index)
+      if (index === null) {
+        showToast('Subtitles off')
+        return
+      }
+      const stream = session?.subtitleStreams.find((s) => s.Index === index)
+      const label = stream?.DisplayTitle ?? `Subtitle ${index}`
+      showToast(
+        stream?.DeliveryMethod !== 'External' ? `Switching to ${label}…` : `Subtitles: ${label}`
+      )
+    },
+    [player.selectSubtitle, session, showToast]
+  )
 
   // the episode after the one playing (dock's next button); NextUp can't be
   // used here — mid-episode it still points at the current one
@@ -249,6 +267,17 @@ function WebPlayer({
     [engine, toggleFullscreen, player.subtitleIndex, player.subtitleDelay, player.subtitleIsText]
   )
 
+  // stable identities for the same reason as the callbacks above — these
+  // feed menu/button props on the memoized part of the controls bar
+  const playNextEpisode = useMemo(
+    () => (nextEp.data ? () => void player.playItem(nextEp.data!) : undefined),
+    [nextEp.data, player.playItem]
+  )
+  const openMpvAtCurrentTime = useMemo(
+    () => (onOpenMpv && mpvOk ? () => onOpenMpv(engine.currentTime()) : undefined),
+    [onOpenMpv, mpvOk, engine.currentTime]
+  )
+
   const displayDuration = engine.duration || ticksToSeconds(session?.mediaSource.RunTimeTicks)
 
   return (
@@ -308,7 +337,7 @@ function WebPlayer({
           subtitleDelay={player.subtitleDelay}
           subtitleDelayEnabled={player.subtitleIsText && player.subtitleIndex !== null}
           nextEpisode={nextEp.data ?? undefined}
-          onPlayNext={nextEp.data ? () => void player.playItem(nextEp.data!) : undefined}
+          onPlayNext={playNextEpisode}
           activeSegment={activeSegment}
           onSkipSegment={
             activeSegment ? () => engine.seek(ticksToSeconds(activeSegment.EndTicks)) : undefined
@@ -326,7 +355,7 @@ function WebPlayer({
           onSubtitleDelay={player.changeDelay}
           onFullscreen={toggleFullscreen}
           onPiP={engine.togglePiP}
-          onOpenMpv={onOpenMpv && mpvOk ? () => onOpenMpv(engine.currentTime()) : undefined}
+          onOpenMpv={openMpvAtCurrentTime}
         />
       )}
       {toast && <div className={styles.toast}>{toast}</div>}

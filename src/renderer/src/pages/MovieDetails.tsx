@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams, useRouter } from '@tanstack/react-router'
-import { CaretLeftIcon, CheckIcon, HeartIcon, PlayIcon } from '@phosphor-icons/react'
+import { CaretLeft, Check, Heart, Play } from 'reicon-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { itemQuery, setFavorite, setPlayed } from '../lib/queries'
 import { queryKeys } from '../lib/queryKeys'
@@ -17,7 +17,7 @@ function BackButton(): React.JSX.Element {
   const router = useRouter()
   return (
     <button onClick={() => router.history.back()} className={styles.back}>
-      <CaretLeftIcon weight="bold" />
+      <CaretLeft />
       Back
     </button>
   )
@@ -80,7 +80,7 @@ export function MovieDetails(): React.JSX.Element {
   return (
     <div className={styles.page}>
       <div className={styles.hero}>
-        {backdrop && <img src={backdrop} alt="" className={styles.heroImg} />}
+        {backdrop && <img src={backdrop} alt="" fetchPriority="high" className={styles.heroImg} />}
         <div className={styles.heroScrim} />
         <BackButton />
       </div>
@@ -105,7 +105,7 @@ export function MovieDetails(): React.JSX.Element {
                   aria-pressed={!!item.UserData?.IsFavorite}
                   className={`${styles.favoriteBtn} ${item.UserData?.IsFavorite ? styles.favoriteBtnActive : ''}`}
                 >
-                  <HeartIcon weight={item.UserData?.IsFavorite ? 'fill' : 'regular'} />
+                  <Heart weight={item.UserData?.IsFavorite ? 'Filled' : 'Outline'} />
                 </button>
               </Tip>
             </div>
@@ -118,7 +118,7 @@ export function MovieDetails(): React.JSX.Element {
             <div className={styles.actions}>
               {position > 60 && (
                 <button onClick={() => play(position)} className={styles.playPrimary}>
-                  <PlayIcon weight="fill" />
+                  <Play weight="Filled" />
                   Resume
                 </button>
               )}
@@ -126,7 +126,7 @@ export function MovieDetails(): React.JSX.Element {
                 onClick={() => play(0)}
                 className={position > 60 ? styles.playSecondary : styles.playPrimary}
               >
-                {position <= 60 && <PlayIcon weight="fill" />}
+                {position <= 60 && <Play weight="Filled" />}
                 {position > 60 ? 'Play from start' : 'Play'}
               </button>
               <Tip label={item.UserData?.Played ? 'Mark unwatched' : 'Mark watched'}>
@@ -136,7 +136,7 @@ export function MovieDetails(): React.JSX.Element {
                   aria-pressed={!!item.UserData?.Played}
                   className={`${styles.iconToggle} ${item.UserData?.Played ? styles.iconToggleActive : ''}`}
                 >
-                  <CheckIcon weight="bold" />
+                  <Check />
                 </button>
               </Tip>
             </div>

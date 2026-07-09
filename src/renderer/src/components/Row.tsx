@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { CaretRightIcon } from '@phosphor-icons/react'
+import { CaretRight } from 'reicon-react'
 import { Card } from './Card'
 import type { BaseItem } from '../lib/jellyfin'
 import styles from './Row.module.css'
@@ -22,7 +22,7 @@ export function Row({
         {to ? (
           <Link to={to} className={styles.headingLink}>
             {title}
-            <CaretRightIcon weight="bold" className={styles.chevron} />
+            <CaretRight className={styles.chevron} />
           </Link>
         ) : (
           title

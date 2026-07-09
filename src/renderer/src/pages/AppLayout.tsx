@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { GearIcon, MagnifyingGlassIcon, MoonIcon, SunIcon } from '@phosphor-icons/react'
+import { Gear, Search, Moon, Sun } from 'reicon-react'
 import { useHotkeys } from '../lib/useHotkeys'
 import { useSettings } from '../stores/settings'
 import { resolvedDark } from '../lib/theme'
 import { ShortcutsOverlay } from './Shortcuts'
 import { Tip } from '../components/Tip'
+import { PhotonMark } from '../components/PhotonMark'
 import styles from './AppLayout.module.css'
 
 function ThemeToggle(): React.JSX.Element {
@@ -20,11 +21,7 @@ function ThemeToggle(): React.JSX.Element {
         aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
         onClick={() => set({ theme: dark ? 'light' : 'dark' })}
       >
-        {dark ? (
-          <SunIcon className={styles.themeIcon} />
-        ) : (
-          <MoonIcon className={styles.themeIcon} />
-        )}
+        {dark ? <Sun className={styles.themeIcon} /> : <Moon className={styles.themeIcon} />}
       </button>
     </Tip>
   )
@@ -60,7 +57,7 @@ export function AppLayout(): React.JSX.Element {
     <div className={styles.shell}>
       <header className={styles.header}>
         <Link to="/" className={styles.brand}>
-          ph<span className={styles.brandO}>o</span>ton
+          <PhotonMark /> Photon
         </Link>
         <nav className={styles.nav}>
           {navItems.map((item) => (
@@ -76,14 +73,14 @@ export function AppLayout(): React.JSX.Element {
         </nav>
         <div className={styles.spacer} />
         <Link to="/search" className={styles.searchPill} aria-label="Search">
-          <MagnifyingGlassIcon weight="bold" className={styles.searchPillIcon} />
+          <Search className={styles.searchPillIcon} />
           <span className={styles.searchPillLabel}>Search</span>
           <kbd className={styles.searchKbd}>/</kbd>
         </Link>
         <ThemeToggle />
         <Tip label="Settings">
           <Link to="/settings" aria-label="Settings" className={styles.iconBtn}>
-            <GearIcon className={styles.icon} />
+            <Gear className={styles.icon} />
           </Link>
         </Tip>
       </header>

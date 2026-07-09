@@ -1,12 +1,25 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckIcon, HeartIcon, PlayIcon } from '@phosphor-icons/react'
-import { imageUrl, type BaseItem } from '../lib/jellyfin'
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { Check, Heart, Play } from 'reicon-react'
+import { imageUrl, type BaseItem, type UserData } from '../lib/jellyfin'
 import { setFavorite, setPlayed } from '../lib/queries'
 import { queryKeys } from '../lib/queryKeys'
 import { Tip } from './Tip'
 import styles from './Card.module.css'
+
+// Patch the toggled item's UserData in every cached query instead of
+// invalidating queryKeys.all() — that refetched the entire library (and the
+// staleTime:Infinity search index) on a single heart/check click.
+function patchUserData(qc: QueryClient, itemId: string, patch: Partial<UserData>): void {
+  const patchOne = (it: BaseItem): BaseItem =>
+    it.Id === itemId ? { ...it, UserData: { ...it.UserData, ...patch } } : it
+  qc.setQueriesData({ queryKey: queryKeys.all() }, (data: unknown) => {
+    if (Array.isArray(data)) return data.map(patchOne)
+    if (data && typeof data === 'object' && 'Id' in data) return patchOne(data as BaseItem)
+    return data
+  })
+}
 
 // Card semantics (CONTEXT.md): click card / hover play button = play,
 // click title label = details. Same everywhere.
@@ -30,12 +43,21 @@ export function Card({
 
   const toggleWatched = useMutation({
     mutationFn: (next: boolean) => setPlayed(item.Id, next),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.all() })
+    onSuccess: (_data, next) => {
+      patchUserData(queryClient, item.Id, {
+        Played: next,
+        PlayedPercentage: undefined,
+        PlaybackPositionTicks: 0
+      })
+      // membership of these rows actually changes when watched state flips
+      queryClient.invalidateQueries({ queryKey: queryKeys.resume() })
+      queryClient.invalidateQueries({ queryKey: queryKeys.nextUp.all() })
+    }
   })
 
   const toggleFavorite = useMutation({
     mutationFn: (next: boolean) => setFavorite(item.Id, next),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.all() })
+    onSuccess: (_data, next) => patchUserData(queryClient, item.Id, { IsFavorite: next })
   })
 
   function play(): void {
@@ -80,7 +102,7 @@ export function Card({
         )}
         <div className={styles.playScrim}>
           <span className={styles.playButton}>
-            <PlayIcon weight="fill" />
+            <Play weight="Filled" />
           </span>
         </div>
         {pct !== undefined && pct > 0 && pct < 100 && (
@@ -101,7 +123,7 @@ export function Card({
               aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
               className={`${styles.actionBtn} ${favorite ? styles.actionBtnActive : ''}`}
             >
-              <HeartIcon weight={favorite ? 'fill' : 'regular'} />
+              <Heart weight={favorite ? 'Filled' : 'Outline'} />
             </button>
           </Tip>
           <Tip label={played ? 'Mark unwatched' : 'Mark watched'}>
@@ -110,7 +132,7 @@ export function Card({
               aria-label={played ? 'Mark unwatched' : 'Mark watched'}
               className={`${styles.actionBtn} ${played ? styles.actionBtnActive : ''}`}
             >
-              <CheckIcon weight="bold" />
+              <Check />
             </button>
           </Tip>
         </div>
