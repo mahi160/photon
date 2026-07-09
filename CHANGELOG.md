@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/mahi160/photon/compare/v1.2.0...v1.2.1) (2026-07-09)
+
+
+### Bug Fixes
+
+* **build:** unbreak launch on macOS and Windows ([a7a27ee](https://github.com/mahi160/photon/commit/a7a27eed231eb9a243f13241853d555167911f6d))
+
 # [1.2.0](https://github.com/mahi160/photon/compare/v1.1.0...v1.2.0) (2026-07-09)
 
 
