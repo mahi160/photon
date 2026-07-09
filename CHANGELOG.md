@@ -1,3 +1,13 @@
+# [1.3.0](https://github.com/mahi160/photon/compare/v1.2.1...v1.3.0) (2026-07-09)
+
+
+### Features
+
+* **main:** broadcast updater status to renderer on state changes ([7057049](https://github.com/mahi160/photon/commit/7057049168c94f2e5f891b7cbfc38ca70468046f))
+* **preload:** add updater status API and event listener ([c76514a](https://github.com/mahi160/photon/commit/c76514a9a81fe5b5d4513ffb133b955656c2123a))
+* **ui/login:** add panel container and enhance field styling ([ae5339b](https://github.com/mahi160/photon/commit/ae5339b8ff3d7aff36e8e45f26c38c99f34b5be5))
+* **ui/settings:** show updater status and restart-to-update button ([573b693](https://github.com/mahi160/photon/commit/573b693a4a685cd1d127592396f9e28121047407))
+
 ## [1.2.1](https://github.com/mahi160/photon/compare/v1.2.0...v1.2.1) (2026-07-09)
 
 
