@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { UpdaterStatus } from '../../../preload/index'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSession } from '../stores/session'
@@ -20,12 +21,26 @@ export function Settings(): React.JSX.Element {
   const [version, setVersion] = useState('')
   const [loginItem, setLoginItem] = useState(false)
   const [autoUpdate, setAutoUpdate] = useState(true)
+  const [updater, setUpdater] = useState<UpdaterStatus>({ state: 'idle' })
 
   useEffect(() => {
     void window.api.appVersion().then(setVersion)
     void window.api.getLoginItem().then(setLoginItem)
     void window.api.getAutoUpdate().then(setAutoUpdate)
+    void window.api.getUpdaterStatus().then(setUpdater)
+    return window.api.onUpdaterStatus(setUpdater)
   }, [])
+
+  const updateHint =
+    updater.state === 'checking'
+      ? 'Checking for updates…'
+      : updater.state === 'available'
+        ? `Downloading ${updater.version}…`
+        : updater.state === 'downloaded'
+          ? `Version ${updater.version} ready`
+          : updater.state === 'not-available'
+            ? 'Up to date'
+            : null
 
   return (
     <div className={styles.page}>
@@ -91,15 +106,21 @@ export function Settings(): React.JSX.Element {
       </SettingsSection>
 
       <SettingsSection title="About">
-        <SettingsRow label={`Photon ${version}`} hint="MIT License">
-          <a
-            className={styles.link}
-            href="https://github.com/mahi160/photon"
-            target="_blank"
-            rel="noreferrer"
-          >
-            GitHub
-          </a>
+        <SettingsRow label={`Photon ${version}`} hint={updateHint ?? 'MIT License'}>
+          {updater.state === 'downloaded' ? (
+            <button className={styles.ghostBtn} onClick={() => window.api.installUpdate()}>
+              Restart to update
+            </button>
+          ) : (
+            <a
+              className={styles.link}
+              href="https://github.com/mahi160/photon"
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub
+            </a>
+          )}
         </SettingsRow>
         <SettingsRow
           label="Acknowledgements"
