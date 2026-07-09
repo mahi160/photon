@@ -147,7 +147,9 @@ export function usePlayback(
     load: engineLoad,
     setTextTrack,
     setSubtitleDelay: engineSetDelay,
-    currentTime: engineCurrentTime
+    currentTime: engineCurrentTime,
+    changeRate: engineChangeRate,
+    clearError: engineClearError
   } = engine
 
   const loadFor = useCallback(
@@ -212,17 +214,29 @@ export function usePlayback(
     [engineLoad, setTextTrack, engineSetDelay, engineCurrentTime]
   )
 
+  // initial load once item arrives; the key guard makes re-runs no-ops.
+  // `attempt` bumps on retry to force a reload of the same item. Declared
+  // before playItem/handleEnded so their closures can read it.
+  const [attempt, setAttempt] = useState(0)
+  const loadedKey = useRef<string | null>(null)
+
   // play a different item in place (next-episode button, autoplay-next).
   // resets per-item track state — stream indexes don't carry across files.
-  async function playItem(next: BaseItem): Promise<void> {
-    loadedKey.current = `${next.Id}#${attempt}`
-    setError(null)
-    setAudioIndex(undefined)
-    // on failure stay put — the error layer (with retry) is already showing
-    if (await loadFor(next, { startSeconds: 0 })) {
-      navigate({ to: '/player/$itemId', params: { itemId: next.Id }, search: {}, replace: true })
-    }
-  }
+  // Stable identity (react-query-cached `nextEpisode` data flows straight
+  // into a menu button prop) so it doesn't force that menu to re-render
+  // on every playback tick.
+  const playItem = useCallback(
+    async (next: BaseItem): Promise<void> => {
+      loadedKey.current = `${next.Id}#${attempt}`
+      setError(null)
+      setAudioIndex(undefined)
+      // on failure stay put — the error layer (with retry) is already showing
+      if (await loadFor(next, { startSeconds: 0 })) {
+        navigate({ to: '/player/$itemId', params: { itemId: next.Id }, search: {}, replace: true })
+      }
+    },
+    [loadFor, navigate, attempt]
+  )
 
   async function handleEnded(prev?: BaseItem): Promise<void> {
     if (useSettings.getState().autoplayNext && prev?.Type === 'Episode' && prev.SeriesId) {
@@ -241,10 +255,6 @@ export function usePlayback(
     navigate({ to: '/' })
   }
 
-  // initial load once item arrives; the key guard makes re-runs no-ops.
-  // `attempt` bumps on retry to force a reload of the same item.
-  const [attempt, setAttempt] = useState(0)
-  const loadedKey = useRef<string | null>(null)
   const { start, audio, sub } = params
   useEffect(() => {
     if (!item || loadedKey.current === `${item.Id}#${attempt}`) return
@@ -339,57 +349,73 @@ export function usePlayback(
     }
   }, [engineState, currentTime])
 
-  function selectSubtitle(index: number | null): void {
-    const sess = sessionRef.current
-    if (!sess) return
-    const action = selectSubtitleLogic(index)
-    if (action === 'reload') {
+  // Track-switch actions below are wrapped in useCallback: they end up as
+  // props on the player's track-select menus (base-ui popovers), and those
+  // menus are memoized to skip the re-render every playback tick brings —
+  // that memoization only holds if these callbacks keep a stable identity.
+  const selectSubtitle = useCallback(
+    (index: number | null): void => {
+      const sess = sessionRef.current
+      if (!sess) return
+      const action = selectSubtitleLogic(index)
+      if (action === 'reload') {
+        void loadFor(sess.item, {
+          startSeconds: engineCurrentTime(),
+          audioStreamIndex: audioIndex,
+          subtitleStreamIndex: index ?? -1,
+          mediaSourceId: sess.mediaSource.Id
+        })
+      } else if (action === 'setTextTrack') {
+        setTextTrack(index)
+      }
+      // else: 'disable' needs no engine action
+    },
+    [selectSubtitleLogic, loadFor, engineCurrentTime, audioIndex, setTextTrack]
+  )
+
+  const selectAudio = useCallback(
+    (index: number): void => {
+      const sess = sessionRef.current
+      if (!sess) return
+      setAudioIndex(index)
+      const language = sess.audioStreams.find((s) => s.Index === index)?.Language
+      if (language) useSettings.getState().set({ preferredAudioLanguage: language })
+      useTrackMemory.getState().remember(sess.item.Id, { audioStreamIndex: index })
+      // HTML5 can't switch embedded audio tracks: reload stream with the new
+      // index, keeping the current subtitle selection (text, burn-in, or off)
       void loadFor(sess.item, {
-        startSeconds: engine.currentTime(),
-        audioStreamIndex: audioIndex,
-        subtitleStreamIndex: index ?? -1,
+        startSeconds: engineCurrentTime(),
+        audioStreamIndex: index,
+        subtitleStreamIndex: subtitleIndex ?? -1,
         mediaSourceId: sess.mediaSource.Id
       })
-    } else if (action === 'setTextTrack') {
-      engine.setTextTrack(index)
-    }
-    // else: 'disable' needs no engine action
-  }
+    },
+    [loadFor, engineCurrentTime, subtitleIndex]
+  )
 
-  function selectAudio(index: number): void {
-    const sess = sessionRef.current
-    if (!sess) return
-    setAudioIndex(index)
-    const language = sess.audioStreams.find((s) => s.Index === index)?.Language
-    if (language) useSettings.getState().set({ preferredAudioLanguage: language })
-    useTrackMemory.getState().remember(sess.item.Id, { audioStreamIndex: index })
-    // HTML5 can't switch embedded audio tracks: reload stream with the new
-    // index, keeping the current subtitle selection (text, burn-in, or off)
-    void loadFor(sess.item, {
-      startSeconds: engine.currentTime(),
-      audioStreamIndex: index,
-      subtitleStreamIndex: subtitleIndex ?? -1,
-      mediaSourceId: sess.mediaSource.Id
-    })
-  }
+  const changeDelay = useCallback(
+    (seconds: number): void => {
+      engineSetDelay(seconds)
+      setSubtitleDelay(seconds)
+      useSettings.getState().set({ lastSubtitleDelay: seconds })
+    },
+    [engineSetDelay]
+  )
 
-  function changeDelay(seconds: number): void {
-    engine.setSubtitleDelay(seconds)
-    setSubtitleDelay(seconds)
-    useSettings.getState().set({ lastSubtitleDelay: seconds })
-  }
+  const changeRate = useCallback(
+    (rate: number): void => {
+      engineChangeRate(rate)
+      const settings = useSettings.getState()
+      if (settings.rememberSpeed) settings.set({ lastSpeed: rate })
+    },
+    [engineChangeRate]
+  )
 
-  function changeRate(rate: number): void {
-    engine.changeRate(rate)
-    const settings = useSettings.getState()
-    if (settings.rememberSpeed) settings.set({ lastSpeed: rate })
-  }
-
-  function retry(): void {
+  const retry = useCallback((): void => {
     setError(null)
-    engine.clearError()
+    engineClearError()
     setAttempt((a) => a + 1)
-  }
+  }, [engineClearError, setAttempt])
 
   return {
     engine,

@@ -11,7 +11,7 @@ import { SettingsSection, SettingsRow } from './SettingsSection'
 import styles from './Settings.module.css'
 
 export function Settings(): React.JSX.Element {
-  const settings = useSettings()
+  const reset = useSettings((s) => s.reset)
   const session = useSession((s) => s.session)
   const logout = useSession((s) => s.logout)
   const navigate = useNavigate()
@@ -81,7 +81,7 @@ export function Settings(): React.JSX.Element {
             className={styles.dangerBtn}
             onClick={() => {
               if (confirm('Reset all settings to defaults? This does not sign you out.')) {
-                settings.reset()
+                reset()
               }
             }}
           >

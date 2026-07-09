@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Menu as BaseMenu } from '@base-ui/react/menu'
 import { Select as BaseSelect } from '@base-ui/react/select'
 import { Popover as BasePopover } from '@base-ui/react/popover'
@@ -82,29 +83,45 @@ function EndTimeDisplay({
   )
 }
 
-export function ControlsBar({
-  state,
-  time,
-  duration,
+// Everything below is untouched by playback ticks (speed/audio/subtitle/sync
+// menus, mpv/PiP/fullscreen). It's memoized so those base-ui popovers don't
+// reconcile on every `time` update from the video element — only when a
+// track/menu actually changes. None of ControlsBar's other props (time,
+// duration, play/pause state, volume) are in this list on purpose.
+type PlaybackMenusProps = Pick<
+  ControlsBarProps,
+  | 'rate'
+  | 'audioStreams'
+  | 'audioIndex'
+  | 'subtitleStreams'
+  | 'subtitleIndex'
+  | 'subtitleDelay'
+  | 'subtitleDelayEnabled'
+  | 'pip'
+  | 'fullscreen'
+  | 'menuOpen'
+  | 'onToggleMenu'
+  | 'onRate'
+  | 'onSelectAudio'
+  | 'onSelectSubtitle'
+  | 'onSubtitleDelay'
+  | 'onFullscreen'
+  | 'onPiP'
+  | 'onOpenMpv'
+>
+
+const PlaybackMenus = memo(function PlaybackMenus({
   rate,
-  volume,
-  muted,
-  pip,
-  fullscreen,
   audioStreams,
   audioIndex,
   subtitleStreams,
   subtitleIndex,
   subtitleDelay,
   subtitleDelayEnabled,
-  nextEpisode,
+  pip,
+  fullscreen,
   menuOpen,
   onToggleMenu,
-  onTogglePlay,
-  onPlayNext,
-  onVolume,
-  onVolumeStep,
-  onMute,
   onRate,
   onSelectAudio,
   onSelectSubtitle,
@@ -112,55 +129,9 @@ export function ControlsBar({
   onFullscreen,
   onPiP,
   onOpenMpv
-}: ControlsBarProps): React.JSX.Element {
+}: PlaybackMenusProps): React.JSX.Element {
   return (
-    <div className={styles.controlsRow}>
-      <Tip label={state === 'playing' ? 'Pause' : 'Play'} kbd="Space">
-        <button className={styles.playBtn} onClick={onTogglePlay} aria-label="Play or pause">
-          {state === 'playing' ? (
-            <Pause weight="Filled" className={styles.icon} />
-          ) : (
-            <Play weight="Filled" className={styles.icon} />
-          )}
-        </button>
-      </Tip>
-
-      {onPlayNext && (
-        <Tip label={nextEpisode ? `Next: ${nextEpisode.Name}` : 'Next episode'}>
-          <button className={styles.iconBtn} onClick={onPlayNext} aria-label="Next episode">
-            <ForwardStep weight="Filled" className={styles.icon} />
-          </button>
-        </Tip>
-      )}
-
-      <div className={styles.volumeGroup}>
-        <Tip label={muted ? 'Unmute' : 'Mute'} kbd="M">
-          <button className={styles.iconBtn} onClick={onMute} aria-label="Mute">
-            {muted || volume === 0 ? (
-              <Mute className={styles.icon} />
-            ) : (
-              <Volume className={styles.icon} />
-            )}
-          </button>
-        </Tip>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={muted ? 0 : volume}
-          onChange={(e) => onVolume(Number(e.target.value))}
-          className={styles.volume}
-          style={{ '--vol': `${(muted ? 0 : volume) * 100}%` } as React.CSSProperties}
-          aria-label="Volume"
-          onWheel={(e) => onVolumeStep(e.deltaY < 0 ? 0.05 : -0.05)}
-        />
-      </div>
-
-      <EndTimeDisplay duration={duration} currentTime={time} rate={rate} />
-
-      <div className={styles.grow} />
-
+    <>
       <BaseMenu.Root
         open={menuOpen === 'speed'}
         onOpenChange={(open) => onToggleMenu('speed', open)}
@@ -295,6 +266,109 @@ export function ControlsBar({
           {fullscreen ? <Minimize className={styles.icon} /> : <Maximize className={styles.icon} />}
         </button>
       </Tip>
+    </>
+  )
+})
+
+export function ControlsBar({
+  state,
+  time,
+  duration,
+  rate,
+  volume,
+  muted,
+  pip,
+  fullscreen,
+  audioStreams,
+  audioIndex,
+  subtitleStreams,
+  subtitleIndex,
+  subtitleDelay,
+  subtitleDelayEnabled,
+  nextEpisode,
+  menuOpen,
+  onToggleMenu,
+  onTogglePlay,
+  onPlayNext,
+  onVolume,
+  onVolumeStep,
+  onMute,
+  onRate,
+  onSelectAudio,
+  onSelectSubtitle,
+  onSubtitleDelay,
+  onFullscreen,
+  onPiP,
+  onOpenMpv
+}: ControlsBarProps): React.JSX.Element {
+  return (
+    <div className={styles.controlsRow}>
+      <Tip label={state === 'playing' ? 'Pause' : 'Play'} kbd="Space">
+        <button className={styles.playBtn} onClick={onTogglePlay} aria-label="Play or pause">
+          {state === 'playing' ? (
+            <Pause weight="Filled" className={styles.icon} />
+          ) : (
+            <Play weight="Filled" className={styles.icon} />
+          )}
+        </button>
+      </Tip>
+
+      {onPlayNext && (
+        <Tip label={nextEpisode ? `Next: ${nextEpisode.Name}` : 'Next episode'}>
+          <button className={styles.iconBtn} onClick={onPlayNext} aria-label="Next episode">
+            <ForwardStep weight="Filled" className={styles.icon} />
+          </button>
+        </Tip>
+      )}
+
+      <div className={styles.volumeGroup}>
+        <Tip label={muted ? 'Unmute' : 'Mute'} kbd="M">
+          <button className={styles.iconBtn} onClick={onMute} aria-label="Mute">
+            {muted || volume === 0 ? (
+              <Mute className={styles.icon} />
+            ) : (
+              <Volume className={styles.icon} />
+            )}
+          </button>
+        </Tip>
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.05}
+          value={muted ? 0 : volume}
+          onChange={(e) => onVolume(Number(e.target.value))}
+          className={styles.volume}
+          style={{ '--vol': `${(muted ? 0 : volume) * 100}%` } as React.CSSProperties}
+          aria-label="Volume"
+          onWheel={(e) => onVolumeStep(e.deltaY < 0 ? 0.05 : -0.05)}
+        />
+      </div>
+
+      <EndTimeDisplay duration={duration} currentTime={time} rate={rate} />
+
+      <div className={styles.grow} />
+
+      <PlaybackMenus
+        rate={rate}
+        audioStreams={audioStreams}
+        audioIndex={audioIndex}
+        subtitleStreams={subtitleStreams}
+        subtitleIndex={subtitleIndex}
+        subtitleDelay={subtitleDelay}
+        subtitleDelayEnabled={subtitleDelayEnabled}
+        pip={pip}
+        fullscreen={fullscreen}
+        menuOpen={menuOpen}
+        onToggleMenu={onToggleMenu}
+        onRate={onRate}
+        onSelectAudio={onSelectAudio}
+        onSelectSubtitle={onSelectSubtitle}
+        onSubtitleDelay={onSubtitleDelay}
+        onFullscreen={onFullscreen}
+        onPiP={onPiP}
+        onOpenMpv={onOpenMpv}
+      />
     </div>
   )
 }

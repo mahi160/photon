@@ -123,7 +123,7 @@ export function ShowDetails(): React.JSX.Element {
   return (
     <div className={styles.page}>
       <div className={styles.hero}>
-        {backdrop && <img src={backdrop} alt="" className={styles.heroImg} />}
+        {backdrop && <img src={backdrop} alt="" fetchPriority="high" className={styles.heroImg} />}
         <div className={styles.heroScrim} />
         <button onClick={() => router.history.back()} className={styles.back}>
           <CaretLeft />

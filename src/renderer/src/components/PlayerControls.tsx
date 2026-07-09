@@ -1,5 +1,5 @@
 import { CaretLeft, Pause, Play } from 'reicon-react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { type BaseItem, type MediaSegment, type MediaStream } from '../lib/jellyfin'
 import { Tip } from './Tip'
 import { TimelinePreview } from './TimelinePreview'
@@ -49,6 +49,11 @@ export interface Props {
 
 export function PlayerControls(p: Props): React.JSX.Element {
   const [menu, setMenu] = useState<'audio' | 'subs' | 'speed' | 'sync' | null>(null)
+  // stable identity — ControlsBar's menu group is memoized against ticking time
+  const onToggleMenu = useCallback(
+    (m: 'audio' | 'subs' | 'speed' | 'sync', open: boolean) => setMenu(open ? m : null),
+    []
+  )
   const [hover, setHover] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const [dismissedFor, setDismissedFor] = useState<string | null>(null)
@@ -181,7 +186,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
               subtitleDelayEnabled={p.subtitleDelayEnabled}
               nextEpisode={p.nextEpisode}
               menuOpen={menu}
-              onToggleMenu={(m, open) => setMenu(open ? m : null)}
+              onToggleMenu={onToggleMenu}
               onTogglePlay={p.onTogglePlay}
               onPlayNext={p.onPlayNext}
               onVolume={p.onVolume}

@@ -1,6 +1,10 @@
 /* fluid by default — grids size cards via their cells; horizontal rows pin
    a fixed basis on track children instead (Row.module.css) */
 .card {
+  /* skip layout/paint for off-screen cards — large libraries / long rows
+     mount hundreds of these; this is free for the ones already visible */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 280px;
   position: relative;
   flex-shrink: 0;
 }

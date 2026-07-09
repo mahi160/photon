@@ -51,23 +51,25 @@ function SubtitleColorSwatches({
 }
 
 export function SubtitleSettings(): React.JSX.Element {
-  const settings = useSettings()
-  const s = settings.subtitleStyle
+  const s = useSettings((st) => st.subtitleStyle)
+  const subtitlesEnabled = useSettings((st) => st.subtitlesEnabled)
+  const preferredSubtitleLanguage = useSettings((st) => st.preferredSubtitleLanguage)
+  const set = useSettings((st) => st.set)
 
   return (
     <SettingsSection title="Subtitles">
       <SettingsRow label="Enabled by default">
         <ToggleSwitch
           label="Subtitles enabled by default"
-          checked={settings.subtitlesEnabled}
-          onChange={(v) => settings.set({ subtitlesEnabled: v })}
+          checked={subtitlesEnabled}
+          onChange={(v) => set({ subtitlesEnabled: v })}
         />
       </SettingsRow>
       <SettingsRow label="Preferred language" hint="ISO code, e.g. eng">
         <input
           className={`${styles.select} ${styles.textInput}`}
-          value={settings.preferredSubtitleLanguage}
-          onChange={(e) => settings.set({ preferredSubtitleLanguage: e.target.value })}
+          value={preferredSubtitleLanguage}
+          onChange={(e) => set({ preferredSubtitleLanguage: e.target.value })}
           aria-label="Preferred subtitle language"
         />
       </SettingsRow>
@@ -77,7 +79,7 @@ export function SubtitleSettings(): React.JSX.Element {
           max={200}
           step={10}
           value={s.fontSize}
-          onChange={(v) => settings.set({ subtitleStyle: { ...s, fontSize: v } })}
+          onChange={(v) => set({ subtitleStyle: { ...s, fontSize: v } })}
           label="subtitle size"
           classes={stepperClasses}
         />
@@ -85,17 +87,14 @@ export function SubtitleSettings(): React.JSX.Element {
       <SettingsRow label="Color">
         <SubtitleColorSwatches
           value={s.color}
-          onChange={useCallback(
-            (color) => settings.set({ subtitleStyle: { ...s, color } }),
-            [s, settings]
-          )}
+          onChange={useCallback((color) => set({ subtitleStyle: { ...s, color } }), [s, set])}
         />
       </SettingsRow>
       <SettingsRow label="Background">
         <select
           className={styles.select}
           value={s.background}
-          onChange={(e) => settings.set({ subtitleStyle: { ...s, background: e.target.value } })}
+          onChange={(e) => set({ subtitleStyle: { ...s, background: e.target.value } })}
           aria-label="Subtitle background"
         >
           <option value="transparent">None</option>
@@ -107,7 +106,7 @@ export function SubtitleSettings(): React.JSX.Element {
         <ToggleSwitch
           label="Subtitle outline"
           checked={s.outline}
-          onChange={(v) => settings.set({ subtitleStyle: { ...s, outline: v } })}
+          onChange={(v) => set({ subtitleStyle: { ...s, outline: v } })}
         />
       </SettingsRow>
       <SettingsRow label="Vertical position">
@@ -116,7 +115,7 @@ export function SubtitleSettings(): React.JSX.Element {
           max={30}
           step={2}
           value={s.verticalPosition}
-          onChange={(v) => settings.set({ subtitleStyle: { ...s, verticalPosition: v } })}
+          onChange={(v) => set({ subtitleStyle: { ...s, verticalPosition: v } })}
           label="subtitle vertical position"
           classes={stepperClasses}
         />
@@ -127,7 +126,7 @@ export function SubtitleSettings(): React.JSX.Element {
           max={1}
           step={0.1}
           value={s.opacity}
-          onChange={(v) => settings.set({ subtitleStyle: { ...s, opacity: v } })}
+          onChange={(v) => set({ subtitleStyle: { ...s, opacity: v } })}
           format={{ style: 'percent', maximumFractionDigits: 0 }}
           label="subtitle opacity"
           classes={stepperClasses}
