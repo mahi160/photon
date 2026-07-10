@@ -103,8 +103,16 @@ export async function authenticateByName(
     throw new JellyfinError(0, 'Cannot reach server.')
   }
   if (res.status === 401) throw new JellyfinError(401, 'Incorrect username or password.')
-  if (!res.ok) throw new JellyfinError(res.status, 'Sign in failed.')
-  const data = await res.json()
+  if (!res.ok) throw new JellyfinError(res.status, `Sign in failed (${res.status}).`)
+  let data: { AccessToken?: string; User?: { Id: string; Name: string } }
+  try {
+    data = await res.json()
+  } catch {
+    throw new JellyfinError(res.status, 'Sign in failed: server sent an unexpected response.')
+  }
+  if (!data.AccessToken || !data.User) {
+    throw new JellyfinError(res.status, 'Sign in failed: unexpected response from server.')
+  }
   return {
     server: base,
     token: data.AccessToken,
