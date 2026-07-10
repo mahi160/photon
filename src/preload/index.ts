@@ -2,8 +2,9 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
 export type UpdaterStatus =
-  | { state: 'idle' | 'checking' | 'not-available' | 'error' }
+  | { state: 'idle' | 'checking' | 'not-available' }
   | { state: 'available' | 'downloaded'; version: string }
+  | { state: 'error'; message: string }
 
 const api = {
   sessionGet: (): Promise<string | null> => ipcRenderer.invoke('session:get'),

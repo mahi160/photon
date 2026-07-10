@@ -182,10 +182,12 @@ app.whenReady().then(() => {
         autoUpdater.on('update-downloaded', (info) =>
           broadcastUpdaterStatus({ state: 'downloaded', version: info.version })
         )
-        autoUpdater.on('error', () => broadcastUpdaterStatus({ state: 'error' }))
+        autoUpdater.on('error', (err) =>
+          broadcastUpdaterStatus({ state: 'error', message: err.message })
+        )
         return autoUpdater.checkForUpdates()
       })
-      .catch(() => broadcastUpdaterStatus({ state: 'error' }))
+      .catch((err: Error) => broadcastUpdaterStatus({ state: 'error', message: err.message }))
   }
 
   app.on('browser-window-created', (_, window) => {

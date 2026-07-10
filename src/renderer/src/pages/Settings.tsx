@@ -40,7 +40,9 @@ export function Settings(): React.JSX.Element {
           ? `Version ${updater.version} ready`
           : updater.state === 'not-available'
             ? 'Up to date'
-            : null
+            : updater.state === 'error'
+              ? `Update check failed: ${updater.message}`
+              : null
 
   return (
     <div className={styles.page}>

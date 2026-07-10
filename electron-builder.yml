@@ -34,9 +34,9 @@ dmg:
   artifactName: ${name}-${version}.${ext}
 linux:
   target:
-    - tar.gz
-    - deb
-    - rpm
+    # AppImage only — it's the sole Linux target electron-updater can
+    # actually auto-update in place; deb/rpm/tar.gz are install-once
+    - AppImage
   maintainer: mahi160
   category: Utility
 npmRebuild: false
