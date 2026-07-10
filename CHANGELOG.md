@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/mahi160/photon/compare/v1.4.1...v1.5.0) (2026-07-10)
+
+
+### Features
+
+* **updater:** surface error messages instead of silently failing ([b79b451](https://github.com/mahi160/photon/commit/b79b4511ba84a0c59d954f24af31b68e4a6a155c))
+
 ## [1.4.1](https://github.com/mahi160/photon/compare/v1.4.0...v1.4.1) (2026-07-10)
 
 

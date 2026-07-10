@@ -1,6 +1,6 @@
 {
   "name": "photon",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "A calm, minimal desktop media player built exclusively for Jellyfin",
   "main": "./out/main/index.js",
   "license": "MIT",
