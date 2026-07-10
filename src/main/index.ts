@@ -110,7 +110,11 @@ function broadcastUpdaterStatus(status: UpdaterStatus): void {
 ipcMain.handle('updater:status', () => updaterStatus)
 
 ipcMain.handle('updater:install', () => {
-  void import('electron-updater').then(({ autoUpdater }) => autoUpdater.quitAndInstall())
+  // electron-updater exports `autoUpdater` as a lazy getter (Object.defineProperty),
+  // not a static property — Rollup's CJS interop can't see it as a named export,
+  // so destructuring it here silently yields undefined. `.default` is the live
+  // CJS exports object itself, getter included.
+  void import('electron-updater').then((mod) => mod.default.autoUpdater.quitAndInstall())
 })
 
 // Subtitle VTT fetched from main: renderer <track> fetches are subject to
@@ -171,7 +175,9 @@ app.whenReady().then(() => {
 
   if (!is.dev && !readPrefs().disableAutoUpdate) {
     void import('electron-updater')
-      .then(({ autoUpdater }) => {
+      .then((mod) => {
+        // see the comment on 'updater:install' above re: .default
+        const { autoUpdater } = mod.default
         autoUpdater.on('checking-for-update', () => broadcastUpdaterStatus({ state: 'checking' }))
         autoUpdater.on('update-not-available', () =>
           broadcastUpdaterStatus({ state: 'not-available' })
