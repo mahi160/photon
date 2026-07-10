@@ -22,12 +22,19 @@ export function deviceId(): string {
   return id
 }
 
+// set once at startup from the real app version (main.tsx) — falls back to
+// this if that IPC round trip hasn't resolved yet on the very first request
+let clientVersion = '1.0.0'
+export function setClientVersion(v: string): void {
+  clientVersion = v
+}
+
 function authHeader(token?: string): string {
   const parts = [
     'MediaBrowser Client="Photon"',
     `Device="${encodeURIComponent(navigator.platform || 'Desktop')}"`,
     `DeviceId="${deviceId()}"`,
-    'Version="1.0.0"'
+    `Version="${clientVersion}"`
   ]
   if (token) parts.push(`Token="${token}"`)
   return parts.join(', ')
@@ -42,6 +49,10 @@ export class JellyfinError extends Error {
   }
 }
 
+// a dropped/asleep server otherwise hangs on the OS TCP timeout (minutes)
+// instead of the friendly "Cannot reach server" message showing up fast
+const REQUEST_TIMEOUT_MS = 10_000
+
 export async function jf<T>(
   path: string,
   opts: { method?: string; body?: unknown; query?: Record<string, string | number | boolean> } = {}
@@ -49,14 +60,20 @@ export async function jf<T>(
   if (!session) throw new JellyfinError(0, 'Not signed in')
   const url = new URL(session.server + path)
   for (const [k, v] of Object.entries(opts.query ?? {})) url.searchParams.set(k, String(v))
-  const res = await fetch(url, {
-    method: opts.method ?? 'GET',
-    headers: {
-      Authorization: authHeader(session.token),
-      ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {})
-    },
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined
-  })
+  let res: Response
+  try {
+    res = await fetch(url, {
+      method: opts.method ?? 'GET',
+      headers: {
+        Authorization: authHeader(session.token),
+        ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {})
+      },
+      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+    })
+  } catch {
+    throw new JellyfinError(0, 'Cannot reach server.')
+  }
   if (!res.ok) throw new JellyfinError(res.status, `${res.status} ${res.statusText}`)
   const text = await res.text()
   return (text ? JSON.parse(text) : undefined) as T
@@ -79,7 +96,8 @@ export async function authenticateByName(
     res = await fetch(`${base}/Users/AuthenticateByName`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: authHeader() },
-      body: JSON.stringify({ Username: username, Pw: password })
+      body: JSON.stringify({ Username: username, Pw: password }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
     })
   } catch {
     throw new JellyfinError(0, 'Cannot reach server.')
