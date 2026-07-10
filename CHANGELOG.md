@@ -1,3 +1,10 @@
+## [1.4.1](https://github.com/mahi160/photon/compare/v1.4.0...v1.4.1) (2026-07-10)
+
+
+### Bug Fixes
+
+* **jellyfin:** validate auth response and improve error messages ([6cef70e](https://github.com/mahi160/photon/commit/6cef70e8d240e8f484a76cc81636b0eef759fe1a))
+
 # [1.4.0](https://github.com/mahi160/photon/compare/v1.3.0...v1.4.0) (2026-07-10)
 
 
