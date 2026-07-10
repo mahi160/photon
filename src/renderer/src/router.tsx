@@ -8,6 +8,7 @@ import {
   redirect
 } from '@tanstack/react-router'
 import { useSession } from './stores/session'
+import { RouteError, RouteNotFound } from './components/RouteFallback'
 import { AppLayout } from './pages/AppLayout'
 import { Login } from './pages/Login'
 import { Home } from './pages/Home'
@@ -123,6 +124,8 @@ const routeTree = rootRoute.addChildren([
 export const router = createRouter({
   routeTree,
   defaultPreload: 'intent',
+  defaultErrorComponent: RouteError,
+  defaultNotFoundComponent: RouteNotFound,
   history: createHashHistory()
 })
 

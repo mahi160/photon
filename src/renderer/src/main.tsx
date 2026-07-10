@@ -8,6 +8,7 @@ import { router } from './router'
 import { useSession } from './stores/session'
 import { useSettings } from './stores/settings'
 import { resolveTheme } from './lib/theme'
+import { setClientVersion } from './lib/jellyfin'
 
 function applyAppearance(): void {
   const s = useSettings.getState()
@@ -25,11 +26,11 @@ const queryClient = new QueryClient({
   }
 })
 
-// restore session before the router mounts so auth guards see the real state
-useSession
-  .getState()
-  .restore()
-  .then(() => {
+// restore session before the router mounts so auth guards see the real state;
+// runs alongside the real app version so the very first API call already
+// carries it instead of the "1.0.0" placeholder
+Promise.all([useSession.getState().restore(), window.api.appVersion().then(setClientVersion)]).then(
+  () => {
     createRoot(document.getElementById('root')!).render(
       <StrictMode>
         <QueryClientProvider client={queryClient}>
@@ -37,4 +38,5 @@ useSession
         </QueryClientProvider>
       </StrictMode>
     )
-  })
+  }
+)
