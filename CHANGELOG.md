@@ -1,3 +1,16 @@
+# [1.4.0](https://github.com/mahi160/photon/compare/v1.3.0...v1.4.0) (2026-07-10)
+
+
+### Bug Fixes
+
+* **api:** add request timeout and dynamic app version header ([7b983f7](https://github.com/mahi160/photon/commit/7b983f73417a24773d7a3816949ab3aeee50c889))
+
+
+### Features
+
+* **app:** wire router error handler and pass app version to API ([c26648d](https://github.com/mahi160/photon/commit/c26648d84ffcf8cc17262c86bfc69c49ea714370))
+* **ui:** add route error and 404 fallback pages ([c327487](https://github.com/mahi160/photon/commit/c327487e76311016af59356bba2b11e6feba3e69))
+
 # [1.3.0](https://github.com/mahi160/photon/compare/v1.2.1...v1.3.0) (2026-07-09)
 
 
