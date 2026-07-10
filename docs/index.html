@@ -12,6 +12,14 @@
       :root {
         --font-sans: ui-sans-serif, system-ui, sans-serif;
         --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+        --radius-s: 0.5rem;
+        --radius-l: 1.5rem;
+        --gutter: clamp(1.5rem, 5vw, 4rem);
+      }
+
+      /* Gruvbox Material (dark) — default, matches the app's dark theme */
+      :root,
+      [data-theme='dark'] {
         --bg: #32302f;
         --fg: #d4be98;
         --fg-muted: #a89984;
@@ -20,9 +28,20 @@
         --accent-2: #d3869b;
         --border: #4a4642;
         --surface-1: #3a3735;
-        --radius-s: 0.5rem;
-        --radius-l: 1.5rem;
-        --gutter: clamp(1.5rem, 5vw, 4rem);
+        --accent-fg: #131318;
+      }
+
+      /* Rosé Pine Dawn (light) — matches the app's light theme */
+      [data-theme='light'] {
+        --bg: #faf4ed;
+        --fg: #575279;
+        --fg-muted: #797593;
+        --fg-faint: #b5aeca;
+        --accent: #b4637a;
+        --accent-2: #907aa9;
+        --border: #ded3c9;
+        --surface-1: #f2e9e1;
+        --accent-fg: #fdfaf5;
       }
 
       * {
@@ -114,9 +133,24 @@
       }
 
       .btn-primary {
-        color: #131318;
+        color: var(--accent-fg);
         background: var(--accent);
         border-color: transparent;
+      }
+
+      .theme-toggle {
+        position: fixed;
+        inset-block-start: 1.25rem;
+        inset-inline-end: 1.25rem;
+        padding-block: 0.4rem;
+        padding-inline: 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-s);
+        background: var(--surface-1);
+        color: var(--fg-muted);
+        font-family: var(--font-mono);
+        font-size: 0.75rem;
+        cursor: pointer;
       }
 
       section {
@@ -177,14 +211,31 @@
         color: var(--fg-muted);
       }
 
+      .shots {
+        display: grid;
+        gap: 0.75rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .shots img {
+        display: block;
+        inline-size: 100%;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-s);
+      }
+
       .gatekeeper code {
         display: block;
         margin-block-start: 0.5rem;
         padding: 0.6rem 0.8rem;
+        overflow-x: auto;
         border-radius: var(--radius-s);
         background: var(--bg);
         font-family: var(--font-mono);
         font-size: 0.8rem;
+        white-space: pre;
         color: var(--fg);
       }
 
@@ -199,6 +250,7 @@
   </head>
 
   <body>
+    <button class="theme-toggle" id="theme-toggle" type="button">Light mode</button>
     <div class="beam"></div>
     <main>
       <div class="brand">
@@ -275,6 +327,18 @@
       </section>
 
       <section>
+        <h2>mpv (optional)</h2>
+        <p class="gatekeeper">
+          The built-in player (HTML5/HLS) needs no setup. For guaranteed direct play with zero
+          server transcoding, install <a href="https://mpv.io">mpv</a> and switch to it in
+          Settings → Playback → Player. Photon does not bundle mpv — install it separately:
+          <code>brew install mpv        # macOS
+choco install mpv        # Windows
+sudo apt install mpv     # Debian/Ubuntu</code>
+        </p>
+      </section>
+
+      <section>
         <h2>macOS Gatekeeper</h2>
         <p class="gatekeeper">
           Photon's macOS build is ad-hoc signed, not notarized (that requires a paid Apple
@@ -282,6 +346,16 @@
           positive, not a corrupt download. Run this once after moving Photon to Applications:
           <code>xattr -cr /Applications/Photon.app</code>
         </p>
+      </section>
+
+      <section>
+        <h2>Screenshots</h2>
+        <ul class="shots">
+          <li><img src="screenshots/home.png" alt="Home screen: Continue Watching, Next Up, Recently Added Movies" loading="lazy" /></li>
+          <li><img src="screenshots/player.png" alt="Player controls during direct playback" loading="lazy" /></li>
+          <li><img src="screenshots/pip.png" alt="Picture-in-Picture playing through mpv" loading="lazy" /></li>
+          <li><img src="screenshots/login.png" alt="Sign in screen" loading="lazy" /></li>
+        </ul>
       </section>
 
       <footer>MIT License · <a href="https://github.com/mahi160/photon">github.com/mahi160/photon</a></footer>
@@ -299,6 +373,26 @@
           }
         })
         .catch(() => {})
+
+      // light/dark: defaults to OS preference, remembers an explicit choice
+      const root = document.documentElement
+      const toggle = document.getElementById('theme-toggle')
+      const stored = localStorage.getItem('photon-site-theme')
+      const media = window.matchMedia('(prefers-color-scheme: light)')
+
+      function apply(theme) {
+        root.dataset.theme = theme
+        toggle.textContent = theme === 'light' ? 'Dark mode' : 'Light mode'
+      }
+
+      apply(stored ?? (media.matches ? 'light' : 'dark'))
+      if (!stored) media.addEventListener('change', (e) => apply(e.matches ? 'light' : 'dark'))
+
+      toggle.addEventListener('click', () => {
+        const next = root.dataset.theme === 'light' ? 'dark' : 'light'
+        localStorage.setItem('photon-site-theme', next)
+        apply(next)
+      })
     </script>
   </body>
 </html>

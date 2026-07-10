@@ -27,6 +27,27 @@ after download. Fix once:
 xattr -cr /Applications/Photon.app
 ```
 
+### mpv (optional)
+
+Photon's built-in player (HTML5/HLS) needs no setup. For guaranteed direct
+play with zero server transcoding, install [mpv](https://mpv.io) and switch
+to it in Settings → Playback → Player ("Built-in · mpv when transcoding" or
+"Always mpv"). mpv plays in its own window; Picture-in-Picture always falls
+back to the built-in player. Photon does not bundle mpv — install it separately:
+
+```bash
+# macOS
+brew install mpv
+
+# Windows — installs mpv.exe on PATH (mpv.net is a different app, won't work)
+choco install mpv
+# or: scoop install mpv
+
+# Linux
+sudo apt install mpv      # Debian/Ubuntu
+sudo pacman -S mpv        # Arch
+```
+
 ## Keyboard shortcuts
 
 | Key      | Action             |
