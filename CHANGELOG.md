@@ -1,3 +1,10 @@
+## [1.5.1](https://github.com/mahi160/photon/compare/v1.5.0...v1.5.1) (2026-07-10)
+
+
+### Bug Fixes
+
+* **main:** resolve autoUpdater undefined at runtime in packaged builds ([8c0156d](https://github.com/mahi160/photon/commit/8c0156d00877dfab66f69c6b9cddc04adbd37477))
+
 # [1.5.0](https://github.com/mahi160/photon/compare/v1.4.1...v1.5.0) (2026-07-10)
 
 
