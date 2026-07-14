@@ -1,3 +1,15 @@
+# [1.6.0](https://github.com/mahi160/photon/compare/v1.5.1...v1.6.0) (2026-07-14)
+
+
+### Bug Fixes
+
+* **player:** consolidate subtitle state, stabilize callbacks, fix progress reporting ([5b77114](https://github.com/mahi160/photon/commit/5b771143297af919c697cf22e4045eb6f400f4cd))
+
+
+### Features
+
+* **jellyfin:** add Quick Connect auth, media stream metadata, and trickplay info ([0258f44](https://github.com/mahi160/photon/commit/0258f44d81bbb613f207b59f9c7a5436cb746c7d))
+
 ## [1.5.1](https://github.com/mahi160/photon/compare/v1.5.0...v1.5.1) (2026-07-10)
 
 
