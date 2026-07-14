@@ -43,15 +43,12 @@ export function AppLayout(): React.JSX.Element {
   const navigate = useNavigate()
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
-  useHotkeys(
-    {
-      'mod+f': () => navigate({ to: '/search' }),
-      '/': () => navigate({ to: '/search' }),
-      '?': () => setShortcutsOpen((v) => !v),
-      'shift+?': () => setShortcutsOpen((v) => !v)
-    },
-    [navigate]
-  )
+  useHotkeys({
+    'mod+f': () => navigate({ to: '/search' }),
+    '/': () => navigate({ to: '/search' }),
+    '?': () => setShortcutsOpen((v) => !v),
+    'shift+?': () => setShortcutsOpen((v) => !v)
+  })
 
   return (
     <div className={styles.shell}>

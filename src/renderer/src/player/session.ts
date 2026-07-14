@@ -26,8 +26,23 @@ export interface PlaybackSession {
 }
 
 // whether a stream index is deliverable as a text track (vs. burned in)
-export function isTextTrack(sess: PlaybackSession, index: number): boolean {
+export function isTextTrack(sess: Pick<PlaybackSession, 'textTracks'>, index: number): boolean {
   return sess.textTracks.some((t) => t.index === index)
+}
+
+// Whether switching subtitles from `current` to `next` (null = off) needs a
+// new stream from the server: a burn-in sub only exists in the transcoded
+// pixels, so entering OR leaving one can't be done with text tracks alone.
+export function subtitleSwitchRequiresReload(
+  sess: Pick<PlaybackSession, 'textTracks' | 'subtitleStreams'>,
+  current: number | null,
+  next: number | null
+): boolean {
+  const burned = (index: number | null): boolean =>
+    index !== null &&
+    sess.subtitleStreams.some((st) => st.Index === index) &&
+    !isTextTrack(sess, index)
+  return burned(current) || burned(next)
 }
 
 interface PlaybackInfoResponse {

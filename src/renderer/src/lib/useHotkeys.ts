@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 // Hand-rolled keyboard shortcut map (PRD: no keybinding dependency).
 // Keys are combos like "mod+f", "space", "arrowleft", "[".
@@ -12,12 +12,26 @@ function comboOf(e: KeyboardEvent): string {
   return parts.join('+')
 }
 
-export function useHotkeys(map: HotkeyMap, deps: unknown[]): void {
+export function useHotkeys(map: HotkeyMap): void {
+  // listener subscribes once; the ref keeps handlers fresh without
+  // resubscribing on every render (the player re-renders on playback ticks)
+  const mapRef = useRef(map)
+  useEffect(() => {
+    mapRef.current = map
+  })
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       const target = e.target as HTMLElement | null
-      if (target?.closest('input, select, textarea, [contenteditable="true"]')) return
-      const handler = map[comboOf(e)]
+      // A deliberately focused control keeps its native keys: Tab-focus and
+      // text-editing surfaces match :focus-visible in Chromium. Mouse-clicked
+      // buttons/sliders don't, so shortcuts keep working right after clicking
+      // a player control — preventDefault below also cancels the focused
+      // button's own Space activation (the double-toggle bug).
+      if (target?.matches(':focus-visible')) return
+      // safety net: text entry always wins even when the heuristic doesn't apply
+      if (target?.closest('input:not([type="range"]), select, textarea, [contenteditable="true"]'))
+        return
+      const handler = mapRef.current[comboOf(e)]
       if (handler) {
         e.preventDefault()
         handler(e)
@@ -25,6 +39,5 @@ export function useHotkeys(map: HotkeyMap, deps: unknown[]): void {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps)
+  }, [])
 }

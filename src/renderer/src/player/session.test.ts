@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveSubtitleSelection, transcodeNeeds } from './session'
+import { resolveSubtitleSelection, subtitleSwitchRequiresReload, transcodeNeeds } from './session'
 import { pickInitialTracks } from './usePlayback'
 import type { MediaStream } from '../lib/jellyfin'
 
@@ -103,6 +103,44 @@ describe('resolveSubtitleSelection', () => {
   it('direct play + non-text server default → nothing shown', () => {
     const s = { ...sess, mediaSource: { DefaultSubtitleStreamIndex: 4 } }
     expect(resolveSubtitleSelection(s, undefined, on)).toEqual({ display: null, textTrack: null })
+  })
+})
+
+describe('subtitleSwitchRequiresReload', () => {
+  const sess = {
+    textTracks: [
+      { index: 3, label: 'English', language: 'eng', url: '' },
+      { index: 5, label: 'German', language: 'ger', url: '' }
+    ],
+    subtitleStreams: [
+      { Index: 3, Type: 'Subtitle', DeliveryMethod: 'External' },
+      { Index: 4, Type: 'Subtitle', DeliveryMethod: 'Encode' },
+      { Index: 5, Type: 'Subtitle', DeliveryMethod: 'External' }
+    ] as MediaStream[]
+  }
+
+  it('text → text: engine-only switch', () => {
+    expect(subtitleSwitchRequiresReload(sess, 3, 5)).toBe(false)
+  })
+
+  it('text → off: engine-only switch', () => {
+    expect(subtitleSwitchRequiresReload(sess, 3, null)).toBe(false)
+  })
+
+  it('off → burned: reload', () => {
+    expect(subtitleSwitchRequiresReload(sess, null, 4)).toBe(true)
+  })
+
+  it('burned → off: reload (burn-in lives in the transcoded pixels)', () => {
+    expect(subtitleSwitchRequiresReload(sess, 4, null)).toBe(true)
+  })
+
+  it('burned → text: reload', () => {
+    expect(subtitleSwitchRequiresReload(sess, 4, 3)).toBe(true)
+  })
+
+  it('off → off: nothing to do', () => {
+    expect(subtitleSwitchRequiresReload(sess, null, null)).toBe(false)
   })
 })
 

@@ -9,14 +9,15 @@ import {
 } from '../lib/jellyfin'
 import { useSettings } from '../stores/settings'
 import { useTrackMemory } from '../stores/trackMemory'
-import { useSubtitleSelection } from '../hooks/useSubtitleSelection'
 import {
+  isTextTrack,
   reportProgress,
   reportStart,
   reportStopped,
   resolveSubtitleSelection,
   startPlayback,
   stopActiveEncoding,
+  subtitleSwitchRequiresReload,
   type PlaybackSession
 } from './session'
 import { usePlayerEngine, type PlayerEngineApi } from './usePlayerEngine'
@@ -112,11 +113,11 @@ export function usePlayback(
   const [error, setError] = useState<string | null>(null)
   const [audioIndex, setAudioIndex] = useState<number | undefined>(undefined)
   const [subtitleDelay, setSubtitleDelay] = useState(0)
-  const {
-    index: subtitleIndex,
-    isText: subtitleIsText,
-    select: selectSubtitleLogic
-  } = useSubtitleSelection(session)
+  // display state only — persistence (settings/track memory) is a user-intent
+  // side effect and lives exclusively in selectSubtitle below
+  const [subtitleIndex, setSubtitleIndex] = useState<number | null>(null)
+  const subtitleIsText =
+    subtitleIndex !== null && session !== null && isTextTrack(session, subtitleIndex)
 
   const initial = useSettings.getState()
   const engine = usePlayerEngine(
@@ -192,7 +193,7 @@ export function usePlayback(
         reportStart(sess, sess.startSeconds)
 
         const sel = resolveSubtitleSelection(sess, opts.subtitleStreamIndex, settings)
-        selectSubtitleLogic(sel.display)
+        setSubtitleIndex(sel.display)
         if (sel.textTrack !== null) setTextTrack(sel.textTrack)
 
         // restore last subtitle sync offset, text tracks only
@@ -290,13 +291,27 @@ export function usePlayback(
       })
   }, [item, start, audio, sub, attempt, loadFor])
 
-  // progress reporting: every 10s + on any pause (button, hotkey, PiP, media keys)
+  // one immediate report on the playing→paused edge (button, hotkey, PiP,
+  // media keys); also keeps the ref the 10s interval below reads fresh
   const { state: engineState, currentTime } = engine
+  const engineStateRef = useRef(engineState)
+  useEffect(() => {
+    const was = engineStateRef.current
+    engineStateRef.current = engineState
+    if (engineState === 'paused' && was === 'playing') {
+      const sess = sessionRef.current
+      if (sess) reportProgress(sess, currentTime(), true)
+    }
+  }, [engineState, currentTime])
+
+  // progress reporting every 10s. Reads engine state via the ref so the
+  // interval survives play/pause/buffer flaps — recreating it on each one
+  // would reset the cadence and could starve reports on a stuttering stream.
   useEffect(() => {
     const id = setInterval(() => {
       const sess = sessionRef.current
       if (!sess) return
-      reportProgress(sess, currentTime(), engineState === 'paused')
+      reportProgress(sess, currentTime(), engineStateRef.current === 'paused')
       // keep the OS media overlay's progress bar roughly honest
       const dur = ticksToSeconds(sess.mediaSource.RunTimeTicks)
       if (dur > 0) {
@@ -311,7 +326,7 @@ export function usePlayback(
       }
     }, 10_000)
     return () => clearInterval(id)
-  }, [engineState, currentTime])
+  }, [currentTime])
 
   // OS media keys / overlay buttons
   const { togglePlay: engineTogglePlay, seekBy: engineSeekBy } = engine
@@ -339,16 +354,6 @@ export function usePlayback(
     return () => clearTimeout(id)
   }, [engineVolume, engineMuted])
 
-  const prevState = useRef(engineState)
-  useEffect(() => {
-    const was = prevState.current
-    prevState.current = engineState
-    if (engineState === 'paused' && was === 'playing') {
-      const sess = sessionRef.current
-      if (sess) reportProgress(sess, currentTime(), true)
-    }
-  }, [engineState, currentTime])
-
   // Track-switch actions below are wrapped in useCallback: they end up as
   // props on the player's track-select menus (base-ui popovers), and those
   // menus are memoized to skip the re-render every playback tick brings —
@@ -357,20 +362,33 @@ export function usePlayback(
     (index: number | null): void => {
       const sess = sessionRef.current
       if (!sess) return
-      const action = selectSubtitleLogic(index)
-      if (action === 'reload') {
+      // persist user intent — only here, never on mechanical loads
+      if (index === null) {
+        useSettings.getState().set({ subtitlesEnabled: false })
+        useTrackMemory.getState().remember(sess.item.Id, { subtitleStreamIndex: -1 })
+      } else {
+        const language = sess.subtitleStreams.find((s) => s.Index === index)?.Language
+        useSettings.getState().set({
+          subtitlesEnabled: true,
+          ...(language ? { preferredSubtitleLanguage: language } : {})
+        })
+        useTrackMemory.getState().remember(sess.item.Id, { subtitleStreamIndex: index })
+      }
+      if (subtitleSwitchRequiresReload(sess, subtitleIndex, index)) {
+        // burn-in only exists in the transcoded pixels — entering or leaving
+        // it needs a new stream (loadFor re-resolves subtitleIndex from it)
         void loadFor(sess.item, {
           startSeconds: engineCurrentTime(),
           audioStreamIndex: audioIndex,
           subtitleStreamIndex: index ?? -1,
           mediaSourceId: sess.mediaSource.Id
         })
-      } else if (action === 'setTextTrack') {
-        setTextTrack(index)
+      } else {
+        setSubtitleIndex(index)
+        setTextTrack(index) // null clears the showing track
       }
-      // else: 'disable' needs no engine action
     },
-    [selectSubtitleLogic, loadFor, engineCurrentTime, audioIndex, setTextTrack]
+    [subtitleIndex, loadFor, engineCurrentTime, audioIndex, setTextTrack]
   )
 
   const selectAudio = useCallback(

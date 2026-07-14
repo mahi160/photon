@@ -33,10 +33,12 @@ function findMpv(): string {
 }
 
 // cached availability probe — lets the renderer avoid routing playback to a
-// player that isn't installed (auto mode falls back to the built-in player)
-let mpvAvailable: boolean | null = null
+// player that isn't installed (auto mode falls back to the built-in player).
+// Only success is cached: a negative result re-probes, so installing mpv
+// mid-session works without an app restart.
+let mpvAvailable = false
 async function checkMpv(): Promise<boolean> {
-  if (mpvAvailable !== null) return mpvAvailable
+  if (mpvAvailable) return true
   mpvAvailable = await new Promise<boolean>((resolve) => {
     const child = spawn(findMpv(), ['--version'], { stdio: 'ignore' })
     child.once('error', () => resolve(false))

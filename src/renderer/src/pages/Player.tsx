@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { itemQuery, mediaSegmentsQuery } from '../lib/queries'
-import { currentSession, jf, ticksToSeconds, type ItemsResult } from '../lib/jellyfin'
+import {
+  currentSession,
+  jf,
+  secondsToTicks,
+  ticksToSeconds,
+  type ItemsResult
+} from '../lib/jellyfin'
 import { resolvePlayable, usePlayback } from '../player/usePlayback'
 import { canDirectPlay } from '../player/session'
 import { useSettings } from '../stores/settings'
@@ -102,6 +108,16 @@ function WebPlayer({
   const item = useQuery(itemQuery(itemId))
   const player = usePlayback(videoRef, item.data, search)
   const { engine, session } = player
+  // stable callbacks pulled out so hook deps can name exactly what they use
+  // (depending on `engine`/`player` themselves would churn every render)
+  const { adjustVolume, toggleMute, currentTime } = engine
+  const {
+    subtitleIsText,
+    subtitleDelay,
+    changeDelay,
+    selectSubtitle: playerSelectSubtitle,
+    playItem
+  } = player
 
   // only offer the mpv handoff when mpv is actually installed
   const [mpvOk, setMpvOk] = useState(false)
@@ -144,41 +160,32 @@ function WebPlayer({
   // aren't cheap to reconcile dozens of times a minute for nothing)
   const bumpVolume = useCallback(
     (delta: number): void => {
-      const v = Math.max(0, Math.min(1, engine.volume + delta))
-      engine.changeVolume(v)
+      const v = adjustVolume(delta)
       showToast(`Volume ${Math.round(v * 100)}%`)
     },
-    [engine.volume, engine.changeVolume, showToast]
+    [adjustVolume, showToast]
   )
 
   const toggleMuteWithToast = useCallback((): void => {
-    const next = !engine.muted
-    engine.toggleMute()
-    showToast(next ? 'Muted' : 'Unmuted')
-  }, [engine.muted, engine.toggleMute, showToast])
+    showToast(toggleMute() ? 'Muted' : 'Unmuted')
+  }, [toggleMute, showToast])
 
   // subtitle sync: shift delay by the same step as the slider, text subs only
   const shiftSubtitleDelay = useCallback(
     (step: number): void => {
-      if (player.subtitleIndex === null || !player.subtitleIsText) return
-      const d = Math.max(-10, Math.min(10, player.subtitleDelay + step))
-      player.changeDelay(d)
+      if (!subtitleIsText) return
+      const d = Math.max(-10, Math.min(10, subtitleDelay + step))
+      changeDelay(d)
       showToast(`Subtitle delay: ${d > 0 ? '+' : ''}${d.toFixed(1)}s`)
     },
-    [
-      player.subtitleIndex,
-      player.subtitleIsText,
-      player.subtitleDelay,
-      player.changeDelay,
-      showToast
-    ]
+    [subtitleIsText, subtitleDelay, changeDelay, showToast]
   )
 
   // a burned-in pick reloads the stream (server transcode start can take a
   // few seconds) — say so, instead of leaving the picker looking unresponsive
   const selectSubtitle = useCallback(
     (index: number | null): void => {
-      player.selectSubtitle(index)
+      playerSelectSubtitle(index)
       if (index === null) {
         showToast('Subtitles off')
         return
@@ -189,7 +196,7 @@ function WebPlayer({
         stream?.DeliveryMethod !== 'External' ? `Switching to ${label}…` : `Subtitles: ${label}`
       )
     },
-    [player.selectSubtitle, session, showToast]
+    [playerSelectSubtitle, session, showToast]
   )
 
   // the episode after the one playing (dock's next button); NextUp can't be
@@ -197,12 +204,13 @@ function WebPlayer({
   const playing = player.session?.item
   // server-detected intro/outro ranges (Jellyfin 10.9+, empty on older servers)
   const segments = useQuery({ ...mediaSegmentsQuery(playing?.Id ?? ''), enabled: !!playing })
-  const timeTicks = engine.time * 10_000_000
+  const timeTicks = secondsToTicks(engine.time)
   const activeSegment = segments.data?.find(
     (s) => s.Type !== 'Unknown' && timeTicks >= s.StartTicks && timeTicks < s.EndTicks
   )
-  const nextEp = useQuery({
-    queryKey: [...queryKeys.item.adjacent(playing?.Id ?? ''), 'next'],
+  // one fetch serves both directions — the adjacentTo response contains them
+  const adjacent = useQuery({
+    queryKey: queryKeys.item.adjacent(playing?.Id ?? ''),
     enabled: playing?.Type === 'Episode' && !!playing.SeriesId,
     staleTime: Infinity,
     queryFn: async () => {
@@ -210,72 +218,62 @@ function WebPlayer({
         query: { userId: currentSession()?.userId ?? '', adjacentTo: playing!.Id }
       })
       const i = r.Items.findIndex((x) => x.Id === playing!.Id)
-      return i >= 0 ? (r.Items[i + 1] ?? null) : null
+      return {
+        prev: i > 0 ? (r.Items[i - 1] ?? null) : null,
+        next: i >= 0 ? (r.Items[i + 1] ?? null) : null
+      }
     }
   })
-  const prevEp = useQuery({
-    queryKey: [...queryKeys.item.adjacent(playing?.Id ?? ''), 'prev'],
-    enabled: playing?.Type === 'Episode' && !!playing.SeriesId,
-    staleTime: Infinity,
-    queryFn: async () => {
-      const r = await jf<ItemsResult>(`/Shows/${playing!.SeriesId}/Episodes`, {
-        query: { userId: currentSession()?.userId ?? '', adjacentTo: playing!.Id }
-      })
-      const i = r.Items.findIndex((x) => x.Id === playing!.Id)
-      return i > 0 ? (r.Items[i - 1] ?? null) : null
-    }
-  })
+  const nextEp = adjacent.data?.next ?? null
+  const prevEp = adjacent.data?.prev ?? null
 
   // OS media keys / overlay buttons with explicit handlers
   useMediaSession({
     togglePlay: engine.togglePlay,
     seekBy: engine.seekBy,
     playItem: player.playItem,
-    prevEpisode: prevEp.data ?? null,
-    nextEpisode: nextEp.data ?? null
+    prevEpisode: prevEp,
+    nextEpisode: nextEp
   })
 
   // keyboard shortcuts (PRD: Navigation); repeat-guarded where holding the
   // key would flap the state instead of progressing it
-  useHotkeys(
-    {
-      space: (e) => {
-        if (!e.repeat) engine.togglePlay()
-      },
-      arrowleft: () => {
-        engine.seekBy(-10)
-        poke()
-      },
-      arrowright: () => {
-        engine.seekBy(10)
-        poke()
-      },
-      arrowup: () => bumpVolume(0.05),
-      arrowdown: () => bumpVolume(-0.05),
-      f: (e) => {
-        if (!e.repeat) toggleFullscreen()
-      },
-      p: (e) => {
-        if (!e.repeat) engine.togglePiP()
-      },
-      m: (e) => {
-        if (!e.repeat) toggleMuteWithToast()
-      },
-      '[': () => shiftSubtitleDelay(-0.5),
-      ']': () => shiftSubtitleDelay(0.5)
+  useHotkeys({
+    space: (e) => {
+      if (!e.repeat) engine.togglePlay()
     },
-    [engine, toggleFullscreen, player.subtitleIndex, player.subtitleDelay, player.subtitleIsText]
-  )
+    arrowleft: () => {
+      engine.seekBy(-10)
+      poke()
+    },
+    arrowright: () => {
+      engine.seekBy(10)
+      poke()
+    },
+    arrowup: () => bumpVolume(0.05),
+    arrowdown: () => bumpVolume(-0.05),
+    f: (e) => {
+      if (!e.repeat) toggleFullscreen()
+    },
+    p: (e) => {
+      if (!e.repeat) engine.togglePiP()
+    },
+    m: (e) => {
+      if (!e.repeat) toggleMuteWithToast()
+    },
+    '[': () => shiftSubtitleDelay(-0.5),
+    ']': () => shiftSubtitleDelay(0.5)
+  })
 
   // stable identities for the same reason as the callbacks above — these
   // feed menu/button props on the memoized part of the controls bar
   const playNextEpisode = useMemo(
-    () => (nextEp.data ? () => void player.playItem(nextEp.data!) : undefined),
-    [nextEp.data, player.playItem]
+    () => (nextEp ? () => void playItem(nextEp) : undefined),
+    [nextEp, playItem]
   )
   const openMpvAtCurrentTime = useMemo(
-    () => (onOpenMpv && mpvOk ? () => onOpenMpv(engine.currentTime()) : undefined),
-    [onOpenMpv, mpvOk, engine.currentTime]
+    () => (onOpenMpv && mpvOk ? () => onOpenMpv(currentTime()) : undefined),
+    [onOpenMpv, mpvOk, currentTime]
   )
 
   const displayDuration = engine.duration || ticksToSeconds(session?.mediaSource.RunTimeTicks)
@@ -335,8 +333,8 @@ function WebPlayer({
           audioIndex={player.audioIndex ?? session.mediaSource.DefaultAudioStreamIndex}
           subtitleIndex={player.subtitleIndex}
           subtitleDelay={player.subtitleDelay}
-          subtitleDelayEnabled={player.subtitleIsText && player.subtitleIndex !== null}
-          nextEpisode={nextEp.data ?? undefined}
+          subtitleDelayEnabled={player.subtitleIsText}
+          nextEpisode={nextEp ?? undefined}
           onPlayNext={playNextEpisode}
           activeSegment={activeSegment}
           onSkipSegment={

@@ -32,9 +32,9 @@ export interface PlayerEngineApi {
   togglePlay: () => void
   seek: (seconds: number) => void
   seekBy: (seconds: number) => void
-  changeVolume: (volume: number) => void
-  adjustVolume: (delta: number) => void
-  toggleMute: () => void
+  changeVolume: (volume: number) => number // returns the clamped volume
+  adjustVolume: (delta: number) => number // returns the clamped volume
+  toggleMute: () => boolean // returns the new muted state
   changeRate: (rate: number) => void
   setTextTrack: (index: number | null) => void
   setSubtitleDelay: (seconds: number) => void
@@ -63,7 +63,10 @@ export function usePlayerEngine(
   const [pip, setPip] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const rateRef = useRef(initial.rate)
-  const volumeRef = useRef(initial.volume) // mirror for stable adjustVolume
+  // mirrors so adjustVolume/toggleMute keep stable identities (they feed
+  // memoized controls) and can report the value they just set
+  const volumeRef = useRef(initial.volume)
+  const mutedRef = useRef(initial.muted)
 
   const ensureEngine = useCallback((): PlaybackEngine | null => {
     if (!engineRef.current && videoRef.current) {
@@ -80,6 +83,7 @@ export function usePlayerEngine(
       // and anything outside our UI (media keys, PiP window)
       e.on('volume', (v, m) => {
         volumeRef.current = v
+        mutedRef.current = m
         setVolume(v)
         setMuted(m)
       })
@@ -129,31 +133,38 @@ export function usePlayerEngine(
     e?.seek(e.currentTime() + delta)
   }, [])
 
-  const changeVolume = useCallback((v: number) => {
+  const changeVolume = useCallback((v: number): number => {
     const e = engineRef.current
     const clamped = Math.max(0, Math.min(1, v))
     volumeRef.current = clamped
     e?.setVolume(clamped)
-    if (clamped > 0) e?.setMuted(false) // raising volume implies "I want sound"
     setVolume(clamped)
-    if (clamped > 0) setMuted(false)
+    if (clamped > 0) {
+      e?.setMuted(false) // raising volume implies "I want sound"
+      mutedRef.current = false
+      setMuted(false)
+    }
+    return clamped
   }, [])
   const adjustVolume = useCallback(
-    (delta: number) => changeVolume(volumeRef.current + delta),
+    (delta: number): number => changeVolume(volumeRef.current + delta),
     [changeVolume]
   )
 
-  const toggleMute = useCallback(() => {
+  const toggleMute = useCallback((): boolean => {
     const e = engineRef.current
-    if (!e) return
-    if (muted && volumeRef.current === 0) {
+    if (!e) return mutedRef.current
+    if (mutedRef.current && volumeRef.current === 0) {
       // ponytail: unmuting at zero restores an audible level instead of staying silent
       changeVolume(0.5)
-      return
+      return false
     }
-    e.setMuted(!muted)
-    setMuted(!muted)
-  }, [muted, changeVolume])
+    const next = !mutedRef.current
+    e.setMuted(next)
+    mutedRef.current = next
+    setMuted(next)
+    return next
+  }, [changeVolume])
 
   const changeRate = useCallback((r: number) => {
     engineRef.current?.setRate(r)
