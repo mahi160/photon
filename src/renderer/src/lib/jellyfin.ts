@@ -85,25 +85,15 @@ export function normalizeServer(input: string): string {
   return s
 }
 
-export async function authenticateByName(
-  server: string,
-  username: string,
-  password: string
-): Promise<Session> {
-  const base = normalizeServer(server)
-  let res: Response
+async function fetchOrThrow(url: string, init?: RequestInit): Promise<Response> {
   try {
-    res = await fetch(`${base}/Users/AuthenticateByName`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: authHeader() },
-      body: JSON.stringify({ Username: username, Pw: password }),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
-    })
+    return await fetch(url, { ...init, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) })
   } catch {
     throw new JellyfinError(0, 'Cannot reach server.')
   }
-  if (res.status === 401) throw new JellyfinError(401, 'Incorrect username or password.')
-  if (!res.ok) throw new JellyfinError(res.status, `Sign in failed (${res.status}).`)
+}
+
+async function authSession(base: string, res: Response): Promise<Session> {
   let data: { AccessToken?: string; User?: { Id: string; Name: string } }
   try {
     data = await res.json()
@@ -119,6 +109,67 @@ export async function authenticateByName(
     userId: data.User.Id,
     userName: data.User.Name
   }
+}
+
+export async function authenticateByName(
+  server: string,
+  username: string,
+  password: string
+): Promise<Session> {
+  const base = normalizeServer(server)
+  const res = await fetchOrThrow(`${base}/Users/AuthenticateByName`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: authHeader() },
+    body: JSON.stringify({ Username: username, Pw: password })
+  })
+  if (res.status === 401) throw new JellyfinError(401, 'Incorrect username or password.')
+  if (!res.ok) throw new JellyfinError(res.status, `Sign in failed (${res.status}).`)
+  return authSession(base, res)
+}
+
+// --- Quick Connect (code-based sign-in approved from another Jellyfin app) ---
+
+export interface QuickConnectStart {
+  secret: string
+  code: string
+}
+
+export async function quickConnectInitiate(server: string): Promise<QuickConnectStart> {
+  const base = normalizeServer(server)
+  const res = await fetchOrThrow(`${base}/QuickConnect/Initiate`, {
+    method: 'POST',
+    headers: { Authorization: authHeader() }
+  })
+  if (res.status === 401) throw new JellyfinError(401, 'Quick Connect is disabled on this server.')
+  if (!res.ok) throw new JellyfinError(res.status, `Quick Connect failed (${res.status}).`)
+  const data = (await res.json()) as { Secret?: string; Code?: string }
+  if (!data.Secret || !data.Code)
+    throw new JellyfinError(res.status, 'Quick Connect failed: unexpected response from server.')
+  return { secret: data.Secret, code: data.Code }
+}
+
+// polls whether the code has been approved in another session
+export async function quickConnectAuthenticated(server: string, secret: string): Promise<boolean> {
+  const base = normalizeServer(server)
+  const res = await fetchOrThrow(
+    `${base}/QuickConnect/Connect?secret=${encodeURIComponent(secret)}`
+  )
+  if (!res.ok) throw new JellyfinError(res.status, 'Quick Connect code expired. Try again.')
+  return !!((await res.json()) as { Authenticated?: boolean }).Authenticated
+}
+
+export async function authenticateWithQuickConnect(
+  server: string,
+  secret: string
+): Promise<Session> {
+  const base = normalizeServer(server)
+  const res = await fetchOrThrow(`${base}/Users/AuthenticateWithQuickConnect`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: authHeader() },
+    body: JSON.stringify({ Secret: secret })
+  })
+  if (!res.ok) throw new JellyfinError(res.status, `Sign in failed (${res.status}).`)
+  return authSession(base, res)
 }
 
 // --- shared types (only the fields Photon reads) ---
@@ -141,6 +192,39 @@ export interface MediaStream {
   DeliveryMethod?: string
   DeliveryUrl?: string
   IsExternal?: boolean
+  Width?: number
+  Height?: number
+  VideoRangeType?: string // SDR | HDR10 | HDR10Plus | HLG | DOVI…
+  ChannelLayout?: string // '5.1', '7.1', 'stereo'
+  Profile?: string // audio profile, e.g. 'Dolby TrueHD + Dolby Atmos'
+}
+
+// short capability badges for a media source (details pages): 4K · HEVC · HDR10 · Atmos · 5.1
+export function mediaBadges(streams: MediaStream[]): string[] {
+  const v = streams.find((s) => s.Type === 'Video')
+  const a =
+    streams.find((s) => s.Type === 'Audio' && s.IsDefault) ??
+    streams.find((s) => s.Type === 'Audio')
+  const out: string[] = []
+  if (v?.Width)
+    out.push(
+      v.Width >= 3800
+        ? '4K'
+        : v.Width >= 2500
+          ? '1440p'
+          : v.Width >= 1900
+            ? '1080p'
+            : v.Width >= 1260
+              ? '720p'
+              : 'SD'
+    )
+  if (v?.Codec) out.push(v.Codec.toUpperCase())
+  const range = v?.VideoRangeType
+  if (range && range !== 'SDR')
+    out.push(range.startsWith('DOVI') ? 'Dolby Vision' : range === 'HDR10Plus' ? 'HDR10+' : range)
+  if (a?.Codec) out.push(a.Profile?.includes('Atmos') ? 'Atmos' : a.Codec.toUpperCase())
+  if (a?.ChannelLayout) out.push(a.ChannelLayout)
+  return out
 }
 
 export interface MediaSource {
@@ -160,6 +244,17 @@ export interface ChapterInfo {
   Name?: string
 }
 
+// Jellyfin 10.9+ trickplay (scrub thumbnails): tiles of thumbs per media source.
+// Outer key = mediaSourceId, inner key = width variant.
+export interface TrickplayInfo {
+  Width: number
+  Height: number
+  TileWidth: number // thumbs per tile row
+  TileHeight: number // thumb rows per tile
+  ThumbnailCount: number
+  Interval: number // ms between thumbs
+}
+
 export interface BaseItem {
   Id: string
   Name: string
@@ -168,6 +263,8 @@ export interface BaseItem {
   DateCreated?: string
   RunTimeTicks?: number
   OfficialRating?: string
+  CommunityRating?: number // 0-10 star score from the server's metadata provider
+  CriticRating?: number // 0-100, Rotten Tomatoes %
   Overview?: string
   SeriesId?: string
   SeriesName?: string
@@ -180,6 +277,7 @@ export interface BaseItem {
   UserData?: UserData
   MediaSources?: MediaSource[]
   Chapters?: ChapterInfo[]
+  Trickplay?: Record<string, Record<string, TrickplayInfo>>
 }
 
 // display title: episodes get their series/episode context
@@ -221,6 +319,34 @@ export function backdropUrl(item: BaseItem, width = 1280): string | null {
   if (item.BackdropImageTags?.length)
     return `${session.server}/Items/${item.Id}/Images/Backdrop/0?fillWidth=${width}&quality=90`
   return null
+}
+
+// which tile image holds the thumb for a timestamp, and its pixel offset within
+export function trickplayTile(
+  info: TrickplayInfo,
+  seconds: number
+): { tile: number; x: number; y: number } {
+  const perTile = info.TileWidth * info.TileHeight
+  const thumb = Math.max(
+    0,
+    Math.min(Math.floor((seconds * 1000) / info.Interval), info.ThumbnailCount - 1)
+  )
+  const inTile = thumb % perTile
+  return {
+    tile: Math.floor(thumb / perTile),
+    x: (inTile % info.TileWidth) * info.Width,
+    y: Math.floor(inTile / info.TileWidth) * info.Height
+  }
+}
+
+export function trickplayUrl(
+  itemId: string,
+  width: number,
+  tileIndex: number,
+  mediaSourceId: string
+): string | null {
+  if (!session) return null
+  return `${session.server}/Videos/${itemId}/Trickplay/${width}/${tileIndex}.jpg?mediaSourceId=${mediaSourceId}&api_key=${session.token}`
 }
 
 // untranscoded stream — used for direct play and for external players (mpv)

@@ -93,7 +93,11 @@ export const searchIndexQuery = queryOptions({
         userId: userId(),
         IncludeItemTypes: 'Movie,Series',
         Recursive: true,
-        SortBy: 'SortName'
+        SortBy: 'SortName',
+        // results render as Cards (poster + progress), so UserData/ImageTags
+        // must stay — but only the Primary image tag is ever used
+        ImageTypeLimit: 1,
+        EnableImageTypes: 'Primary'
       }
     }).then((r) => r.Items)
 })
@@ -120,7 +124,7 @@ export const itemQuery = (itemId: string) =>
     queryKey: queryKeys.item.detail(itemId),
     queryFn: () =>
       jf<BaseItem>(`/Users/${userId()}/Items/${itemId}`, {
-        query: { Fields: 'Overview,MediaSources,Chapters' }
+        query: { Fields: 'Overview,MediaSources,Chapters,Trickplay' }
       })
   })
 

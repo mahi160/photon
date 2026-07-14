@@ -22,7 +22,11 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', app
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false }
+    // refetchOnWindowFocus: the app window lives for days — coming back to it
+    // is the natural "show me what's new on the server" moment (Home's
+    // Recently Added otherwise never refreshes without a route change).
+    // staleTime still throttles: a quick alt-tab within 30s refetches nothing.
+    queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: true }
   }
 })
 

@@ -21,8 +21,12 @@ const api = {
   setAutoUpdate: (enabled: boolean): Promise<void> =>
     ipcRenderer.invoke('app:setAutoUpdate', enabled),
   getAutoUpdate: (): Promise<boolean> => ipcRenderer.invoke('app:getAutoUpdate'),
-  mpvPlay: (opts: { url: string; start: number; title: string }): Promise<boolean> =>
-    ipcRenderer.invoke('mpv:play', opts),
+  mpvPlay: (opts: {
+    url: string
+    start: number
+    title: string
+    subs?: string[]
+  }): Promise<boolean> => ipcRenderer.invoke('mpv:play', opts),
   mpvStatus: (): Promise<{ running: boolean; timePos: number; paused: boolean }> =>
     ipcRenderer.invoke('mpv:status'),
   mpvStop: (): Promise<void> => ipcRenderer.invoke('mpv:stop'),

@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron'
+import { app, ipcMain, powerSaveBlocker } from 'electron'
 import { spawn, type ChildProcess } from 'child_process'
 import { createConnection, type Socket } from 'net'
 import { existsSync } from 'fs'
@@ -23,10 +23,29 @@ let proc: ChildProcess | null = null
 let sock: Socket | null = null
 let status: MpvStatus = { running: false, timePos: 0, paused: false }
 
+// keep the display awake while mpv plays — Photon's own window is idle then,
+// so Chromium's usual video-playback wake lock doesn't apply
+let sleepBlocker: number | null = null
+function releaseSleepBlocker(): void {
+  if (sleepBlocker !== null) {
+    powerSaveBlocker.stop(sleepBlocker)
+    sleepBlocker = null
+  }
+}
+
 function findMpv(): string {
   if (process.platform === 'darwin') {
     // GUI apps on macOS don't inherit the shell PATH (homebrew arm/intel, macports)
     for (const p of ['/opt/homebrew/bin/mpv', '/usr/local/bin/mpv', '/opt/local/bin/mpv'])
+      if (existsSync(p)) return p
+  }
+  if (process.platform === 'win32') {
+    // manual installs commonly aren't on PATH (scoop/choco shims are)
+    for (const p of [
+      join(process.env['LOCALAPPDATA'] ?? '', 'Programs', 'mpv', 'mpv.exe'),
+      join(process.env['ProgramFiles'] ?? 'C:\\Program Files', 'mpv', 'mpv.exe'),
+      join(app.getPath('home'), 'scoop', 'shims', 'mpv.exe')
+    ])
       if (existsSync(p)) return p
   }
   return 'mpv'
@@ -84,6 +103,7 @@ function connect(attempt = 0): void {
 }
 
 function stop(): void {
+  releaseSleepBlocker()
   sock?.destroy()
   sock = null
   proc?.kill()
@@ -94,7 +114,10 @@ function stop(): void {
 export function registerMpv(): void {
   ipcMain.handle(
     'mpv:play',
-    async (_e, opts: { url: string; start: number; title: string }): Promise<boolean> => {
+    async (
+      _e,
+      opts: { url: string; start: number; title: string; subs?: string[] }
+    ): Promise<boolean> => {
       stop()
       const child = spawn(
         findMpv(),
@@ -102,6 +125,8 @@ export function registerMpv(): void {
           `--input-ipc-server=${socketPath}`,
           `--start=${opts.start}`,
           `--force-media-title=${opts.title}`,
+          // server-side external subtitles; mpv parses vtt/srt natively
+          ...(opts.subs ?? []).map((u) => `--sub-file=${u}`),
           '--no-terminal',
           '--border=no', // no titlebar/chrome — keeps mpv's own OSC for scrubbing
           // hides the Dock icon and global menu bar so mpv doesn't look like a
@@ -118,8 +143,10 @@ export function registerMpv(): void {
       if (!ok) return false
       proc = child
       status = { running: true, timePos: opts.start, paused: false }
+      sleepBlocker = powerSaveBlocker.start('prevent-display-sleep')
       child.on('exit', () => {
         if (proc === child) {
+          releaseSleepBlocker()
           sock?.destroy()
           sock = null
           proc = null

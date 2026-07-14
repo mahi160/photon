@@ -21,6 +21,8 @@ export function PlaybackSettings(): React.JSX.Element {
   const maxBitrate = useSettings((s) => s.maxBitrate)
   const playerMode = useSettings((s) => s.playerMode)
   const autoplayNext = useSettings((s) => s.autoplayNext)
+  const autoSkipSegments = useSettings((s) => s.autoSkipSegments)
+  const surpriseUnwatchedOnly = useSettings((s) => s.surpriseUnwatchedOnly)
   const rememberSpeed = useSettings((s) => s.rememberSpeed)
   const set = useSettings((s) => s.set)
   const [hwAccel, setHwAccel] = useState(true)
@@ -79,6 +81,26 @@ export function PlaybackSettings(): React.JSX.Element {
           label="Autoplay next episode"
           checked={autoplayNext}
           onChange={(v) => set({ autoplayNext: v })}
+        />
+      </SettingsRow>
+      <SettingsRow
+        label="Skip intros automatically"
+        hint="Also recaps and previews, when the server has detected them. Credits always show."
+      >
+        <ToggleSwitch
+          label="Skip intros automatically"
+          checked={autoSkipSegments}
+          onChange={(v) => set({ autoSkipSegments: v })}
+        />
+      </SettingsRow>
+      <SettingsRow
+        label="“Surprise me” picks unwatched only"
+        hint="Off: the random pick can include movies you’ve already seen"
+      >
+        <ToggleSwitch
+          label="Surprise me picks unwatched only"
+          checked={surpriseUnwatchedOnly}
+          onChange={(v) => set({ surpriseUnwatchedOnly: v })}
         />
       </SettingsRow>
       <SettingsRow label="Remember playback speed">

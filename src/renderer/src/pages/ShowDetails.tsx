@@ -13,6 +13,7 @@ import {
 import { queryKeys } from '../lib/queryKeys'
 import { backdropUrl, imageUrl, ticksToSeconds, type BaseItem } from '../lib/jellyfin'
 import { Tip } from '../components/Tip'
+import { Ratings } from '../components/Ratings'
 import styles from './Details.module.css'
 
 function EpisodeRow({ ep, onPlay }: { ep: BaseItem; onPlay: () => void }): React.JSX.Element {
@@ -159,6 +160,7 @@ export function ShowDetails(): React.JSX.Element {
               {meta.map((m) => (
                 <span key={String(m)}>{m}</span>
               ))}
+              <Ratings item={item} />
             </div>
             <p className={styles.overview}>{item.Overview}</p>
             {next && (

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { ticksToSeconds, type BaseItem } from '../lib/jellyfin'
+import { useEffect, useMemo, useState } from 'react'
+import { ticksToSeconds, trickplayTile, trickplayUrl, type BaseItem } from '../lib/jellyfin'
 import styles from './PlayerControls.module.css'
 
 interface Chapter {
@@ -37,6 +37,16 @@ export function TimelinePreview({
   const [preview, setPreview] = useState<{ x: number; t: number } | null>(null)
   const [showRemaining, setShowRemaining] = useState(false)
 
+  // server trickplay thumbs (Jellyfin 10.9+); absent → text-only bubble.
+  // ponytail: first media source, smallest width variant — items have one
+  // source in practice and a hover thumb doesn't need the large tiles
+  const tp = useMemo(() => {
+    const [mediaSourceId, widths] = Object.entries(item.Trickplay ?? {})[0] ?? []
+    const infos = Object.values(widths ?? {})
+    if (!mediaSourceId || !infos.length) return null
+    return { mediaSourceId, info: infos.reduce((a, b) => (a.Width <= b.Width ? a : b)) }
+  }, [item])
+
   const chapters: Chapter[] = (item.Chapters ?? [])
     .map((c) => ({ start: ticksToSeconds(c.StartPositionTicks), name: c.Name }))
     .filter((c) => c.start > 0 && c.start < duration)
@@ -70,6 +80,27 @@ export function TimelinePreview({
             className={styles.previewBubble}
             style={{ '--x': `${preview.x}px` } as React.CSSProperties}
           >
+            {tp &&
+              (() => {
+                const { tile, x, y } = trickplayTile(tp.info, preview.t)
+                const url = trickplayUrl(item.Id, tp.info.Width, tile, tp.mediaSourceId)
+                return url ? (
+                  <div
+                    className={styles.previewThumb}
+                    style={{ inlineSize: tp.info.Width, blockSize: tp.info.Height }}
+                  >
+                    {/* <img>, not background-image: load failures surface in the
+                        console instead of silently showing an empty box */}
+                    <img
+                      src={url}
+                      alt=""
+                      draggable={false}
+                      style={{ transform: `translate(-${x}px, -${y}px)` }}
+                      onError={() => console.error('[trickplay] tile failed to load', url)}
+                    />
+                  </div>
+                ) : null
+              })()}
             {previewChapter && <span className={styles.previewChapter}>{previewChapter}</span>}
             {fmt(preview.t)}
           </div>

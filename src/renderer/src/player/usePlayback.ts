@@ -9,6 +9,7 @@ import {
 } from '../lib/jellyfin'
 import { useSettings } from '../stores/settings'
 import { useTrackMemory } from '../stores/trackMemory'
+import { useWatchStats } from '../stores/watchStats'
 import {
   isTextTrack,
   reportProgress,
@@ -311,7 +312,11 @@ export function usePlayback(
     const id = setInterval(() => {
       const sess = sessionRef.current
       if (!sess) return
-      reportProgress(sess, currentTime(), engineStateRef.current === 'paused')
+      const paused = engineStateRef.current === 'paused'
+      reportProgress(sess, currentTime(), paused)
+      // local watch stats — only time actually playing counts
+      if (engineStateRef.current === 'playing')
+        useWatchStats.getState().record(sess.item, 10, false)
       // keep the OS media overlay's progress bar roughly honest
       const dur = ticksToSeconds(sess.mediaSource.RunTimeTicks)
       if (dur > 0) {
@@ -328,20 +333,8 @@ export function usePlayback(
     return () => clearInterval(id)
   }, [currentTime])
 
-  // OS media keys / overlay buttons
-  const { togglePlay: engineTogglePlay, seekBy: engineSeekBy } = engine
-  useEffect(() => {
-    const ms = navigator.mediaSession
-    ms.setActionHandler('play', () => engineTogglePlay())
-    ms.setActionHandler('pause', () => engineTogglePlay())
-    ms.setActionHandler('seekbackward', () => engineSeekBy(-10))
-    ms.setActionHandler('seekforward', () => engineSeekBy(10))
-    return () => {
-      for (const a of ['play', 'pause', 'seekbackward', 'seekforward'] as MediaSessionAction[])
-        ms.setActionHandler(a, null)
-      ms.metadata = null
-    }
-  }, [engineTogglePlay, engineSeekBy])
+  // OS media keys are registered by useMediaSession (Player page) — the
+  // single owner of that surface; this hook only sets metadata/position
 
   // volume/mute survive across sessions; debounced — a slider drag is dozens of
   // changes and each settings.set() writes localStorage

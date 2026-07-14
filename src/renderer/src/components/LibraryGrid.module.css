@@ -88,6 +88,34 @@
   gap: 1.75rem 1rem;
 }
 
+/* big libraries: skip layout/paint for offscreen cards — the CSS-only
+   virtualization; a real windowing lib only if this ever stops being enough */
+.grid > * {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 11rem auto 21rem;
+}
+
+.surpriseBtn {
+  padding: 0.3rem 0.9rem;
+  border: 1px solid var(--surface-3);
+  border-radius: var(--radius-full);
+
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+
+  transition:
+    color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.surpriseBtn:hover {
+  color: var(--fg);
+  border-color: var(--accent);
+}
+
 .gridItem {
   animation: card-rise var(--dur-slow) var(--ease-out) backwards;
 }

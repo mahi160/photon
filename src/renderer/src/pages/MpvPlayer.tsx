@@ -11,6 +11,7 @@ import {
   type BaseItem
 } from '../lib/jellyfin'
 import { resolvePlayable } from '../player/usePlayback'
+import { useWatchStats } from '../stores/watchStats'
 import {
   reportProgress,
   reportStart,
@@ -21,9 +22,10 @@ import {
 import styles from './Player.module.css'
 
 // External-player mode: mpv owns the window and all controls; Photon starts the
-// session, hands mpv the untranscoded stream and reports progress to Jellyfin.
-// ponytail: audio/subtitle choice happens inside mpv; server-side external
-// subtitle files aren't passed along. Autoplay-next doesn't apply here.
+// session, hands mpv the untranscoded stream (plus any server-side external
+// subtitle files via --sub-file) and reports progress to Jellyfin.
+// ponytail: audio/subtitle choice happens inside mpv. Autoplay-next doesn't
+// apply here.
 interface Props {
   startOverride?: number // web → mpv handoff resumes at the built-in player's position
   onFallback?: () => void
@@ -124,7 +126,10 @@ export function MpvPlayer({ startOverride, onFallback, onRequestPiP }: Props): R
         const ok = await window.api.mpvPlay({
           url: directStreamUrl(playable.Id, sess.mediaSource.Id),
           start: sess.startSeconds,
-          title: t
+          title: t,
+          // external text subs live on the server, not in the container —
+          // hand them to mpv or they'd silently not exist in this mode
+          subs: sess.textTracks.map((tt) => tt.url)
         })
         if (!ok) {
           setError('mpv not found. Install mpv or turn off "Use mpv" in Settings.')
@@ -149,6 +154,7 @@ export function MpvPlayer({ startOverride, onFallback, onRequestPiP }: Props): R
         lastPos.current = st.timePos
         setPos(st.timePos)
         reportProgress(sess, st.timePos, st.paused)
+        if (!st.paused) useWatchStats.getState().record(sess.item, 5, true)
       } else {
         sessRef.current = null
         reportStopped(sess, lastPos.current)

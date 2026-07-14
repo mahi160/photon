@@ -1,11 +1,12 @@
-import { useState } from 'react'
-import { useNavigate, useParams, useRouter } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams, useRouter, useSearch } from '@tanstack/react-router'
 import { CaretLeft, Check, Heart, Play } from 'reicon-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { itemQuery, setFavorite, setPlayed } from '../lib/queries'
 import { queryKeys } from '../lib/queryKeys'
-import { backdropUrl, imageUrl, ticksToSeconds } from '../lib/jellyfin'
+import { backdropUrl, imageUrl, mediaBadges, ticksToSeconds } from '../lib/jellyfin'
 import { Tip } from '../components/Tip'
+import { Ratings } from '../components/Ratings'
 import styles from './Details.module.css'
 
 function fmtRuntime(ticks?: number): string {
@@ -25,11 +26,29 @@ function BackButton(): React.JSX.Element {
 
 export function MovieDetails(): React.JSX.Element {
   const { itemId } = useParams({ from: '/app/shell/movies/$itemId' })
+  const { surprise } = useSearch({ from: '/app/shell/movies/$itemId' })
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { data: item, isPending, isError, refetch } = useQuery(itemQuery(itemId))
   const [audio, setAudio] = useState<number | undefined>()
   const [sub, setSub] = useState<number | undefined>()
+
+  // "Surprise me" countdown: auto-plays unless cancelled; waits for the item
+  const [countdown, setCountdown] = useState<number | null>(surprise ? 5 : null)
+  useEffect(() => {
+    if (countdown === null || !item) return
+    if (countdown <= 0) {
+      const pos = ticksToSeconds(item.UserData?.PlaybackPositionTicks)
+      navigate({
+        to: '/player/$itemId',
+        params: { itemId: item.Id },
+        search: { start: pos > 60 ? pos : 0 }
+      })
+      return
+    }
+    const t = setTimeout(() => setCountdown((c) => (c === null ? null : c - 1)), 1000)
+    return () => clearTimeout(t)
+  }, [countdown, item, navigate])
 
   const toggleWatched = useMutation({
     mutationFn: (next: boolean) => setPlayed(itemId, next),
@@ -64,6 +83,7 @@ export function MovieDetails(): React.JSX.Element {
     item.RunTimeTicks ? fmtRuntime(item.RunTimeTicks) : null,
     item.OfficialRating
   ].filter(Boolean)
+  const badges = mediaBadges(streams)
 
   function play(start: number): void {
     navigate({
@@ -113,7 +133,27 @@ export function MovieDetails(): React.JSX.Element {
               {meta.map((m) => (
                 <span key={String(m)}>{m}</span>
               ))}
+              <Ratings item={item} />
             </div>
+            {badges.length > 0 && (
+              <div className={styles.badges}>
+                {badges.map((b) => (
+                  <span key={b} className={styles.badge}>
+                    {b}
+                  </span>
+                ))}
+              </div>
+            )}
+            {countdown !== null && (
+              <div className={styles.surpriseBar}>
+                <span>
+                  Playing in {countdown}… <span className={styles.surpriseHint}>surprise pick</span>
+                </span>
+                <button onClick={() => setCountdown(null)} className={styles.playSecondary}>
+                  Cancel
+                </button>
+              </div>
+            )}
             <p className={styles.overview}>{item.Overview}</p>
             <div className={styles.actions}>
               {position > 60 && (

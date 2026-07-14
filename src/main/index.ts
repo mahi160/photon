@@ -123,7 +123,7 @@ ipcMain.handle('updater:install', () => {
 ipcMain.handle('subtitle:fetch', async (_e, url: string): Promise<string> => {
   if (!serverOrigin || new URL(url).origin !== serverOrigin)
     throw new Error('Subtitle URL not on the signed-in server')
-  const res = await fetch(url)
+  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.text()
 })

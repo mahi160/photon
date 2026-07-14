@@ -1,6 +1,9 @@
 // PlaybackEngine boundary (ADR-0002): playback primitives + events only.
 // Jellyfin sync, shortcuts, autoplay-next and subtitle styling live outside.
 
+// selectable playback rates (speed menu + < > hotkeys)
+export const speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
+
 export interface TextTrackSource {
   index: number // jellyfin stream index
   label: string

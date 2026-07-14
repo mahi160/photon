@@ -17,6 +17,7 @@ import {
   Volume
 } from 'reicon-react'
 import type { MediaStream, BaseItem } from '../lib/jellyfin'
+import { speeds } from '../player/engine'
 import { Stepper, type StepperClasses } from './Stepper'
 import { Tip } from './Tip'
 import { TrackSelectMenu } from './TrackSelectMenu'
@@ -27,8 +28,6 @@ const stepperClasses: StepperClasses = {
   btn: styles.stepBtn,
   input: styles.stepInput
 }
-
-const speeds = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
 
 export interface ControlsBarProps {
   state: 'playing' | 'paused' | 'buffering'

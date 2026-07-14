@@ -20,6 +20,8 @@ interface SettingsState {
   maxBitrate: number // bits/sec, 0 = auto (very high)
   playerMode: PlayerMode
   autoplayNext: boolean
+  autoSkipSegments: boolean // auto-skip intros/recaps/previews (never credits)
+  surpriseUnwatchedOnly: boolean // "Surprise me" picks from unwatched movies
   rememberSpeed: boolean
   lastSpeed: number
   lastVolume: number // 0..1, restored on next playback
@@ -40,6 +42,8 @@ const defaults: Omit<SettingsState, 'set' | 'reset'> = {
   maxBitrate: 0,
   playerMode: 'web',
   autoplayNext: true,
+  autoSkipSegments: false,
+  surpriseUnwatchedOnly: true,
   rememberSpeed: false,
   lastSpeed: 1,
   lastVolume: 1,

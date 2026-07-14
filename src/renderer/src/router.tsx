@@ -77,7 +77,11 @@ const settingsRoute = createRoute({
 const movieDetailsRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: '/movies/$itemId',
-  component: MovieDetails
+  component: MovieDetails,
+  // surprise=1: arrived via "Surprise me" — details page runs a cancellable
+  // auto-play countdown
+  validateSearch: (search: Record<string, unknown>): { surprise?: boolean } =>
+    search.surprise ? { surprise: true } : {}
 })
 const showDetailsRoute = createRoute({
   getParentRoute: () => shellRoute,

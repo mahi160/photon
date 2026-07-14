@@ -73,6 +73,9 @@ export function ShortcutsOverlay({
                 <Item label="Mute" keys={['M']} />
                 <Item label="Fullscreen" keys={['F']} />
                 <Item label="Picture in picture" keys={['P']} />
+                <Item label="Skip intro / segment" hint="When the skip button shows" keys={['S']} />
+                <Item label="Previous / next chapter" keys={['⇧', '← →']} />
+                <Item label="Playback speed" keys={['<', '>']} join="/" />
                 <Item
                   label="Nudge subtitle delay"
                   hint="Text subtitles only"

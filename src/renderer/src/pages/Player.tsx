@@ -13,6 +13,7 @@ import { resolvePlayable, usePlayback } from '../player/usePlayback'
 import { canDirectPlay } from '../player/session'
 import { useSettings } from '../stores/settings'
 import { PlayerControls } from '../components/PlayerControls'
+import { speeds } from '../player/engine'
 import { SubtitleStyleTag } from '../components/SubtitleStyleTag'
 import { useHotkeys } from '../lib/useHotkeys'
 import { useToast } from '../hooks/useToast'
@@ -91,6 +92,10 @@ export function Player(): React.JSX.Element {
   )
 }
 
+function segmentNoun(type: string): string {
+  return type === 'Outro' ? 'credits' : type === 'Commercial' ? 'ad' : type.toLowerCase()
+}
+
 function WebPlayer({
   startOverride,
   onOpenMpv
@@ -110,7 +115,7 @@ function WebPlayer({
   const { engine, session } = player
   // stable callbacks pulled out so hook deps can name exactly what they use
   // (depending on `engine`/`player` themselves would churn every render)
-  const { adjustVolume, toggleMute, currentTime } = engine
+  const { adjustVolume, toggleMute, currentTime, seek } = engine
   const {
     subtitleIsText,
     subtitleDelay,
@@ -208,6 +213,20 @@ function WebPlayer({
   const activeSegment = segments.data?.find(
     (s) => s.Type !== 'Unknown' && timeTicks >= s.StartTicks && timeTicks < s.EndTicks
   )
+  // auto-skip intros/recaps/previews (never credits — NextUpCard owns the end
+  // of an episode). Each segment skips once per item, so seeking back into an
+  // intro on purpose doesn't fight the user.
+  const autoSkip = useSettings((s) => s.autoSkipSegments)
+  const autoSkipped = useRef(new Set<string>())
+  useEffect(() => {
+    if (!autoSkip || !activeSegment || activeSegment.Type === 'Outro' || !playing) return
+    const key = `${playing.Id}:${activeSegment.StartTicks}`
+    if (autoSkipped.current.has(key)) return
+    autoSkipped.current.add(key)
+    seek(ticksToSeconds(activeSegment.EndTicks))
+    showToast(`Skipped ${segmentNoun(activeSegment.Type)}`)
+  }, [autoSkip, activeSegment, playing, seek, showToast])
+
   // one fetch serves both directions — the adjacentTo response contains them
   const adjacent = useQuery({
     queryKey: queryKeys.item.adjacent(playing?.Id ?? ''),
@@ -261,9 +280,42 @@ function WebPlayer({
     m: (e) => {
       if (!e.repeat) toggleMuteWithToast()
     },
+    s: (e) => {
+      if (e.repeat || !activeSegment) return
+      seek(ticksToSeconds(activeSegment.EndTicks))
+      showToast(`Skipped ${segmentNoun(activeSegment.Type)}`)
+    },
+    'shift+arrowright': () => jumpChapter(1),
+    'shift+arrowleft': () => jumpChapter(-1),
+    'shift+>': () => stepSpeed(1),
+    'shift+<': () => stepSpeed(-1),
     '[': () => shiftSubtitleDelay(-0.5),
     ']': () => shiftSubtitleDelay(0.5)
   })
+
+  // plain functions — useHotkeys reads through a ref, no stable identity needed
+  function jumpChapter(dir: 1 | -1): void {
+    const marks = (playing?.Chapters ?? []).map((c) => ticksToSeconds(c.StartPositionTicks))
+    if (!marks.length) return
+    const t = currentTime()
+    const target =
+      dir === 1 ? marks.find((m) => m > t + 1) : [...marks].reverse().find((m) => m < t - 3)
+    if (target === undefined) {
+      if (dir === -1) seek(0)
+      return
+    }
+    seek(target)
+    poke()
+    showToast(dir === 1 ? 'Next chapter' : 'Previous chapter')
+  }
+
+  function stepSpeed(dir: 1 | -1): void {
+    const i = speeds.indexOf(engine.rate)
+    const next =
+      speeds[Math.max(0, Math.min(speeds.length - 1, (i < 0 ? speeds.indexOf(1) : i) + dir))]
+    player.changeRate(next)
+    showToast(`Speed ${next}×`)
+  }
 
   // stable identities for the same reason as the callbacks above — these
   // feed menu/button props on the memoized part of the controls bar

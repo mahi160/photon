@@ -47,16 +47,20 @@ DeviceProfile — client has no custom transcoding logic or quality heuristics.
 
 ## Keyboard shortcuts
 
-| Key      | Action             |
-| -------- | ------------------ |
-| Space    | Play / pause       |
-| ← / →    | Seek ±10s          |
-| ↑ / ↓    | Volume             |
-| F        | Fullscreen         |
-| P        | Picture-in-Picture |
-| M        | Mute               |
-| Esc      | Exit fullscreen    |
-| Ctrl/⌘+F | Search             |
+| Key       | Action                  |
+| --------- | ----------------------- |
+| Space     | Play / pause            |
+| ← / →     | Seek ±10s               |
+| ↑ / ↓     | Volume                  |
+| Shift+←/→ | Previous / next chapter |
+| S         | Skip intro / segment    |
+| < / >     | Playback speed          |
+| [ / ]     | Subtitle delay          |
+| F         | Fullscreen              |
+| P         | Picture-in-Picture      |
+| M         | Mute                    |
+| Esc       | Exit fullscreen         |
+| Ctrl/⌘+F  | Search                  |
 
 ## Development
 

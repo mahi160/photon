@@ -213,7 +213,20 @@
 }
 
 .dock {
+  position: relative;
   padding: 3.5rem 1.5rem 1.25rem;
+}
+
+/* scrim/glass on a pseudo-element, not the dock itself: mask-image on the
+   parent would also fade out children that rise above it — the trickplay
+   preview bubble was invisible except its bottom slice */
+.dock::before {
+  content: '';
+  pointer-events: none;
+
+  position: absolute;
+  inset: 0;
+
   background: linear-gradient(
     to top,
     color-mix(in oklch, black 78%, transparent),
@@ -238,6 +251,7 @@
 }
 
 .dockInner {
+  position: relative; /* paints above the ::before scrim */
   inline-size: min(100%, 68rem);
   margin-inline: auto;
 }
@@ -255,8 +269,8 @@
   align-items: center;
 }
 
-/* hover timestamp (and chapter) preview — near-opaque so it stays legible
-   over bright video frames */
+/* hover timestamp (and chapter) preview — frosted glass over the video;
+   the blur keeps text legible without going near-opaque black */
 .previewBubble {
   pointer-events: none;
 
@@ -279,8 +293,24 @@
   color: white;
   white-space: nowrap;
 
-  background: color-mix(in oklch, black 94%, var(--accent-2));
+  background: color-mix(in oklch, black 55%, transparent);
+  backdrop-filter: blur(14px);
   box-shadow: var(--shadow-2);
+}
+
+.previewThumb {
+  overflow: hidden;
+
+  margin-block-end: 0.2rem;
+  border-radius: calc(var(--radius-s) - 2px);
+}
+
+/* the tile sheet must keep its natural size — any inherited max-width/height
+   rule would scale the whole sprite and break the per-thumb offsets */
+.previewThumb img {
+  display: block;
+  max-inline-size: none;
+  max-block-size: none;
 }
 
 .previewChapter {

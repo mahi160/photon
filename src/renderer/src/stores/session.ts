@@ -6,6 +6,7 @@ interface SessionState {
   session: Session | null
   restore: () => Promise<void>
   login: (server: string, username: string, password: string) => Promise<void>
+  loginWith: (session: Session) => Promise<void> // pre-authenticated (Quick Connect)
   logout: () => Promise<void>
 }
 
@@ -30,6 +31,12 @@ export const useSession = create<SessionState>((set) => ({
 
   login: async (server, username, password) => {
     const session = await authenticateByName(server, username, password)
+    configure(session)
+    await window.api.sessionSet(JSON.stringify(session))
+    set({ status: 'signedIn', session })
+  },
+
+  loginWith: async (session) => {
     configure(session)
     await window.api.sessionSet(JSON.stringify(session))
     set({ status: 'signedIn', session })

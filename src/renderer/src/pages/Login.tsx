@@ -1,18 +1,57 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useSession } from '../stores/session'
-import { JellyfinError } from '../lib/jellyfin'
+import {
+  authenticateWithQuickConnect,
+  JellyfinError,
+  normalizeServer,
+  quickConnectAuthenticated,
+  quickConnectInitiate
+} from '../lib/jellyfin'
 import { PhotonMark } from '../components/PhotonMark'
 import styles from './Login.module.css'
 
 export function Login(): React.JSX.Element {
   const login = useSession((s) => s.login)
+  const loginWith = useSession((s) => s.loginWith)
   const navigate = useNavigate()
   const [server, setServer] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // Quick Connect: show a code, poll until it's approved from another
+  // signed-in Jellyfin session, then sign in with the secret
+  const [qc, setQc] = useState<{ code: string; secret: string; server: string } | null>(null)
+
+  async function startQuickConnect(): Promise<void> {
+    setError(null)
+    try {
+      const base = normalizeServer(server)
+      const { code, secret } = await quickConnectInitiate(base)
+      setQc({ code, secret, server: base })
+    } catch (err) {
+      setError(err instanceof JellyfinError ? err.message : 'Quick Connect failed.')
+    }
+  }
+
+  useEffect(() => {
+    if (!qc) return
+    const id = setInterval(async () => {
+      try {
+        if (!(await quickConnectAuthenticated(qc.server, qc.secret))) return
+        clearInterval(id)
+        await loginWith(await authenticateWithQuickConnect(qc.server, qc.secret))
+        navigate({ to: '/' })
+      } catch (err) {
+        clearInterval(id)
+        setQc(null)
+        setError(err instanceof JellyfinError ? err.message : 'Quick Connect failed.')
+      }
+    }, 2000)
+    return () => clearInterval(id)
+  }, [qc, loginWith, navigate])
 
   async function submit(e: React.FormEvent): Promise<void> {
     e.preventDefault()
@@ -80,6 +119,28 @@ export function Login(): React.JSX.Element {
           <button type="submit" disabled={busy} className={styles.submit}>
             {busy ? 'Signing in…' : 'Sign In'}
           </button>
+          <div className={styles.divider}>or</div>
+          {qc ? (
+            <div className={styles.qcBox}>
+              <span className={styles.qcCode}>{qc.code}</span>
+              <p className={styles.qcHint}>
+                Enter this code in any signed-in Jellyfin app (Settings → Quick Connect). Waiting
+                for approval…
+              </p>
+              <button type="button" className={styles.qcCancel} onClick={() => setQc(null)}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={busy || !server.trim()}
+              className={styles.qcBtn}
+              onClick={startQuickConnect}
+            >
+              Use Quick Connect
+            </button>
+          )}
         </div>
       </form>
     </div>

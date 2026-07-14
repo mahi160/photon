@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { libraryQuery, type SortKey } from '../lib/queries'
+import { useSettings } from '../stores/settings'
 import { Card } from './Card'
 import styles from './LibraryGrid.module.css'
 
@@ -19,6 +21,18 @@ export function LibraryGrid({
 }): React.JSX.Element {
   const [sort, setSort] = useState<SortKey>('added')
   const { data, isPending, isError, refetch } = useQuery(libraryQuery(type, sort))
+  const navigate = useNavigate()
+
+  // decision-paralysis killer: random unwatched movie → details page, which
+  // runs a cancellable auto-play countdown (?surprise=1)
+  function surpriseMe(): void {
+    if (!data?.length) return
+    const unwatchedOnly = useSettings.getState().surpriseUnwatchedOnly
+    const unwatched = unwatchedOnly ? data.filter((i) => !i.UserData?.Played) : data
+    const pool = unwatched.length ? unwatched : data // everything watched → anything goes
+    const pick = pool[Math.floor(Math.random() * pool.length)]
+    navigate({ to: '/movies/$itemId', params: { itemId: pick.Id }, search: { surprise: true } })
+  }
 
   const noun = type === 'Movie' ? 'movies' : 'shows'
   const empty = !isPending && !isError && data?.length === 0
@@ -29,6 +43,11 @@ export function LibraryGrid({
         <h1 className={styles.title}>{title}</h1>
         {data && <span className={styles.count}>{`${data.length} ${noun}`}</span>}
         <div className={styles.spacer} />
+        {type === 'Movie' && !!data?.length && (
+          <button className={styles.surpriseBtn} onClick={surpriseMe}>
+            Surprise me
+          </button>
+        )}
         <div className={styles.sort} role="group" aria-label="Sort">
           {sorts.map((s) => (
             <button

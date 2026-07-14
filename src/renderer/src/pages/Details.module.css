@@ -175,6 +175,52 @@
   color: var(--fg-muted);
 }
 
+/* capability badges: 4K · HEVC · HDR10 · Atmos · 5.1 */
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+
+  margin-block-start: 0.75rem;
+}
+
+.badge {
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--surface-3);
+  border-radius: var(--radius-s);
+
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* "Surprise me" auto-play countdown */
+.surpriseBar {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+
+  max-inline-size: fit-content;
+  margin-block-start: 1.25rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--surface-3);
+  border-radius: var(--radius-s);
+
+  font-size: 0.875rem;
+
+  background: var(--surface-1);
+}
+
+.surpriseHint {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--fg-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 .overview {
   max-inline-size: 40rem;
   margin-block-start: 1.25rem;

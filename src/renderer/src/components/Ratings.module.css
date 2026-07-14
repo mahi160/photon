@@ -1,0 +1,10 @@
+.rating {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.icon {
+  inline-size: 0.8125rem;
+  block-size: 0.8125rem;
+}
