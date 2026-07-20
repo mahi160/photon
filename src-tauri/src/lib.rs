@@ -33,6 +33,9 @@ pub fn run() {
             mpv::commands::mpv_set_rate,
             mpv::commands::mpv_set_volume,
             mpv::commands::mpv_set_muted,
+            mpv::commands::mpv_add_subtitle,
+            mpv::commands::mpv_set_text_track,
+            mpv::commands::mpv_set_subtitle_delay,
             mpv::commands::mpv_set_rect,
             mpv::commands::mpv_destroy
         ])
