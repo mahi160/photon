@@ -20,6 +20,7 @@ import { useToast } from '../hooks/useToast'
 import { useMediaSession } from '../hooks/useMediaSession'
 import { useAutoHideControls } from '../hooks/useAutoHideControls'
 import { queryKeys } from '../lib/queryKeys'
+import { isTauri } from '../lib/platform'
 import { MpvPlayer } from './MpvPlayer'
 import styles from './Player.module.css'
 
@@ -109,9 +110,10 @@ function WebPlayer({
     startOverride !== undefined ? { ...routeSearch, start: startOverride } : routeSearch
   const navigate = useNavigate()
 
-  // no longer an actual <video> element (ADR-0005: mpv composites into a
-  // native surface positioned under this placeholder's on-screen rect)
-  const videoRef = useRef<HTMLDivElement>(null)
+  // Tauri: a plain placeholder div -- mpv composites into a native surface
+  // positioned under its on-screen rect (ADR-0005). Electron (until #10
+  // removes it): a real <video> element, driven by Html5Engine.
+  const videoRef = useRef<HTMLElement>(null)
   const item = useQuery(itemQuery(itemId))
   const player = usePlayback(videoRef, item.data, search)
   const { engine, session } = player
@@ -350,7 +352,11 @@ function WebPlayer({
       style={{ cursor: visible ? 'default' : 'none' }}
     >
       <SubtitleStyleTag />
-      <div ref={videoRef} className={styles.video} />
+      {isTauri() ? (
+        <div ref={videoRef as React.RefObject<HTMLDivElement>} className={styles.video} />
+      ) : (
+        <video ref={videoRef as React.RefObject<HTMLVideoElement>} className={styles.video} />
+      )}
       {player.error && (
         <div className={styles.errorLayer}>
           <p className={styles.errorText}>{player.error}</p>

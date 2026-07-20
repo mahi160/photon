@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Html5Engine } from './html5'
 import { MpvEngine } from './mpv'
+import { isTauri } from '../lib/platform'
 import type { LoadRequest, PlaybackEngine } from './engine'
 
 // Mirrors engine state into React and funnels every engine write through one
@@ -70,7 +72,13 @@ export function usePlayerEngine(
 
   const ensureEngine = useCallback((): PlaybackEngine | null => {
     if (!engineRef.current && videoRef.current) {
-      const e = new MpvEngine(videoRef.current)
+      // Tauri and Electron both still build/run this renderer during the
+      // replatform (issue #5 onward is additive) -- MpvEngine needs Tauri
+      // APIs that don't exist under Electron. Collapses to MpvEngine only
+      // once ticket #10 removes the Electron shell entirely.
+      const e = isTauri()
+        ? new MpvEngine(videoRef.current)
+        : new Html5Engine(videoRef.current as HTMLVideoElement)
       e.on('time', (t) => {
         setTime(t)
         setDuration(e.duration())

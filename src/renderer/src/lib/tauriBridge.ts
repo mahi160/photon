@@ -11,14 +11,9 @@
 // MpvPlayer, Settings) shouldn't crash in the meantime.
 import { invoke } from '@tauri-apps/api/core'
 import type { PreloadApi, UpdaterStatus } from '../../../preload/index'
+import { isTauri } from './platform'
 
-declare global {
-  interface Window {
-    __TAURI_INTERNALS__?: unknown
-  }
-}
-
-if (typeof window !== 'undefined' && window.__TAURI_INTERNALS__ && !window.api) {
+if (isTauri() && !window.api) {
   const api: PreloadApi = {
     sessionGet: () => invoke('session_get'),
     sessionSet: (value) => invoke('session_set', { value }),
