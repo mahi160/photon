@@ -22,7 +22,13 @@ body {
   font-family: var(--font-sans);
   color: var(--fg);
 
-  background: var(--bg);
+  /* no background here (ADR-0005): body/html/#root must stay fully
+     unpainted so the transparent window can show mpv's composited surface
+     through the Player page's video placeholder. Body's background used to
+     cover every pixel of the window regardless of what any descendant
+     (including Player's own already-background-less .stage) did -- every
+     OTHER page supplies its own opaque background instead (AppLayout's
+     .shell, Login's .page). */
 
   -webkit-font-smoothing: antialiased;
 }

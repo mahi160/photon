@@ -6,6 +6,9 @@
   place-items: center;
 
   block-size: 100%;
+
+  /* body no longer supplies this (ADR-0005) -- see base.css */
+  background: var(--bg);
 }
 
 /* a single beam of light crossing the dark, out of the way of the form */
