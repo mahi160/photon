@@ -1,7 +1,4 @@
-// Dedicated Vite config for hosting the existing renderer under Tauri
-// (issue #5). electron.vite.config.ts stays untouched — the Electron and
-// Tauri shells build the same src/renderer source from two separate configs
-// until issue #10 removes the Electron one.
+// Vite config for the renderer, hosted by the Tauri shell (issue #5).
 import { resolve } from 'path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
