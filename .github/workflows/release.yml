@@ -41,44 +41,17 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build:
-    needs: release
-    if: needs.release.outputs.published == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            builderArgs: --win --x64
-          - os: macos-latest
-            builderArgs: --mac --arm64
-          - os: ubuntu-latest
-            builderArgs: --linux
-    runs-on: ${{ matrix.os }}
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      CSC_IDENTITY_AUTO_DISCOVERY: false
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.release.outputs.tag }}
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
-
-      - run: pnpm build
-      - run: pnpm exec electron-builder ${{ matrix.builderArgs }} --publish always
-
+  # TODO(#11): platform builds + publish. The Electron/electron-builder path
+  # this used to run (pnpm build && electron-builder --publish, then
+  # undraft once all three succeeded) is gone (ADR-0003 onward: Tauri +
+  # in-process libmpv is the shell now) — the Tauri bundler/signing/updater
+  # replacement isn't wired up yet. Until then, semantic-release above still
+  # versions/tags/changelogs releases, but leaves them as drafts — the
+  # previous auto-undraft-once-builds-succeed step is intentionally removed
+  # rather than made to undraft a release with no binaries attached.
   publish-release:
-    needs: [release, build]
+    if: false # re-enable once #11 lands real platform builds
+    needs: [release]
     runs-on: ubuntu-latest
     steps:
       - env:

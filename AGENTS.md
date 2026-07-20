@@ -10,9 +10,11 @@ metadata/user/plugin management, casting, mobile/browser support.
 
 ## Stack
 
-Electron + React + TypeScript + Vite, TanStack Router/Query, Zustand, Tailwind v4.
-Single Jellyfin server per install. Movies/Shows grids merge all server libraries
-of that type — library boundaries are invisible in the UI.
+Tauri (Rust shell) + React + TypeScript + Vite, TanStack Router/Query, Zustand,
+Tailwind v4. In-process libmpv (render API) is the sole playback engine —
+see `src-tauri/src/mpv/` and ADR-0003/0005. Single Jellyfin server per
+install. Movies/Shows grids merge all server libraries of that type — library
+boundaries are invisible in the UI.
 
 ## Domain language
 
@@ -25,13 +27,13 @@ of that type — library boundaries are invisible in the UI.
 
 ## Architecture decisions
 
-- **PlaybackEngine interface from day one** (`src/renderer/src/player/engine.ts`).
-  The UI never touches `<video>` directly. One interface — load, play/pause, seek,
-  rate, volume, track selection, subtitle delay, PiP enter/exit — emits events
-  (time, state, ended, error). Progress sync, hotkeys, autoplay-next, subtitle
-  styling all consume events, none reach into the DOM. Deliberate one-implementation
-  interface: the planned MPV backend is a native surface, and any DOM assumption
-  leaking into the interface turns that swap into a rewrite instead of a drop-in.
+- **PlaybackEngine interface** (`src/renderer/src/player/engine.ts`). One
+  interface — load, play/pause, seek, rate, volume, track selection, subtitle
+  delay, PiP enter/exit — emits events (time, state, ended, error). Progress
+  sync, hotkeys, autoplay-next all consume events. `MpvEngine`
+  (`src/renderer/src/player/mpv.ts`) is the only implementation, backed by
+  in-process libmpv composited under a transparent window region — see
+  `docs/adr/0003` onward.
 - **Hybrid search** (`src/renderer/src/lib/search.ts`). Movies/shows: fetch a
   lightweight index (id, title, year) once per launch, fuzzy-filter locally,
   <100ms. Episodes: server-side search, debounced, results stream in — a large
@@ -40,10 +42,13 @@ of that type — library boundaries are invisible in the UI.
 
 ## Playback
 
-v1 uses Electron's HTML5 `<video>` (direct play or silent server transcode), or
-hands off to a local `mpv` process for guaranteed direct play with no
-transcoding. Server always decides direct-play/remux/transcode via an accurate
-DeviceProfile — client has no custom transcoding logic or quality heuristics.
+In-process libmpv, embedded via its render API and composited into the app's
+own window (no separate mpv window, no `--wid` embedding). Server always
+decides direct-play/remux/transcode via a DeviceProfile — client has no
+custom transcoding logic or quality heuristics.
+
+Picture-in-Picture is not yet implemented on this engine (`enterPiP`/`exitPiP`
+are no-ops) — a mini-window substitute is planned (ADR-0006) but not built.
 
 ## Keyboard shortcuts
 
@@ -66,12 +71,16 @@ DeviceProfile — client has no custom transcoding logic or quality heuristics.
 
 ```bash
 pnpm install
-pnpm dev        # run in development
-pnpm build      # typecheck + build
+pnpm dev        # run in development (Tauri)
+pnpm build      # typecheck + build + bundle
 pnpm lint       # eslint
 npx vitest run  # tests
-pnpm build:mac  # package (also build:win, build:linux)
 ```
+
+Requires Rust + a system `mpv` install (dev builds link it via pkg-config —
+`brew install mpv` on macOS). The shipped app will vendor its own LGPL libmpv
+build (ADR-0004); that vendoring isn't wired up yet, so dev builds link
+whatever `mpv` pkg-config resolves to on the machine.
 
 ## Releasing
 
@@ -79,8 +88,12 @@ Commits must follow [Conventional Commits](https://www.conventionalcommits.org/)
 (`feat:`, `fix:`, `chore:`, etc.) — enforced by commitlint (husky `commit-msg`
 hook locally, CI on PRs). Merging into `prod` runs semantic-release: computes
 next version from commit types, tags, updates `CHANGELOG.md`, drafts a GitHub
-Release. Windows/macOS/Linux builds attach to that release, which only goes
-public once all three succeed.
+Release.
+
+**Not wired up yet**: the platform-build-and-publish half of the pipeline
+(Tauri bundler artifacts, code signing, the auto-updater) — that's tracked
+work, not done. `release.yml`'s build/publish jobs are disabled until it
+lands; semantic-release itself (versioning/changelog/tagging) still runs.
 
 ## macOS Gatekeeper note
 
