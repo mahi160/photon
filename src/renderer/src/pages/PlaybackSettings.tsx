@@ -24,6 +24,7 @@ export function PlaybackSettings(): React.JSX.Element {
   const autoSkipSegments = useSettings((s) => s.autoSkipSegments)
   const surpriseUnwatchedOnly = useSettings((s) => s.surpriseUnwatchedOnly)
   const rememberSpeed = useSettings((s) => s.rememberSpeed)
+  const mpvConfig = useSettings((s) => s.mpvConfig)
   const set = useSettings((s) => s.set)
   const [hwAccel, setHwAccel] = useState(true)
 
@@ -108,6 +109,19 @@ export function PlaybackSettings(): React.JSX.Element {
           label="Remember playback speed"
           checked={rememberSpeed}
           onChange={(v) => set({ rememberSpeed: v })}
+        />
+      </SettingsRow>
+      <SettingsRow
+        label="mpv config"
+        hint="Advanced: raw key=value mpv options, applied on top of Photon's defaults (e.g. subtitle appearance). Takes effect on next playback."
+      >
+        <textarea
+          className={`${styles.select} ${styles.mpvConfigInput}`}
+          value={mpvConfig}
+          onChange={(e) => set({ mpvConfig: e.target.value })}
+          placeholder={'sub-font-size=64\nsub-color=#00FF00'}
+          spellCheck={false}
+          aria-label="mpv config"
         />
       </SettingsRow>
     </SettingsSection>

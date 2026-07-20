@@ -79,6 +79,16 @@
   font-family: var(--font-mono);
 }
 
+.mpvConfigInput {
+  inline-size: 22rem;
+  min-block-size: 5rem;
+  padding: 0.5rem 0.7rem;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
 .toggle {
   display: flex;
   flex-shrink: 0;

@@ -32,6 +32,9 @@ interface SettingsState {
   subtitlesEnabled: boolean
   preferredAudioLanguage: string // ISO 639-2, '' = server default. Kept in sync with the player.
   lastSubtitleDelay: number // seconds, restored on next playback
+  // mpv (issue #9): raw `key=value` lines, applied as extra mpv options at
+  // launch on top of Photon's default subtitle appearance. See mpvConfig.ts.
+  mpvConfig: string
   // general
   theme: 'dark' | 'light' | 'system'
   set: (partial: Partial<Omit<SettingsState, 'set'>>) => void
@@ -60,6 +63,7 @@ const defaults: Omit<SettingsState, 'set' | 'reset'> = {
   subtitlesEnabled: true,
   preferredAudioLanguage: '',
   lastSubtitleDelay: 0,
+  mpvConfig: '',
   theme: 'dark'
 }
 

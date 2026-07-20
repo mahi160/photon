@@ -1,6 +1,8 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { EngineEvents, LoadRequest, PlaybackEngine } from './engine'
+import { parseMpvConfig } from './mpvConfig'
+import { useSettings } from '../stores/settings'
 
 type Listeners = { [K in keyof EngineEvents]: Set<EngineEvents[K]> }
 
@@ -48,7 +50,8 @@ export class MpvEngine implements PlaybackEngine {
   private subtitleSids = new Map<number, number>()
 
   constructor(private element: HTMLElement) {
-    this.ready = invoke('mpv_attach').then(() => this.syncRect())
+    const extraConfig = parseMpvConfig(useSettings.getState().mpvConfig)
+    this.ready = invoke('mpv_attach', { extraConfig }).then(() => this.syncRect())
 
     this.resizeObserver = new ResizeObserver(() => this.syncRect())
     this.resizeObserver.observe(element)
