@@ -16,8 +16,7 @@ interface Tick {
 
 // PlaybackEngine backed by in-process libmpv (render API, ADR-0003/0005),
 // composited under `element`'s on-screen rect instead of a <video> tag — see
-// src-tauri/src/mpv/engine.rs. No subtitles/PiP yet (tickets #7/#8): those
-// methods are no-ops here.
+// src-tauri/src/mpv/engine.rs. PiP is a no-op here (deprioritized, #8).
 //
 // currentTime()/duration()/paused()/buffered() are synchronous per the
 // PlaybackEngine contract, but IPC to Rust is inherently async — this class
@@ -44,6 +43,9 @@ export class MpvEngine implements PlaybackEngine {
   private resizeObserver: ResizeObserver
   private rectListenersAbort = new AbortController()
   private ready: Promise<void>
+  // jellyfin stream index -> mpv's track id ("sid") for the current file,
+  // populated by load() as it adds each external text subtitle
+  private subtitleSids = new Map<number, number>()
 
   constructor(private element: HTMLElement) {
     this.ready = invoke('mpv_attach').then(() => this.syncRect())
@@ -97,9 +99,20 @@ export class MpvEngine implements PlaybackEngine {
 
   async load(req: LoadRequest): Promise<void> {
     await this.ready
+    this.subtitleSids.clear()
     await invoke('mpv_load', { url: req.url, startSeconds: req.startSeconds })
-    // ponytail: req.textTracks ignored until #7 — no subtitles on this
-    // engine yet, matching ticket #6's explicit scope
+    // mpv fetches subtitle URLs itself (its own HTTP stack, no CORS) — unlike
+    // html5.ts there's no need to fetch/blob these through the main process
+    await Promise.all(
+      req.textTracks.map(async (t) => {
+        try {
+          const sid = await invoke<number>('mpv_add_subtitle', { url: t.url, lang: t.language })
+          this.subtitleSids.set(t.index, sid)
+        } catch (e) {
+          console.error('[playback] subtitle add failed', t.label, e)
+        }
+      })
+    )
   }
 
   play(): void {
@@ -126,12 +139,13 @@ export class MpvEngine implements PlaybackEngine {
     void invoke('mpv_set_muted', { muted })
   }
 
-  // ponytail: subtitles land in #7 — no-op until then
-  setTextTrack(): void {
-    /* no-op until #7 */
+  setTextTrack(index: number | null): void {
+    const sid = index === null ? null : (this.subtitleSids.get(index) ?? null)
+    void invoke('mpv_set_text_track', { sid })
   }
-  setSubtitleDelay(): void {
-    /* no-op until #7 */
+
+  setSubtitleDelay(seconds: number): void {
+    void invoke('mpv_set_subtitle_delay', { seconds })
   }
 
   // ponytail: PiP is deprioritized (#8) — no-op until then
@@ -168,6 +182,7 @@ export class MpvEngine implements PlaybackEngine {
     this.rectListenersAbort.abort()
     for (const un of this.unlisten) un()
     this.unlisten = []
+    this.subtitleSids.clear()
     void invoke('mpv_destroy')
   }
 }
