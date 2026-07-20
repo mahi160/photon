@@ -1,7 +1,6 @@
 mod commands;
 mod mpv;
 
-use commands::AppState;
 use mpv::commands::MpvState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -11,7 +10,6 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
-        .manage(AppState::default())
         .manage(MpvState::default())
         .invoke_handler(tauri::generate_handler![
             commands::session_get,
@@ -24,7 +22,6 @@ pub fn run() {
             commands::app_get_login_item,
             commands::app_set_hw_accel,
             commands::app_get_hw_accel,
-            commands::subtitle_fetch,
             mpv::commands::mpv_attach,
             mpv::commands::mpv_load,
             mpv::commands::mpv_play,

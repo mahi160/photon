@@ -1,48 +1,22 @@
 //! Non-player IPC surface (issue #5): session storage, app/window info,
-//! launch-at-login, hardware-acceleration pref, and the subtitle CORS proxy.
-//! Playback (mpv:*) and updater commands are out of scope here — tickets
-//! #6/#10 (player) and #11 (release pipeline) respectively.
+//! launch-at-login, hardware-acceleration pref. Playback (mpv:*) and updater
+//! commands live elsewhere (mpv module) / aren't ported yet (ticket #11).
 
 use keyring::Entry;
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::sync::Mutex;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Manager};
 
 const KEYRING_SERVICE: &str = "dev.photon";
 const KEYRING_USER: &str = "session";
 
-/// Origin of the signed-in Jellyfin server, remembered from the session
-/// payload so `subtitle_fetch` can't be used as an arbitrary URL fetcher.
-pub struct AppState {
-    server_origin: Mutex<Option<String>>,
-}
-
-impl Default for AppState {
-    fn default() -> Self {
-        Self { server_origin: Mutex::new(None) }
-    }
-}
-
-fn remember_origin(state: &AppState, session_json: &str) {
-    let origin = serde_json::from_str::<serde_json::Value>(session_json)
-        .ok()
-        .and_then(|v| v.get("server").and_then(|s| s.as_str()).map(str::to_string))
-        .and_then(|server| url::Url::parse(&server).ok())
-        .map(|u| u.origin().ascii_serialization());
-    *state.server_origin.lock().unwrap() = origin;
+#[tauri::command]
+pub fn session_get() -> Option<String> {
+    Entry::new(KEYRING_SERVICE, KEYRING_USER).ok()?.get_password().ok()
 }
 
 #[tauri::command]
-pub fn session_get(state: State<'_, AppState>) -> Option<String> {
-    let value = Entry::new(KEYRING_SERVICE, KEYRING_USER).ok()?.get_password().ok()?;
-    remember_origin(&state, &value);
-    Some(value)
-}
-
-#[tauri::command]
-pub fn session_set(state: State<'_, AppState>, value: String) -> bool {
-    remember_origin(&state, &value);
+pub fn session_set(value: String) -> bool {
     match Entry::new(KEYRING_SERVICE, KEYRING_USER) {
         Ok(entry) => entry.set_password(&value).is_ok(),
         Err(_) => false,
@@ -50,8 +24,7 @@ pub fn session_set(state: State<'_, AppState>, value: String) -> bool {
 }
 
 #[tauri::command]
-pub fn session_clear(state: State<'_, AppState>) {
-    *state.server_origin.lock().unwrap() = None;
+pub fn session_clear() {
     if let Ok(entry) = Entry::new(KEYRING_SERVICE, KEYRING_USER) {
         let _ = entry.delete_credential();
     }
@@ -129,24 +102,3 @@ pub fn app_set_hw_accel(app: AppHandle, enabled: bool) {
 pub fn app_get_hw_accel(app: AppHandle) -> bool {
     !read_prefs(&app).disable_hw_accel
 }
-
-#[tauri::command]
-pub async fn subtitle_fetch(state: State<'_, AppState>, url: String) -> Result<String, String> {
-    let origin = state.server_origin.lock().unwrap().clone();
-    let target = url::Url::parse(&url).map_err(|e| e.to_string())?;
-    let target_origin = target.origin().ascii_serialization();
-    if origin.as_deref() != Some(target_origin.as_str()) {
-        return Err("Subtitle URL not on the signed-in server".into());
-    }
-    let res = reqwest::Client::new()
-        .get(url)
-        .timeout(std::time::Duration::from_secs(10))
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    if !res.status().is_success() {
-        return Err(format!("{}", res.status()));
-    }
-    res.text().await.map_err(|e| e.to_string())
-}
-
