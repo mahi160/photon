@@ -104,22 +104,24 @@ where
 pub fn spawn_render_loop<R: Runtime>(app: AppHandle<R>) {
     std::thread::spawn(move || loop {
         // ponytail: fixed-rate poll, not vsync/update-callback driven (see
-        // engine.rs doc). Empirically tested on real 4K-backing-store
-        // hardware: 60fps (16ms) and even 30fps (33ms) saturate the main
-        // thread badly enough to beachball the whole window -- every tick
-        // allocates a fresh multi-MB frame buffer + CGImage (see render()'s
-        // doc), and at this resolution that's real work. 5fps (200ms) is the
-        // fastest rate that stayed responsive; visibly choppy, known ceiling.
-        // Upgrade path: reuse/pool buffers instead of a fresh Vec per frame,
-        // and/or move the CGImage build off the main thread.
-        std::thread::sleep(std::time::Duration::from_millis(200));
-        let tick_app = app.clone();
-        let _ = app.run_on_main_thread(move || {
-            if let Some(state) = tick_app.try_state::<MpvState>() {
-                if let Some(engine) = state.0.lock().unwrap().as_ref() {
-                    engine.render();
-                }
+        // engine.rs doc). render() now runs directly on this background
+        // thread instead of being marshalled onto the main thread every
+        // tick -- even after rendering at point resolution instead of full
+        // Retina backing resolution (quarter the bytes), the per-frame
+        // buffer alloc + CGImage build was still enough main-thread work to
+        // beachball the window at 30fps. CALayer.contents is documented as
+        // safe to set from a background thread (Core Animation's own
+        // threading model, unlike most of AppKit) -- this is the standard
+        // technique real custom video-compositing code uses for exactly
+        // this reason. `self.view`'s *other* AppKit calls (setFrame:,
+        // setHidden:) still only ever happen from set_rect() on the main
+        // thread (a Tauri command); render()'s own NSView touches are read
+        // only (bounds/isHidden/layer getters).
+        std::thread::sleep(std::time::Duration::from_millis(16));
+        if let Some(state) = app.try_state::<MpvState>() {
+            if let Some(engine) = state.0.lock().unwrap().as_ref() {
+                engine.render();
             }
-        });
+        }
     });
 }

@@ -372,9 +372,16 @@ impl MpvEngine {
             if hidden == YES {
                 return;
             }
+            // ponytail: rendering at *point* resolution, not the 2x/HiDPI
+            // backing-store resolution `convertRectToBacking:` would give us.
+            // Quarters the per-frame buffer/CGImage cost on Retina displays,
+            // which is what actually made 30fps possible instead of
+            // beachballing (see spawn_render_loop's doc) -- most streamed
+            // video isn't native 4K anyway, so this is rarely a visible loss.
+            // CALayer's default contentsScale (1.0) matches a point-sized
+            // image correctly; no extra config needed.
             let bounds: NSRect = msg_send![self.view, bounds];
-            let backing: NSRect = msg_send![self.view, convertRectToBacking: bounds];
-            let (w, h) = (backing.size.width as i32, backing.size.height as i32);
+            let (w, h) = (bounds.size.width as i32, bounds.size.height as i32);
             if w <= 0 || h <= 0 {
                 return;
             }
@@ -427,6 +434,14 @@ impl MpvEngine {
             );
             let layer: id = msg_send![self.view, layer];
             let _: () = msg_send![layer, setContents: (image.as_ptr() as id)];
+            // Core Animation normally flushes implicit transactions on the
+            // next run-loop pass of whichever thread touched the layer --
+            // this render loop runs on a plain std::thread with no run loop
+            // at all, so without an explicit flush the contents change just
+            // sits pending forever (screen shows the punched-through hole to
+            // nothing: solid black) even though mpv genuinely produced a
+            // real frame. Forces it to the window server immediately.
+            let _: () = msg_send![class!(CATransaction), flush];
         }
     }
 }
