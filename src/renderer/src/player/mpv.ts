@@ -1,0 +1,173 @@
+import { invoke } from '@tauri-apps/api/core'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import type { EngineEvents, LoadRequest, PlaybackEngine } from './engine'
+
+type Listeners = { [K in keyof EngineEvents]: Set<EngineEvents[K]> }
+
+interface Tick {
+  time: number
+  duration: number
+  paused: boolean
+  coreIdle: boolean
+  buffered: number
+  volume: number
+  muted: boolean
+}
+
+// PlaybackEngine backed by in-process libmpv (render API, ADR-0003/0005),
+// composited under `element`'s on-screen rect instead of a <video> tag — see
+// src-tauri/src/mpv/engine.rs. No subtitles/PiP yet (tickets #7/#8): those
+// methods are no-ops here.
+//
+// currentTime()/duration()/paused()/buffered() are synchronous per the
+// PlaybackEngine contract, but IPC to Rust is inherently async — this class
+// mirrors the last "mpv://tick" snapshot locally instead of round-tripping.
+export class MpvEngine implements PlaybackEngine {
+  private listeners: Listeners = {
+    time: new Set(),
+    state: new Set(),
+    ended: new Set(),
+    error: new Set(),
+    pip: new Set(),
+    volume: new Set()
+  }
+  private last: Tick = {
+    time: 0,
+    duration: 0,
+    paused: true,
+    coreIdle: false,
+    buffered: 0,
+    volume: 1,
+    muted: false
+  }
+  private unlisten: UnlistenFn[] = []
+  private resizeObserver: ResizeObserver
+  private rectListenersAbort = new AbortController()
+  private ready: Promise<void>
+
+  constructor(private element: HTMLElement) {
+    this.ready = invoke('mpv_attach').then(() => this.syncRect())
+
+    this.resizeObserver = new ResizeObserver(() => this.syncRect())
+    this.resizeObserver.observe(element)
+    // element size doesn't change on scroll/window move, but its on-screen
+    // *position* does — mpv's surface is positioned in window-local
+    // coordinates, so any of these can shift it
+    const signal = this.rectListenersAbort.signal
+    window.addEventListener('resize', this.syncRect, { signal })
+    window.addEventListener('scroll', this.syncRect, { signal, capture: true })
+
+    void listen<Tick>('mpv://tick', ({ payload }) => {
+      const prev = this.last
+      // duration/buffered have no dedicated event on this interface —
+      // `last` is updated before emitting so duration()/buffered() are
+      // already fresh for anything reading them off the 'time' callback
+      this.last = payload
+      this.emit('time', payload.time)
+      if (payload.paused !== prev.paused || payload.coreIdle !== prev.coreIdle) {
+        this.emit('state', payload.paused ? 'paused' : payload.coreIdle ? 'buffering' : 'playing')
+      }
+      if (payload.volume !== prev.volume || payload.muted !== prev.muted) {
+        this.emit('volume', payload.volume, payload.muted)
+      }
+    }).then((un) => this.unlisten.push(un))
+
+    void listen('mpv://ended', () => this.emit('ended')).then((un) => this.unlisten.push(un))
+    void listen<string>('mpv://error', ({ payload }) => {
+      console.error('[playback] mpv error', payload)
+      this.emit('error', 'Playback failed.')
+    }).then((un) => this.unlisten.push(un))
+  }
+
+  private emit<K extends keyof EngineEvents>(event: K, ...args: Parameters<EngineEvents[K]>): void {
+    for (const cb of this.listeners[event]) (cb as (...a: unknown[]) => void)(...args)
+  }
+
+  // top-left CSS px, matching engine.rs's expectation
+  private syncRect = (): void => {
+    const r = this.element.getBoundingClientRect()
+    const visible = r.width > 0 && r.height > 0 && !document.hidden
+    void invoke('mpv_set_rect', {
+      x: r.left,
+      y: r.top,
+      w: visible ? r.width : 0,
+      h: visible ? r.height : 0
+    })
+  }
+
+  async load(req: LoadRequest): Promise<void> {
+    await this.ready
+    await invoke('mpv_load', { url: req.url, startSeconds: req.startSeconds })
+    // ponytail: req.textTracks ignored until #7 — no subtitles on this
+    // engine yet, matching ticket #6's explicit scope
+  }
+
+  play(): void {
+    void invoke('mpv_play')
+  }
+
+  pause(): void {
+    void invoke('mpv_pause')
+  }
+
+  seek(seconds: number): void {
+    void invoke('mpv_seek', { seconds: Math.max(0, seconds) })
+  }
+
+  setRate(rate: number): void {
+    void invoke('mpv_set_rate', { rate })
+  }
+
+  setVolume(volume: number): void {
+    void invoke('mpv_set_volume', { volume: Math.max(0, Math.min(1, volume)) })
+  }
+
+  setMuted(muted: boolean): void {
+    void invoke('mpv_set_muted', { muted })
+  }
+
+  // ponytail: subtitles land in #7 — no-op until then
+  setTextTrack(): void {
+    /* no-op until #7 */
+  }
+  setSubtitleDelay(): void {
+    /* no-op until #7 */
+  }
+
+  // ponytail: PiP is deprioritized (#8) — no-op until then
+  async enterPiP(): Promise<void> {
+    /* no-op until #8 */
+  }
+  async exitPiP(): Promise<void> {
+    /* no-op until #8 */
+  }
+
+  currentTime(): number {
+    return this.last.time
+  }
+
+  duration(): number {
+    return this.last.duration
+  }
+
+  paused(): boolean {
+    return this.last.paused
+  }
+
+  buffered(): number {
+    return this.last.buffered
+  }
+
+  on<K extends keyof EngineEvents>(event: K, cb: EngineEvents[K]): () => void {
+    this.listeners[event].add(cb)
+    return () => this.listeners[event].delete(cb)
+  }
+
+  destroy(): void {
+    this.resizeObserver.disconnect()
+    this.rectListenersAbort.abort()
+    for (const un of this.unlisten) un()
+    this.unlisten = []
+    void invoke('mpv_destroy')
+  }
+}
