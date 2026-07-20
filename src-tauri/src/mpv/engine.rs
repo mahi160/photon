@@ -79,9 +79,14 @@ fn check(rc: i32, what: &str) -> Result<(), String> {
     Ok(())
 }
 
+// Silently no-ops (doesn't panic) on a key/value containing an embedded NUL,
+// which CString::new rejects — our own call sites are static strings that
+// never hit this, but the raw mpv-config passthrough (#9) is arbitrary user
+// input, and a malformed line there must never crash playback.
 unsafe fn set_option(mpv: *mut mpv_handle, name: &str, value: &str) {
-    let name = CString::new(name).unwrap();
-    let value = CString::new(value).unwrap();
+    let (Ok(name), Ok(value)) = (CString::new(name), CString::new(value)) else {
+        return;
+    };
     unsafe {
         mpv_set_option_string(mpv, name.as_ptr(), value.as_ptr());
     }
@@ -95,7 +100,11 @@ unsafe fn observe(mpv: *mut mpv_handle, id: u64, name: &str, format: mpv_format)
 }
 
 impl MpvEngine {
-    pub fn attach<R: Runtime>(app: &AppHandle<R>, window: &WebviewWindow<R>) -> Result<Self, String> {
+    pub fn attach<R: Runtime>(
+        app: &AppHandle<R>,
+        window: &WebviewWindow<R>,
+        extra_config: &[(String, String)],
+    ) -> Result<Self, String> {
         unsafe {
             let ns_window = window.ns_window().map_err(|e| e.to_string())? as id;
             let content_view: id = CocoaNSWindow::contentView(ns_window);
@@ -160,7 +169,26 @@ impl MpvEngine {
             set_option(mpv, "terminal", "no");
             set_option(mpv, "input-default-bindings", "no");
             set_option(mpv, "input-vo-keyboard", "no");
-            // subtitles/PiP land in #7/#8 — no sub renderer config needed yet
+
+            // Sane default subtitle appearance (issue #9): outlined text, no
+            // background box, legible at a normal viewing distance without any
+            // settings UI. PiP lands in #8.
+            set_option(mpv, "sub-font-size", "48");
+            set_option(mpv, "sub-color", "#FFFFFFFF");
+            set_option(mpv, "sub-border-color", "#FF000000");
+            set_option(mpv, "sub-border-size", "2.5");
+            set_option(mpv, "sub-back-color", "#00000000");
+            set_option(mpv, "sub-shadow-offset", "0");
+
+            // Raw mpv-config passthrough (issue #9): applied after the
+            // defaults above, so the user's values win for whatever keys they
+            // set. This is deliberately unsandboxed — a power-user field, not
+            // exposed to normal users; someone pasting e.g. `osc=yes` can
+            // reintroduce mpv's own OSC, which is an accepted risk of "raw
+            // passthrough", not a bug.
+            for (key, value) in extra_config {
+                set_option(mpv, key, value);
+            }
 
             check(mpv_initialize(mpv), "mpv_initialize")?;
 

@@ -6,13 +6,17 @@ use tauri::{AppHandle, Manager, Runtime, State};
 pub struct MpvState(pub Mutex<Option<MpvEngine>>);
 
 #[tauri::command]
-pub fn mpv_attach<R: Runtime>(app: AppHandle<R>, state: State<'_, MpvState>) -> Result<(), String> {
+pub fn mpv_attach<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, MpvState>,
+    extra_config: Vec<(String, String)>,
+) -> Result<(), String> {
     let mut slot = state.0.lock().unwrap();
     if slot.is_some() {
         return Ok(()); // idempotent — usePlayerEngine only constructs the engine once
     }
     let window = app.get_webview_window("main").ok_or("no main window")?;
-    *slot = Some(MpvEngine::attach(&app, &window)?);
+    *slot = Some(MpvEngine::attach(&app, &window, &extra_config)?);
     Ok(())
 }
 
