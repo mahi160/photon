@@ -6,11 +6,7 @@ use tauri::{AppHandle, Manager, Runtime, State};
 pub struct MpvState(pub Mutex<Option<MpvEngine>>);
 
 #[tauri::command]
-pub fn mpv_attach<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, MpvState>,
-    extra_config: Vec<(String, String)>,
-) -> Result<(), String> {
+pub fn mpv_attach<R: Runtime>(app: AppHandle<R>, state: State<'_, MpvState>, extra_config: Vec<(String, String)>) -> Result<(), String> {
     let mut slot = state.0.lock().unwrap();
     if slot.is_some() {
         return Ok(()); // idempotent — usePlayerEngine only constructs the engine once
@@ -107,7 +103,16 @@ where
 /// isn't update-callback-driven yet).
 pub fn spawn_render_loop<R: Runtime>(app: AppHandle<R>) {
     std::thread::spawn(move || loop {
-        std::thread::sleep(std::time::Duration::from_millis(16));
+        // ponytail: fixed-rate poll, not vsync/update-callback driven (see
+        // engine.rs doc). Empirically tested on real 4K-backing-store
+        // hardware: 60fps (16ms) and even 30fps (33ms) saturate the main
+        // thread badly enough to beachball the whole window -- every tick
+        // allocates a fresh multi-MB frame buffer + CGImage (see render()'s
+        // doc), and at this resolution that's real work. 5fps (200ms) is the
+        // fastest rate that stayed responsive; visibly choppy, known ceiling.
+        // Upgrade path: reuse/pool buffers instead of a fresh Vec per frame,
+        // and/or move the CGImage build off the main thread.
+        std::thread::sleep(std::time::Duration::from_millis(200));
         let tick_app = app.clone();
         let _ = app.run_on_main_thread(move || {
             if let Some(state) = tick_app.try_state::<MpvState>() {

@@ -1,30 +1,61 @@
-//! In-process libmpv render-API engine (ADR-0003/0005, proven by issue #4's
-//! spike): composites mpv's OpenGL output into an NSOpenGLView inserted below
-//! the window's (transparent) WKWebView, at a rect the frontend keeps synced
-//! to a placeholder DOM element. No subtitles/PiP yet (tickets #7/#8).
+//! In-process libmpv render-API engine (ADR-0003/0005).
+//!
+//! Renders via mpv's *software* render API (`MPV_RENDER_API_TYPE_SW`) into a
+//! plain buffer, then hands each frame to a `CALayer` (via `layer.contents`)
+//! on a layer-backed `NSView` inserted below the window's (transparent)
+//! WKWebView, at a rect the frontend keeps synced to a placeholder DOM
+//! element. No subtitles/PiP yet (tickets #7/#8).
+//!
+//! ponytail: NOT the OpenGL render API, on purpose. Tried that first
+//! (`MPV_RENDER_API_TYPE_OPENGL` into an `NSOpenGLView`) and it rendered
+//! successfully (mpv reported no errors, playback ticked forward correctly)
+//! but only ever painted flat gray, never real frames. Researched rather
+//! than guessed further: `NSOpenGLView` is not layer-backed, so it composites
+//! through a legacy pre-Core-Animation "surface" plane that doesn't blend
+//! correctly with a modern layer-backed (Metal) `WKWebView` above it — and
+//! independently, transparent OpenGL surfaces have been broken on macOS
+//! since 10.11 (`NSOpenGLCPSurfaceOpacity` is simply ignored). Layer-backing
+//! an `NSOpenGLView` directly is also documented to cause distortion/severe
+//! performance loss. The software render API sidesteps all of it: a plain
+//! `CALayer.contents = CGImage` assignment is native, fully-supported
+//! Core Animation compositing, no OpenGL/Core-Animation interop involved.
+//! Slower than GPU rendering (mpv's own docs: "very slow, because everything
+//! ... runs on the CPU") and allocates a fresh frame buffer every render —
+//! correct-first; a buffer pool / IOSurface zero-copy path is real upgrade
+//! work, not done here.
 //!
 //! ponytail: render loop is a fixed ~60fps timer tick (see `spawn_render_loop`
 //! in commands.rs), not driven by `mpv_render_context_set_update_callback` +
-//! a display link — same known ceiling the spike flagged. Upgrade path:
-//! wire the update callback once this is proven out in the real app.
+//! a display link — same known ceiling the spike flagged.
 
 use cocoa::appkit::NSWindow as CocoaNSWindow;
-use cocoa::base::{id, nil, BOOL, NO, YES};
+use cocoa::base::{id, nil, BOOL, YES};
 use cocoa::foundation::{NSPoint, NSRect, NSSize};
+use core_graphics::color_space::CGColorSpace;
+use core_graphics::data_provider::CGDataProvider;
+use core_graphics::image::{CGImage, CGImageAlphaInfo};
+use foreign_types::ForeignType;
 use libmpv_sys::*;
+
+// libmpv-sys 3.1.0's published pregenerated bindings predate mpv's software
+// render API (added upstream well after that snapshot was taken) even though
+// our actual installed mpv (0.41.0) headers have it -- confirmed by grepping
+// them directly. Regenerating via the crate's own `use-bindgen` feature was
+// the "correct" fix, but its pinned bindgen (0.54, ~2020) can't parse our
+// current headers at all (panics on an anonymous union). These four values
+// are stable/documented in mpv's render.h and unlikely to ever change
+// (they're a public C API), so defining them locally is the pragmatic fix.
+const MPV_RENDER_PARAM_SW_SIZE: mpv_render_param_type = 17;
+const MPV_RENDER_PARAM_SW_FORMAT: mpv_render_param_type = 18;
+const MPV_RENDER_PARAM_SW_STRIDE: mpv_render_param_type = 19;
+const MPV_RENDER_PARAM_SW_POINTER: mpv_render_param_type = 20;
+const MPV_RENDER_API_TYPE_SW: &[u8] = b"sw\0";
 use objc::{class, msg_send, sel, sel_impl};
 use std::ffi::{c_void, CStr, CString};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use tauri::{AppHandle, Emitter, Runtime, WebviewWindow};
-
-const NS_OPENGL_PFA_ACCELERATED: u32 = 73;
-const NS_OPENGL_PFA_DOUBLE_BUFFER: u32 = 5;
-const NS_OPENGL_PFA_COLOR_SIZE: u32 = 8;
-const NS_OPENGL_PFA_ALPHA_SIZE: u32 = 11;
-const NS_OPENGL_PFA_DEPTH_SIZE: u32 = 12;
-const NS_OPENGL_CP_SURFACE_OPACITY: i32 = 236;
 
 /// Snapshot pushed to the frontend on every observed-property change.
 #[derive(Clone, serde::Serialize)]
@@ -47,8 +78,7 @@ impl Default for Tick {
 pub struct MpvEngine {
     mpv: *mut mpv_handle,
     render_ctx: *mut mpv_render_context,
-    gl_view: id,
-    gl_context: id,
+    view: id, // plain, layer-backed NSView — not an NSOpenGLView, see module doc
     stop: Arc<AtomicBool>,
     observer: Option<JoinHandle<()>>,
     // ponytail: `seek` right after `loadfile` races the (async) load and
@@ -56,20 +86,16 @@ pub struct MpvEngine {
     // here and applied by the observer thread on MPV_EVENT_FILE_LOADED,
     // when the core is actually ready to accept it.
     pending_start: Arc<Mutex<f64>>,
+    // created once — CGColorSpace is the same for every frame, no reason to
+    // recreate it 5x/sec
+    colorspace: CGColorSpace,
 }
 
-// Cocoa views/GL context are only ever touched from the main thread; the raw
+// Cocoa view/layer calls are only ever made from the main thread; the raw
 // mpv handle/render context are only touched from the main thread (commands,
 // render ticks) and the dedicated observer thread, which mpv's C API allows.
 unsafe impl Send for MpvEngine {}
 unsafe impl Sync for MpvEngine {}
-
-unsafe extern "C" fn get_proc_address(
-    _ctx: *mut c_void,
-    name: *const std::os::raw::c_char,
-) -> *mut c_void {
-    unsafe { libc::dlsym(libc::RTLD_DEFAULT, name) as *mut c_void }
-}
 
 fn check(rc: i32, what: &str) -> Result<(), String> {
     if rc < 0 {
@@ -109,52 +135,22 @@ impl MpvEngine {
             let ns_window = window.ns_window().map_err(|e| e.to_string())? as id;
             let content_view: id = CocoaNSWindow::contentView(ns_window);
 
-            let attrs: [u32; 10] = [
-                NS_OPENGL_PFA_ACCELERATED,
-                NS_OPENGL_PFA_DOUBLE_BUFFER,
-                NS_OPENGL_PFA_COLOR_SIZE,
-                24,
-                NS_OPENGL_PFA_ALPHA_SIZE,
-                8,
-                NS_OPENGL_PFA_DEPTH_SIZE,
-                24,
-                0,
-                0,
-            ];
-            let pixel_format: id = msg_send![class!(NSOpenGLPixelFormat), alloc];
-            let pixel_format: id = msg_send![pixel_format, initWithAttributes: attrs.as_ptr()];
-            if pixel_format.is_null() {
-                return Err("no matching GL pixel format".into());
-            }
-
             let zero_frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(0.0, 0.0));
-            let gl_view: id = msg_send![class!(NSOpenGLView), alloc];
-            let gl_view: id = msg_send![gl_view, initWithFrame: zero_frame pixelFormat: pixel_format];
-            if gl_view.is_null() {
-                return Err("failed to create NSOpenGLView".into());
+            let view: id = msg_send![class!(NSView), alloc];
+            let view: id = msg_send![view, initWithFrame: zero_frame];
+            if view.is_null() {
+                return Err("failed to create NSView".into());
             }
-            // initWithFrame:pixelFormat: retains its own reference to the pixel
-            // format; release ours now that the view owns one
-            let _: () = msg_send![pixel_format, release];
-
-            let gl_context: id = msg_send![gl_view, openGLContext];
-            let opacity: i32 = 0;
-            let _: () =
-                msg_send![gl_context, setValues: &opacity forParameter: NS_OPENGL_CP_SURFACE_OPACITY];
-
-            let autoresize_none: u64 = 0; // positioned explicitly on every rect update, no autoresize
-            let _: () = msg_send![gl_view, setAutoresizingMask: autoresize_none];
-            let _: () = msg_send![gl_view, setWantsBestResolutionOpenGLSurface: YES];
-            let _: () = msg_send![gl_view, setHidden: YES]; // hidden until the frontend reports a real rect
+            let _: () = msg_send![view, setWantsLayer: YES];
+            let _: () = msg_send![view, setAutoresizingMask: 0u64]; // positioned explicitly on every rect update
+            let _: () = msg_send![view, setHidden: YES]; // hidden until the frontend reports a real rect
 
             let below: isize = -1; // NSWindowBelow (NSWindowOrderingMode is a signed NSInteger)
-            let _: () = msg_send![content_view, addSubview: gl_view positioned: below relativeTo: nil];
-            // addSubview: retains gl_view; release our own alloc'd reference now
-            // that the content view owns one (removeFromSuperview in Drop below
-            // releases that one in turn)
-            let _: () = msg_send![gl_view, release];
-
-            let _: () = msg_send![gl_context, makeCurrentContext];
+            let _: () = msg_send![content_view, addSubview: view positioned: below relativeTo: nil];
+            // addSubview: retains view; release our own alloc'd reference now
+            // that the content view owns one (removeFromSuperview in Drop
+            // below releases that one in turn)
+            let _: () = msg_send![view, release];
 
             let mpv = mpv_create();
             if mpv.is_null() {
@@ -165,7 +161,7 @@ impl MpvEngine {
             set_option(mpv, "osc", "no");
             set_option(mpv, "osd-level", "0");
             set_option(mpv, "keep-open", "yes");
-            set_option(mpv, "hwdec", "auto-safe");
+            set_option(mpv, "hwdec", "no"); // software render API only ever gets software-decoded frames anyway
             set_option(mpv, "terminal", "no");
             set_option(mpv, "input-default-bindings", "no");
             set_option(mpv, "input-vo-keyboard", "no");
@@ -192,20 +188,11 @@ impl MpvEngine {
 
             check(mpv_initialize(mpv), "mpv_initialize")?;
 
-            let api_type_ptr = MPV_RENDER_API_TYPE_OPENGL.as_ptr() as *const std::os::raw::c_char;
-            let mut gl_init_params = mpv_opengl_init_params {
-                get_proc_address: Some(get_proc_address),
-                get_proc_address_ctx: std::ptr::null_mut(),
-                extra_exts: std::ptr::null(),
-            };
+            let api_type_ptr = MPV_RENDER_API_TYPE_SW.as_ptr() as *const std::os::raw::c_char;
             let mut params = [
                 mpv_render_param {
                     type_: mpv_render_param_type_MPV_RENDER_PARAM_API_TYPE,
                     data: api_type_ptr as *mut c_void,
-                },
-                mpv_render_param {
-                    type_: mpv_render_param_type_MPV_RENDER_PARAM_OPENGL_INIT_PARAMS,
-                    data: &mut gl_init_params as *mut _ as *mut c_void,
                 },
                 mpv_render_param {
                     type_: mpv_render_param_type_MPV_RENDER_PARAM_INVALID,
@@ -230,7 +217,15 @@ impl MpvEngine {
             let pending_start = Arc::new(Mutex::new(0.0));
             let observer = spawn_observer(app.clone(), mpv, stop.clone(), pending_start.clone());
 
-            Ok(Self { mpv, render_ctx, gl_view, gl_context, stop, observer: Some(observer), pending_start })
+            Ok(Self {
+                mpv,
+                render_ctx,
+                view,
+                stop,
+                observer: Some(observer),
+                pending_start,
+                colorspace: CGColorSpace::create_device_rgb(),
+            })
         }
     }
 
@@ -346,61 +341,92 @@ impl MpvEngine {
         }
     }
 
-    /// Repositions the GL surface to the given content-view-local rect
-    /// (points, top-left origin, matching `getBoundingClientRect()`), or
-    /// hides it entirely when the placeholder isn't visible/mounted.
+    /// Repositions the surface to the given content-view-local rect (points,
+    /// top-left origin, matching `getBoundingClientRect()`), or hides it
+    /// entirely when the placeholder isn't visible/mounted.
     pub fn set_rect(&self, x: f64, y_top_left: f64, w: f64, h: f64) {
         unsafe {
             if w <= 0.0 || h <= 0.0 {
-                let _: () = msg_send![self.gl_view, setHidden: YES];
+                let _: () = msg_send![self.view, setHidden: YES];
                 return;
             }
-            let superview: id = msg_send![self.gl_view, superview];
+            let superview: id = msg_send![self.view, superview];
             let parent_bounds: NSRect = msg_send![superview, bounds];
             // AppKit's NSView origin is bottom-left; the frontend reports
             // top-left (CSS) coordinates.
             let y = parent_bounds.size.height - y_top_left - h;
             let frame = NSRect::new(NSPoint::new(x, y), NSSize::new(w, h));
-            let _: () = msg_send![self.gl_view, setFrame: frame];
-            let _: () = msg_send![self.gl_context, update];
-            let _: () = msg_send![self.gl_view, setHidden: NO as BOOL];
+            let _: () = msg_send![self.view, setFrame: frame];
+            let _: () = msg_send![self.view, setHidden: cocoa::base::NO as BOOL];
         }
         self.render();
     }
 
+    /// Renders one frame into an in-memory buffer and hands it to the
+    /// view's layer as a `CGImage` (see module doc for why this is the
+    /// software render API, not OpenGL). Called on a fixed timer tick from
+    /// the main thread.
     pub fn render(&self) {
         unsafe {
-            let hidden: BOOL = msg_send![self.gl_view, isHidden];
+            let hidden: BOOL = msg_send![self.view, isHidden];
             if hidden == YES {
                 return;
             }
-            let _: () = msg_send![self.gl_context, makeCurrentContext];
-            let bounds: NSRect = msg_send![self.gl_view, bounds];
-            let backing: NSRect = msg_send![self.gl_view, convertRectToBacking: bounds];
+            let bounds: NSRect = msg_send![self.view, bounds];
+            let backing: NSRect = msg_send![self.view, convertRectToBacking: bounds];
             let (w, h) = (backing.size.width as i32, backing.size.height as i32);
             if w <= 0 || h <= 0 {
                 return;
             }
 
-            let mut fbo = mpv_opengl_fbo { fbo: 0, w, h, internal_format: 0 };
-            let mut flip: std::os::raw::c_int = 1;
-            let mut render_params = [
+            let stride: usize = (w as usize) * 4;
+            let mut frame = vec![0u8; stride * (h as usize)];
+
+            let mut size = [w, h];
+            let format = CString::new("rgb0").unwrap(); // opaque RGB + padding byte, no real alpha needed
+            let mut stride_val: usize = stride;
+            let mut params = [
                 mpv_render_param {
-                    type_: mpv_render_param_type_MPV_RENDER_PARAM_OPENGL_FBO,
-                    data: &mut fbo as *mut _ as *mut c_void,
+                    type_: MPV_RENDER_PARAM_SW_SIZE,
+                    data: size.as_mut_ptr() as *mut c_void,
                 },
                 mpv_render_param {
-                    type_: mpv_render_param_type_MPV_RENDER_PARAM_FLIP_Y,
-                    data: &mut flip as *mut _ as *mut c_void,
+                    type_: MPV_RENDER_PARAM_SW_FORMAT,
+                    data: format.as_ptr() as *mut c_void,
+                },
+                mpv_render_param {
+                    type_: MPV_RENDER_PARAM_SW_STRIDE,
+                    data: &mut stride_val as *mut _ as *mut c_void,
+                },
+                mpv_render_param {
+                    type_: MPV_RENDER_PARAM_SW_POINTER,
+                    data: frame.as_mut_ptr() as *mut c_void,
                 },
                 mpv_render_param {
                     type_: mpv_render_param_type_MPV_RENDER_PARAM_INVALID,
                     data: std::ptr::null_mut(),
                 },
             ];
-            mpv_render_context_render(self.render_ctx, render_params.as_mut_ptr());
-            mpv_render_context_report_swap(self.render_ctx);
-            let _: () = msg_send![self.gl_context, flushBuffer];
+            let rc = mpv_render_context_render(self.render_ctx, params.as_mut_ptr());
+            if rc < 0 {
+                return; // no frame ready yet or a transient error — try again next tick
+            }
+
+            let provider = CGDataProvider::from_buffer(Arc::new(frame));
+            let image = CGImage::new(
+                w as usize,
+                h as usize,
+                8,
+                32,
+                stride,
+                &self.colorspace,
+                CGImageAlphaInfo::CGImageAlphaNoneSkipLast as u32,
+                &provider,
+                false,
+                0, // kCGRenderingIntentDefault
+            );
+            let layer: id = msg_send![self.view, layer];
+            let _: () = msg_send![layer, setContents: (image.as_ptr() as id)];
         }
     }
 }
@@ -415,7 +441,7 @@ impl Drop for MpvEngine {
             let _ = h.join();
         }
         unsafe {
-            let _: () = msg_send![self.gl_view, removeFromSuperview];
+            let _: () = msg_send![self.view, removeFromSuperview];
             mpv_render_context_free(self.render_ctx);
             mpv_terminate_destroy(self.mpv);
         }
