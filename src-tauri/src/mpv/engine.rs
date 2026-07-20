@@ -242,6 +242,60 @@ impl MpvEngine {
         unsafe { self.set_flag("mute", muted) }
     }
 
+    /// Adds an external text subtitle (server-delivered VTT/SRT URL — mpv
+    /// fetches it itself via its own HTTP stack, so unlike the browser this
+    /// has no CORS restriction, no subtitle_fetch proxy needed here).
+    /// Returns mpv's assigned track id ("sid") for later reselection via
+    /// `set_text_track`.
+    ///
+    /// ponytail: tried the documented approach first — `sub-add ... auto`
+    /// then reading its command_ret/mpv_node result, which the manual says
+    /// carries the new track's id. Verified (against raw mpv IPC, not just
+    /// this FFI layer) that this mpv build returns `null` there instead.
+    /// `sub-add ... select` immediately makes the new track current, so
+    /// reading the now-current "sid" property right after (mpv_command is
+    /// synchronous — it only returns once the command has been processed)
+    /// reliably gives the right id. Momentarily selecting each track while
+    /// mapping is harmless: `load()`'s caller always follows up with an
+    /// explicit `set_text_track` for whichever one the user actually wants.
+    pub fn add_subtitle(&self, url: &str, lang: Option<&str>) -> Result<i64, String> {
+        let lang = lang.unwrap_or("");
+        self.command(&["sub-add", url, "select", "", lang])?;
+        let name = CString::new("sid").unwrap();
+        let mut sid: i64 = -1;
+        unsafe {
+            check(
+                mpv_get_property(self.mpv, name.as_ptr(), mpv_format_MPV_FORMAT_INT64, &mut sid as *mut _ as *mut c_void),
+                "mpv_get_property (sid)",
+            )?;
+        }
+        Ok(sid)
+    }
+
+    /// `sid`: mpv's track id from `add_subtitle`, or `None` to disable subs.
+    pub fn set_text_track(&self, sid: Option<i64>) -> Result<(), String> {
+        let name = CString::new("sid").unwrap();
+        unsafe {
+            match sid {
+                Some(id) => {
+                    let mut v = id;
+                    check(
+                        mpv_set_property(self.mpv, name.as_ptr(), mpv_format_MPV_FORMAT_INT64, &mut v as *mut _ as *mut c_void),
+                        "mpv_set_property (sid)",
+                    )
+                }
+                None => {
+                    let no = CString::new("no").unwrap();
+                    check(mpv_set_property_string(self.mpv, name.as_ptr(), no.as_ptr()), "mpv_set_property_string (sid=no)")
+                }
+            }
+        }
+    }
+
+    pub fn set_subtitle_delay(&self, seconds: f64) -> Result<(), String> {
+        unsafe { self.set_double("sub-delay", seconds) }
+    }
+
     unsafe fn set_flag(&self, name: &str, value: bool) -> Result<(), String> {
         let cname = CString::new(name).unwrap();
         let mut v: std::os::raw::c_int = if value { 1 } else { 0 };
