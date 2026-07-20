@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { UpdaterStatus } from '../../../preload/index'
+import type { UpdaterStatus } from '../lib/api'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSession } from '../stores/session'
@@ -7,7 +7,6 @@ import { useSettings } from '../stores/settings'
 import { ToggleSwitch } from '../components/ToggleSwitch'
 import { AppearanceSettings } from './AppearanceSettings'
 import { PlaybackSettings } from './PlaybackSettings'
-import { SubtitleSettings } from './SubtitleSettings'
 import { StatsSettings } from './StatsSettings'
 import { SettingsSection, SettingsRow } from './SettingsSection'
 import styles from './Settings.module.css'
@@ -96,7 +95,6 @@ export function Settings(): React.JSX.Element {
           </SettingsSection>
 
           <PlaybackSettings />
-          <SubtitleSettings />
 
           <SettingsSection title="Server">
             <SettingsRow
@@ -151,7 +149,7 @@ export function Settings(): React.JSX.Element {
             </SettingsRow>
             <SettingsRow
               label="Acknowledgements"
-              hint="Electron, React, TanStack, Zustand, mpv, and the Jellyfin project"
+              hint="Tauri, React, TanStack, Zustand, mpv, and the Jellyfin project"
             />
           </SettingsSection>
         </>

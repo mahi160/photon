@@ -44,7 +44,6 @@ export interface Props {
   onSubtitleDelay: (s: number) => void
   onFullscreen: () => void
   onPiP: () => void
-  onOpenMpv?: () => void
 }
 
 export function PlayerControls(p: Props): React.JSX.Element {
@@ -198,7 +197,6 @@ export function PlayerControls(p: Props): React.JSX.Element {
               onSubtitleDelay={p.onSubtitleDelay}
               onFullscreen={p.onFullscreen}
               onPiP={p.onPiP}
-              onOpenMpv={p.onOpenMpv}
             />
           </div>
         </div>

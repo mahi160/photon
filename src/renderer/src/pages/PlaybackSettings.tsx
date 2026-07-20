@@ -11,15 +11,8 @@ const bitrates = [
   { value: 4_000_000, label: '4 Mbps' }
 ]
 
-const playerModes = [
-  { value: 'web', label: 'Built-in' },
-  { value: 'auto', label: 'Built-in · mpv when transcoding' },
-  { value: 'mpv', label: 'Always mpv' }
-] as const
-
 export function PlaybackSettings(): React.JSX.Element {
   const maxBitrate = useSettings((s) => s.maxBitrate)
-  const playerMode = useSettings((s) => s.playerMode)
   const autoplayNext = useSettings((s) => s.autoplayNext)
   const autoSkipSegments = useSettings((s) => s.autoSkipSegments)
   const surpriseUnwatchedOnly = useSettings((s) => s.surpriseUnwatchedOnly)
@@ -57,25 +50,6 @@ export function PlaybackSettings(): React.JSX.Element {
             void window.api.setHwAccel(v)
           }}
         />
-      </SettingsRow>
-      <SettingsRow
-        label="Player"
-        hint="mpv plays in its own window, avoids transcoding (requires mpv). Picture-in-Picture always switches to the built-in player."
-      >
-        <select
-          className={styles.select}
-          value={playerMode}
-          onChange={(e) =>
-            set({ playerMode: e.target.value as (typeof playerModes)[number]['value'] })
-          }
-          aria-label="Player"
-        >
-          {playerModes.map((m) => (
-            <option key={m.value} value={m.value}>
-              {m.label}
-            </option>
-          ))}
-        </select>
       </SettingsRow>
       <SettingsRow label="Autoplay next episode">
         <ToggleSwitch

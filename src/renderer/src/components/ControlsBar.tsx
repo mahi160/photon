@@ -3,7 +3,6 @@ import { Menu as BaseMenu } from '@base-ui/react/menu'
 import { Select as BaseSelect } from '@base-ui/react/select'
 import { Popover as BasePopover } from '@base-ui/react/popover'
 import {
-  ArrowUpRightSquare,
   Cc,
   Headphones,
   History,
@@ -58,7 +57,6 @@ export interface ControlsBarProps {
   onSubtitleDelay: (s: number) => void
   onFullscreen: () => void
   onPiP: () => void
-  onOpenMpv?: () => void
 }
 
 function EndTimeDisplay({
@@ -106,7 +104,6 @@ type PlaybackMenusProps = Pick<
   | 'onSubtitleDelay'
   | 'onFullscreen'
   | 'onPiP'
-  | 'onOpenMpv'
 >
 
 const PlaybackMenus = memo(function PlaybackMenus({
@@ -126,8 +123,7 @@ const PlaybackMenus = memo(function PlaybackMenus({
   onSelectSubtitle,
   onSubtitleDelay,
   onFullscreen,
-  onPiP,
-  onOpenMpv
+  onPiP
 }: PlaybackMenusProps): React.JSX.Element {
   return (
     <>
@@ -242,14 +238,6 @@ const PlaybackMenus = memo(function PlaybackMenus({
         </BasePopover.Portal>
       </BasePopover.Root>
 
-      {onOpenMpv && (
-        <Tip label="Open in mpv">
-          <button className={styles.iconBtn} onClick={onOpenMpv} aria-label="Open in mpv">
-            <ArrowUpRightSquare className={styles.icon} />
-          </button>
-        </Tip>
-      )}
-
       <Tip label={pip ? 'Exit Picture in Picture' : 'Picture in Picture'} kbd="P">
         <button
           className={`${styles.iconBtn} ${pip ? styles.iconBtnActive : ''}`}
@@ -297,8 +285,7 @@ export function ControlsBar({
   onSelectSubtitle,
   onSubtitleDelay,
   onFullscreen,
-  onPiP,
-  onOpenMpv
+  onPiP
 }: ControlsBarProps): React.JSX.Element {
   return (
     <div className={styles.controlsRow}>
@@ -366,7 +353,6 @@ export function ControlsBar({
         onSubtitleDelay={onSubtitleDelay}
         onFullscreen={onFullscreen}
         onPiP={onPiP}
-        onOpenMpv={onOpenMpv}
       />
     </div>
   )

@@ -1,5 +1,13 @@
-// Accurate Chromium DeviceProfile — the server decides direct-play/remux/transcode
-// and the user never sees which (PRD: API Usage).
+// DeviceProfile — the server decides direct-play/remux/transcode and the
+// user never sees which (PRD: API Usage).
+//
+// ponytail: still queries the *webview's* (WKWebView) MediaSource support,
+// a leftover from the HTML5 <video> engine. mpv (the sole engine now, see
+// ADR-0003) can direct-play a much broader codec set than any webview —
+// this under-claims capability and can cause needless transcodes. Reporting
+// mpv's actual decoder support here is real follow-up work, not a quick
+// fix (needs querying mpv's decoder list and translating it into Jellyfin's
+// DeviceProfile shape), tracked separately from this cleanup pass.
 
 // bitrate sent when the user picks "Auto" (settings.maxBitrate = 0)
 export const AUTO_BITRATE = 140_000_000
@@ -16,8 +24,8 @@ export function buildDeviceProfile(maxBitrate: number): object {
   const h264 = 'h264'
   const videoCodecs = [h264]
   // gate every non-h264 codec the same way — an unchecked codec here claims
-  // direct-play support this Electron's Chromium may not actually decode,
-  // and the server has no way to know that (it just trusts the profile)
+  // direct-play support the webview may not actually decode, and the server
+  // has no way to know that (it just trusts the profile)
   if (supported('video/webm; codecs="vp9"')) videoCodecs.push('vp9')
   if (supported('video/mp4; codecs="av01.0.05M.08"')) videoCodecs.push('av1')
   if (supported('video/mp4; codecs="hvc1.1.6.L93.B0"')) videoCodecs.push('hevc')

@@ -9,111 +9,29 @@ import {
   ticksToSeconds,
   type ItemsResult
 } from '../lib/jellyfin'
-import { resolvePlayable, usePlayback } from '../player/usePlayback'
-import { canDirectPlay } from '../player/session'
+import { usePlayback } from '../player/usePlayback'
 import { useSettings } from '../stores/settings'
 import { PlayerControls } from '../components/PlayerControls'
 import { speeds } from '../player/engine'
-import { SubtitleStyleTag } from '../components/SubtitleStyleTag'
 import { useHotkeys } from '../lib/useHotkeys'
 import { useToast } from '../hooks/useToast'
 import { useMediaSession } from '../hooks/useMediaSession'
 import { useAutoHideControls } from '../hooks/useAutoHideControls'
 import { queryKeys } from '../lib/queryKeys'
-import { isTauri } from '../lib/platform'
-import { MpvPlayer } from './MpvPlayer'
 import styles from './Player.module.css'
-
-// One state machine for player routing: engine is 'web', 'mpv', or null while
-// the 'auto' probe is in flight. mpv falling over (not installed) or a PiP
-// request both collapse to the built-in player — setEngine('web') is the only
-// transition. 'auto' probes the server once: direct play stays in the
-// built-in player, anything that would transcode is handed to mpv (which
-// plays the original file).
-// ponytail: decided at play start only — a mid-session reload that flips to
-// transcoding (e.g. an audio switch) stays in the built-in player.
-export function Player(): React.JSX.Element {
-  const mode = useSettings((s) => s.playerMode)
-  const { itemId } = useParams({ from: '/app/player/$itemId' })
-  const search = useSearch({ from: '/app/player/$itemId' })
-  const navigate = useNavigate()
-  const [engine, setEngine] = useState<'web' | 'mpv' | null>(mode === 'auto' ? null : mode)
-  // handoffs in either direction resume the other player at the last position
-  const [resume, setResume] = useState<number | undefined>(undefined)
-  const handoff = (to: 'web' | 'mpv') => (pos: number) => {
-    setResume(pos)
-    setEngine(to)
-  }
-  const [failed, setFailed] = useState(false)
-  const item = useQuery({ ...itemQuery(itemId), enabled: engine === null })
-  const probedFor = useRef<string | null>(null)
-
-  useEffect(() => {
-    const it = item.data
-    if (engine !== null || !it || probedFor.current === it.Id) return
-    probedFor.current = it.Id
-    const settings = useSettings.getState()
-    // probe and availability check are independent — run them together; never
-    // route to a player that isn't installed (the server can transcode for
-    // the built-in player instead)
-    Promise.all([
-      resolvePlayable(it).then((playable) =>
-        canDirectPlay(playable, {
-          audioStreamIndex: search.audio,
-          subtitleStreamIndex: search.sub,
-          maxBitrate: settings.maxBitrate || undefined
-        })
-      ),
-      window.api.mpvCheck()
-    ])
-      .then(([direct, mpvOk]) => setEngine(!direct && mpvOk ? 'mpv' : 'web'))
-      .catch(() => setFailed(true))
-  }, [engine, item.data, search.audio, search.sub])
-
-  if (engine === 'mpv')
-    return (
-      <MpvPlayer
-        startOverride={resume}
-        onFallback={() => setEngine('web')}
-        onRequestPiP={handoff('web')}
-      />
-    )
-  if (engine === 'web') return <WebPlayer startOverride={resume} onOpenMpv={handoff('mpv')} />
-  return (
-    <div className={styles.stage}>
-      {failed && (
-        <div className={styles.errorLayer}>
-          <p className={styles.errorText}>Playback failed.</p>
-          <button onClick={() => navigate({ to: '/' })} className={styles.errorBack}>
-            Back to Home
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
 
 function segmentNoun(type: string): string {
   return type === 'Outro' ? 'credits' : type === 'Commercial' ? 'ad' : type.toLowerCase()
 }
 
-function WebPlayer({
-  startOverride,
-  onOpenMpv
-}: {
-  startOverride?: number
-  onOpenMpv?: (pos: number) => void
-}): React.JSX.Element {
+export function Player(): React.JSX.Element {
   const { itemId } = useParams({ from: '/app/player/$itemId' })
-  const routeSearch = useSearch({ from: '/app/player/$itemId' })
-  const search =
-    startOverride !== undefined ? { ...routeSearch, start: startOverride } : routeSearch
+  const search = useSearch({ from: '/app/player/$itemId' })
   const navigate = useNavigate()
 
-  // Tauri: a plain placeholder div -- mpv composites into a native surface
-  // positioned under its on-screen rect (ADR-0005). Electron (until #10
-  // removes it): a real <video> element, driven by Html5Engine.
-  const videoRef = useRef<HTMLElement>(null)
+  // mpv composites into a native surface positioned under this placeholder's
+  // on-screen rect (ADR-0005)
+  const videoRef = useRef<HTMLDivElement>(null)
   const item = useQuery(itemQuery(itemId))
   const player = usePlayback(videoRef, item.data, search)
   const { engine, session } = player
@@ -127,12 +45,6 @@ function WebPlayer({
     selectSubtitle: playerSelectSubtitle,
     playItem
   } = player
-
-  // only offer the mpv handoff when mpv is actually installed
-  const [mpvOk, setMpvOk] = useState(false)
-  useEffect(() => {
-    void window.api.mpvCheck().then(setMpvOk)
-  }, [])
 
   // extract toast and auto-hide controls
   const { message: toast, show: showToast } = useToast(1200)
@@ -327,10 +239,6 @@ function WebPlayer({
     () => (nextEp ? () => void playItem(nextEp) : undefined),
     [nextEp, playItem]
   )
-  const openMpvAtCurrentTime = useMemo(
-    () => (onOpenMpv && mpvOk ? () => onOpenMpv(currentTime()) : undefined),
-    [onOpenMpv, mpvOk, currentTime]
-  )
 
   const displayDuration = engine.duration || ticksToSeconds(session?.mediaSource.RunTimeTicks)
 
@@ -351,12 +259,7 @@ function WebPlayer({
       }}
       style={{ cursor: visible ? 'default' : 'none' }}
     >
-      <SubtitleStyleTag />
-      {isTauri() ? (
-        <div ref={videoRef as React.RefObject<HTMLDivElement>} className={styles.video} />
-      ) : (
-        <video ref={videoRef as React.RefObject<HTMLVideoElement>} className={styles.video} />
-      )}
+      <div ref={videoRef} className={styles.video} />
       {player.error && (
         <div className={styles.errorLayer}>
           <p className={styles.errorText}>{player.error}</p>
@@ -413,7 +316,6 @@ function WebPlayer({
           onSubtitleDelay={player.changeDelay}
           onFullscreen={toggleFullscreen}
           onPiP={engine.togglePiP}
-          onOpenMpv={openMpvAtCurrentTime}
         />
       )}
       {toast && <div className={styles.toast}>{toast}</div>}
