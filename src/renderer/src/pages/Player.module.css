@@ -2,7 +2,10 @@
   position: relative;
   overflow: hidden;
   block-size: 100%;
-  background: black;
+  /* no background here (ADR-0005): this box must stay fully unpainted so
+     the transparent window can show mpv's composited surface through it.
+     mpv paints its own black letterboxing; NSWindow's #0e0e10 background
+     covers the brief window before the surface attaches/positions. */
 }
 
 .video {

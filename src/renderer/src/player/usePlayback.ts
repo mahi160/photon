@@ -103,7 +103,7 @@ export function pickInitialTracks(
 }
 
 export function usePlayback(
-  videoRef: React.RefObject<HTMLVideoElement | null>,
+  videoRef: React.RefObject<HTMLElement | null>,
   item: BaseItem | undefined,
   params: StartParams
 ): PlaybackApi {

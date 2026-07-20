@@ -109,7 +109,9 @@ function WebPlayer({
     startOverride !== undefined ? { ...routeSearch, start: startOverride } : routeSearch
   const navigate = useNavigate()
 
-  const videoRef = useRef<HTMLVideoElement>(null)
+  // no longer an actual <video> element (ADR-0005: mpv composites into a
+  // native surface positioned under this placeholder's on-screen rect)
+  const videoRef = useRef<HTMLDivElement>(null)
   const item = useQuery(itemQuery(itemId))
   const player = usePlayback(videoRef, item.data, search)
   const { engine, session } = player
@@ -343,12 +345,12 @@ function WebPlayer({
       }}
       onDoubleClick={(e) => {
         const t = e.target as HTMLElement
-        if (t === e.currentTarget || t.tagName === 'VIDEO') toggleFullscreen()
+        if (t === e.currentTarget || t === videoRef.current) toggleFullscreen()
       }}
       style={{ cursor: visible ? 'default' : 'none' }}
     >
       <SubtitleStyleTag />
-      <video ref={videoRef} className={styles.video} />
+      <div ref={videoRef} className={styles.video} />
       {player.error && (
         <div className={styles.errorLayer}>
           <p className={styles.errorText}>{player.error}</p>

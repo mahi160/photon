@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Html5Engine } from './html5'
+import { MpvEngine } from './mpv'
 import type { LoadRequest, PlaybackEngine } from './engine'
 
 // Mirrors engine state into React and funnels every engine write through one
@@ -42,7 +42,7 @@ export interface PlayerEngineApi {
 }
 
 export function usePlayerEngine(
-  videoRef: React.RefObject<HTMLVideoElement | null>,
+  videoRef: React.RefObject<HTMLElement | null>,
   initial: EngineInitial,
   handlers: EngineHandlers
 ): PlayerEngineApi {
@@ -70,7 +70,7 @@ export function usePlayerEngine(
 
   const ensureEngine = useCallback((): PlaybackEngine | null => {
     if (!engineRef.current && videoRef.current) {
-      const e = new Html5Engine(videoRef.current)
+      const e = new MpvEngine(videoRef.current)
       e.on('time', (t) => {
         setTime(t)
         setDuration(e.duration())
