@@ -1,109 +1,86 @@
-// DeviceProfile — the server decides direct-play/remux/transcode and the
-// user never sees which (PRD: API Usage).
+// DeviceProfile — tells the server what this client can play directly, so it
+// knows when transcoding genuinely isn't needed (PRD: API Usage).
 //
-// ponytail: still queries the *webview's* (WKWebView) MediaSource support,
-// a leftover from the HTML5 <video> engine. mpv (the sole engine now, see
-// ADR-0003) can direct-play a much broader codec set than any webview —
-// this under-claims capability and can cause needless transcodes. Reporting
-// mpv's actual decoder support here is real follow-up work, not a quick
-// fix (needs querying mpv's decoder list and translating it into Jellyfin's
-// DeviceProfile shape), tracked separately from this cleanup pass.
+// mpv is the sole playback engine (ADR-0003) and does its own demuxing/
+// decoding via ffmpeg (ADR-0008) — unlike a browser <video>/MediaSource tag,
+// it isn't limited to whatever codecs the OS's media framework happens to
+// expose to the webview. This claims that real, broad capability directly
+// instead of probing MediaSource.isTypeSupported() (a leftover from the old
+// HTML5 engine that under-claimed support and caused needless transcodes).
 
 // bitrate sent when the user picks "Auto" (settings.maxBitrate = 0)
 export const AUTO_BITRATE = 140_000_000
-
-function supported(type: string): boolean {
-  return typeof MediaSource !== 'undefined' && MediaSource.isTypeSupported(type)
-}
 
 function rangeCondition(value: string): object {
   return { Condition: 'EqualsAny', Property: 'VideoRangeType', Value: value, IsRequired: false }
 }
 
 export function buildDeviceProfile(maxBitrate: number): object {
-  const h264 = 'h264'
-  const videoCodecs = [h264]
-  // gate every non-h264 codec the same way — an unchecked codec here claims
-  // direct-play support the webview may not actually decode, and the server
-  // has no way to know that (it just trusts the profile)
-  if (supported('video/webm; codecs="vp9"')) videoCodecs.push('vp9')
-  if (supported('video/mp4; codecs="av01.0.05M.08"')) videoCodecs.push('av1')
-  if (supported('video/mp4; codecs="hvc1.1.6.L93.B0"')) videoCodecs.push('hevc')
+  // every common video codec ffmpeg (mpv's decoder backend) ships with —
+  // not gated behind a webview capability check, see module doc
+  const videoCodecs = ['h264', 'hevc', 'vp8', 'vp9', 'av1', 'mpeg2video', 'mpeg4', 'vc1']
+  const audioCodecs = [
+    'aac',
+    'mp3',
+    'ac3',
+    'eac3',
+    'dts',
+    'truehd',
+    'flac',
+    'opus',
+    'vorbis',
+    'pcm_s16le',
+    'pcm_s24le'
+  ]
 
   // permissive video-range declaration per codec (SDR/HDR10/HLG, no Dolby
-  // Vision — Chromium <video> has no DOVI path worth claiming). Omitting this
-  // makes the server assume the client can't handle non-SDR and insert an
-  // HDR->SDR tonemap filter before encoding; combined with subtitle burn-in
-  // that silently drops the subtitle overlay on some transcode paths, even
-  // though the negotiation still reports SubtitleMethod=Encode.
+  // Vision profile claimed — mpv has no dedicated DOVI tone-mapping path
+  // worth claiming here). Omitting this makes the server assume the client
+  // can't handle non-SDR and insert an HDR->SDR tonemap filter, i.e. a
+  // transcode, for no reason.
   const hdrRanges = 'SDR|HDR10|HDR10Plus|HLG'
-  const codecProfiles: object[] = [
-    { Type: 'Video', Codec: 'h264', Conditions: [rangeCondition('SDR')] }
-  ]
-  for (const codec of ['hevc', 'vp9', 'av1']) {
-    if (videoCodecs.includes(codec))
-      codecProfiles.push({ Type: 'Video', Codec: codec, Conditions: [rangeCondition(hdrRanges)] })
-  }
+  const codecProfiles = videoCodecs.map((codec) => ({
+    Type: 'Video',
+    Codec: codec,
+    Conditions: [rangeCondition(codec === 'h264' ? 'SDR' : hdrRanges)]
+  }))
 
   return {
     MaxStreamingBitrate: maxBitrate,
     CodecProfiles: codecProfiles,
     DirectPlayProfiles: [
       {
-        // mkv: Chromium demuxes Matroska — codec lists below still gate it,
-        // so DTS/TrueHD audio etc. correctly falls back to remux/transcode
-        Container: 'mp4,m4v,mkv',
+        Container: 'mp4,m4v,mkv,avi,mov,ts,m2ts,webm',
         Type: 'Video',
         VideoCodec: videoCodecs.join(','),
-        AudioCodec: 'aac,mp3,opus,flac'
-      },
-      { Container: 'webm', Type: 'Video', VideoCodec: 'vp8,vp9,av1', AudioCodec: 'vorbis,opus' }
+        AudioCodec: audioCodecs.join(',')
+      }
     ],
+    // schema safety net, not a path this client's own logic ever asks for
+    // (always direct play, ADR-0008) — only reached if the server itself
+    // decides a source genuinely can't be direct played (exotic codec,
+    // bitrate cap it wants to enforce, etc).
     TranscodingProfiles: [
-      // fmp4 first, same codec list as direct play: lets the server keep the
-      // source video codec (stream copy) when only audio/subtitle need work,
-      // instead of always burning a full h264 re-encode. Restricting this to
-      // 'ts'+h264 only (the old profile) is what pushed the server onto its
-      // coarse DirectPlayError fallback path, which never evaluates whether
-      // the requested subtitle needs burning in — so subs silently dropped.
       {
         Container: 'mp4',
         Type: 'Video',
-        VideoCodec: videoCodecs.join(','),
+        VideoCodec: 'h264',
         AudioCodec: 'aac,mp3',
         Protocol: 'hls',
         Context: 'Streaming',
         MaxAudioChannels: '2',
         MinSegments: 2,
         BreakOnNonKeyFrames: true
-      },
-      {
-        Container: 'ts',
-        Type: 'Video',
-        VideoCodec: h264,
-        AudioCodec: 'aac,mp3',
-        Protocol: 'hls',
-        Context: 'Streaming',
-        MaxAudioChannels: '2',
-        MinSegments: 1,
-        BreakOnNonKeyFrames: true
       }
     ],
     SubtitleProfiles: [
-      // vtt only: Chromium <track> renders WebVTT exclusively — declaring any
-      // other text format (srt, ass, ssa) here makes the server hand back
-      // that format's raw content instead of converting it, and <track>
-      // silently drops what it can't parse. Leaving only vtt declared makes
-      // the server auto-convert any other *text* subtitle to vtt External.
-      // (jellyfin-web declares ass/ssa as External too, but only because it
-      // renders raw .ass itself via a WASM libass overlay — we don't have
-      // that, so copying its profile literally breaks ass/ssa for us.)
+      // vtt External for anything text-convertible; every other format
+      // (pgssub/dvdsub/ass/ssa/etc.) is selected as an embedded mpv track
+      // instead (ADR-0008) — deliberately undeclared here, same as before:
+      // declaring an Encode profile for them short-circuits the server's own
+      // negotiation into burning them in server-side, which is exactly the
+      // transcode this profile is trying to avoid.
       { Format: 'vtt', Method: 'External' }
-      // deliberately no pgssub/dvdsub/ass/ssa entries: declaring an Encode
-      // profile for image subs (pgssub/dvdsub) short-circuits the server's
-      // own "codec unsupported" negotiation — leaving them undeclared is what
-      // makes it fall back to burning them in and actually embed
-      // SubtitleStreamIndex/SubtitleMethod in the transcode url.
     ]
   }
 }
