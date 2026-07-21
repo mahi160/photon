@@ -37,6 +37,10 @@
 // compositing layer above, not a drive-by fix for a warning -- silenced
 // here, not fixed, until/unless that migration is actually undertaken.
 #![allow(deprecated)]
+// The unexpected_cfgs warnings this file's msg_send!/sel_impl! call sites
+// also generate (objc 0.2.x's own pre-`--check-cfg` cargo-clippy detection
+// trick) aren't suppressible with a source-level #[allow] here -- see the
+// [lints.rust] table in Cargo.toml instead.
 
 use cocoa::appkit::NSWindow as CocoaNSWindow;
 use cocoa::base::{id, nil, BOOL, YES};

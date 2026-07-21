@@ -9,6 +9,15 @@ edition = "2021"
 name = "photon_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+# objc 0.2.x's msg_send!/sel_impl! macros expand to a `cfg(feature =
+# "cargo-clippy")` check internally (a pre-`--check-cfg` clippy-detection
+# trick from a now-unmaintained crate) -- fires at every call site using
+# those macros. A source-level #[allow(unexpected_cfgs)] doesn't suppress it
+# (rustc's check-cfg diagnostic isn't scoped by the macro's call-site
+# attributes here), so it has to be silenced at the lint-config level instead.
+[lints.rust]
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 pkg-config = "0.3"
