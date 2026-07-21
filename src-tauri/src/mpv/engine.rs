@@ -75,17 +75,26 @@ impl Default for Tick {
     }
 }
 
+#[derive(Default)]
+struct PendingState {
+    loaded: bool, // has MPV_EVENT_FILE_LOADED fired for the *current* load() yet
+    start_seconds: f64,
+    queued_tracks: Vec<(String, Option<i64>)>, // (kind, source_index) selected before `loaded`
+}
+
 pub struct MpvEngine {
     mpv: *mut mpv_handle,
     render_ctx: *mut mpv_render_context,
     view: id, // plain, layer-backed NSView — not an NSOpenGLView, see module doc
     stop: Arc<AtomicBool>,
     observer: Option<JoinHandle<()>>,
-    // ponytail: `seek` right after `loadfile` races the (async) load and
-    // fails — confirmed against raw mpv IPC, not just this FFI layer. Queued
-    // here and applied by the observer thread on MPV_EVENT_FILE_LOADED,
-    // when the core is actually ready to accept it.
-    pending_start: Arc<Mutex<f64>>,
+    // ponytail: `seek` and `select_track` (aid/sid) right after `loadfile`
+    // both race the (async) load and fail/no-op — confirmed against raw mpv
+    // IPC, not just this FFI layer: mpv_command('loadfile', ...) returns as
+    // soon as it's *queued*, well before the file is actually demuxed and its
+    // track-list populated. Queued here and applied by the observer thread on
+    // MPV_EVENT_FILE_LOADED, when the core is actually ready to accept them.
+    pending: Arc<Mutex<PendingState>>,
     // created once — CGColorSpace is the same for every frame, no reason to
     // recreate it 5x/sec
     colorspace: CGColorSpace,
@@ -122,6 +131,80 @@ unsafe fn observe(mpv: *mut mpv_handle, id: u64, name: &str, format: mpv_format)
     let cname = CString::new(name).unwrap();
     unsafe {
         mpv_observe_property(mpv, id, cname.as_ptr(), format);
+    }
+}
+
+// Free functions (not `&self` methods) so both `MpvEngine::select_track`
+// (main thread, once loaded) and the observer thread (draining queued
+// selections on MPV_EVENT_FILE_LOADED) can call them from just a raw handle.
+
+fn get_property_int(mpv: *mut mpv_handle, name: &str) -> Result<i64, String> {
+    let cname = CString::new(name).map_err(|e| e.to_string())?;
+    let mut v: i64 = 0;
+    unsafe {
+        check(
+            mpv_get_property(mpv, cname.as_ptr(), mpv_format_MPV_FORMAT_INT64, &mut v as *mut _ as *mut c_void),
+            "mpv_get_property (int)",
+        )?;
+    }
+    Ok(v)
+}
+
+fn get_property_string(mpv: *mut mpv_handle, name: &str) -> Result<String, String> {
+    let cname = CString::new(name).map_err(|e| e.to_string())?;
+    let mut ptr: *mut std::os::raw::c_char = std::ptr::null_mut();
+    unsafe {
+        check(
+            mpv_get_property(mpv, cname.as_ptr(), mpv_format_MPV_FORMAT_STRING, &mut ptr as *mut _ as *mut c_void),
+            "mpv_get_property (string)",
+        )?;
+        let s = CStr::from_ptr(ptr).to_string_lossy().into_owned();
+        mpv_free(ptr as *mut c_void);
+        Ok(s)
+    }
+}
+
+// Resolves a (already static-stream-shift-corrected, see TS's
+// `toDemuxedIndex`) source stream index to mpv's own track id for the given
+// kind ("audio"/"sub"), via track-list's `ff-index` field -- confirmed
+// against real mpv processes (flat `track-list/N/...` sub-properties, not
+// the mpv_node array itself, to avoid hand-rolling node-tree parsing over
+// FFI for this).
+fn find_track_id(mpv: *mut mpv_handle, kind: &str, source_index: i64) -> Result<i64, String> {
+    let count = get_property_int(mpv, "track-list/count")?;
+    for i in 0..count {
+        if get_property_string(mpv, &format!("track-list/{i}/type"))? != kind {
+            continue;
+        }
+        if get_property_int(mpv, &format!("track-list/{i}/ff-index")).unwrap_or(-1) == source_index {
+            return get_property_int(mpv, &format!("track-list/{i}/id"));
+        }
+    }
+    Err(format!("select_track: no {kind} track with source index {source_index}"))
+}
+
+fn apply_select_track(mpv: *mut mpv_handle, kind: &str, source_index: Option<i64>) -> Result<(), String> {
+    let prop = match kind {
+        "audio" => "aid",
+        "sub" => "sid",
+        _ => return Err(format!("select_track: unknown kind {kind}")),
+    };
+    let name = CString::new(prop).unwrap();
+    match source_index {
+        Some(idx) => {
+            let id = find_track_id(mpv, kind, idx)?;
+            let mut v = id;
+            unsafe {
+                check(
+                    mpv_set_property(mpv, name.as_ptr(), mpv_format_MPV_FORMAT_INT64, &mut v as *mut _ as *mut c_void),
+                    "mpv_set_property (track select)",
+                )
+            }
+        }
+        None => {
+            let no = CString::new("no").unwrap();
+            unsafe { check(mpv_set_property_string(mpv, name.as_ptr(), no.as_ptr()), "mpv_set_property_string (track off)") }
+        }
     }
 }
 
@@ -214,8 +297,8 @@ impl MpvEngine {
             observe(mpv, 7, "mute", mpv_format_MPV_FORMAT_FLAG);
 
             let stop = Arc::new(AtomicBool::new(false));
-            let pending_start = Arc::new(Mutex::new(0.0));
-            let observer = spawn_observer(app.clone(), mpv, stop.clone(), pending_start.clone());
+            let pending = Arc::new(Mutex::new(PendingState::default()));
+            let observer = spawn_observer(app.clone(), mpv, stop.clone(), pending.clone());
 
             Ok(Self {
                 mpv,
@@ -223,7 +306,7 @@ impl MpvEngine {
                 view,
                 stop,
                 observer: Some(observer),
-                pending_start,
+                pending,
                 colorspace: CGColorSpace::create_device_rgb(),
             })
         }
@@ -237,7 +320,9 @@ impl MpvEngine {
     }
 
     pub fn load(&self, url: &str, start_seconds: f64) -> Result<(), String> {
-        *self.pending_start.lock().unwrap() = start_seconds;
+        // fresh load, fresh wait-for-loaded state — anything queued for the
+        // *previous* file (if this interrupts an in-flight load) is stale
+        *self.pending.lock().unwrap() = PendingState { start_seconds, ..Default::default() };
         self.command(&["loadfile", url, "replace"])
     }
 
@@ -317,6 +402,36 @@ impl MpvEngine {
 
     pub fn set_subtitle_delay(&self, seconds: f64) -> Result<(), String> {
         unsafe { self.set_double("sub-delay", seconds) }
+    }
+
+    /// Selects an *embedded* audio or subtitle track by the media's own
+    /// stream index, already corrected for Jellyfin's static-stream subtitle
+    /// stripping (see `toDemuxedIndex` on the TS side) -- `kind` is
+    /// `"audio"` or `"sub"`. `None` disables that track type entirely.
+    ///
+    /// Since playback is always direct play now (ADR-0008: no client-side
+    /// transcode forcing), every audio/subtitle track Jellyfin reports is
+    /// already embedded in the exact file mpv is demuxing -- no separate
+    /// server request needed to switch, unlike the old HTML5 engine (which
+    /// could only ever play a container's single default audio track, and
+    /// could only show non-text subtitles by asking the server to burn them
+    /// into transcoded pixels).
+    ///
+    /// If the file mpv is currently playing hasn't finished loading yet
+    /// (MPV_EVENT_FILE_LOADED not fired), this queues the request instead of
+    /// applying it immediately -- confirmed against raw mpv IPC that
+    /// selecting a track right after `loadfile` returns races the (async)
+    /// load: `track-list` is empty/incomplete at that point, so resolution
+    /// silently fails. The observer thread drains the queue once loaded,
+    /// same pattern as the pre-existing seek deferral.
+    pub fn select_track(&self, kind: &str, source_index: Option<i64>) -> Result<(), String> {
+        let mut pending = self.pending.lock().unwrap();
+        if !pending.loaded {
+            pending.queued_tracks.push((kind.to_string(), source_index));
+            return Ok(());
+        }
+        drop(pending);
+        apply_select_track(self.mpv, kind, source_index)
     }
 
     unsafe fn set_flag(&self, name: &str, value: bool) -> Result<(), String> {
@@ -467,7 +582,7 @@ fn spawn_observer<R: Runtime>(
     app: AppHandle<R>,
     mpv: *mut mpv_handle,
     stop: Arc<AtomicBool>,
-    pending_start: Arc<Mutex<f64>>,
+    pending: Arc<Mutex<PendingState>>,
 ) -> JoinHandle<()> {
     // Safety: `mpv` outlives this thread — MpvEngine::drop() signals `stop`,
     // sends "quit" (unblocking mpv_wait_event with MPV_EVENT_SHUTDOWN), and
@@ -502,7 +617,11 @@ fn spawn_observer<R: Runtime>(
                     let _ = app.emit("mpv://tick", tick.clone());
                 }
                 x if x == mpv_event_id_MPV_EVENT_FILE_LOADED => {
-                    let start = std::mem::replace(&mut *pending_start.lock().unwrap(), 0.0);
+                    let (start, queued_tracks) = {
+                        let mut p = pending.lock().unwrap();
+                        p.loaded = true;
+                        (std::mem::replace(&mut p.start_seconds, 0.0), std::mem::take(&mut p.queued_tracks))
+                    };
                     if start > 0.0 {
                         let args = ["seek", &start.to_string(), "absolute"];
                         let cstrs: Vec<CString> =
@@ -515,6 +634,9 @@ fn spawn_observer<R: Runtime>(
                         unsafe {
                             mpv_command(mpv, ptrs.as_mut_ptr());
                         }
+                    }
+                    for (kind, source_index) in queued_tracks {
+                        let _ = apply_select_track(mpv, &kind, source_index);
                     }
                 }
                 x if x == mpv_event_id_MPV_EVENT_END_FILE => {

@@ -70,6 +70,14 @@ pub fn mpv_set_subtitle_delay(state: State<'_, MpvState>, seconds: f64) -> Resul
     with_engine(&state, |e| e.set_subtitle_delay(seconds))
 }
 
+/// Selects an embedded audio/subtitle track by the media's own stream index
+/// (see engine.rs's `select_track` doc — always direct play now, so every
+/// track Jellyfin reports is already in the file mpv itself is demuxing).
+#[tauri::command]
+pub fn mpv_select_track(state: State<'_, MpvState>, kind: String, source_index: Option<i64>) -> Result<(), String> {
+    with_engine(&state, |e| e.select_track(&kind, source_index))
+}
+
 #[tauri::command]
 pub fn mpv_set_rect(state: State<'_, MpvState>, x: f64, y: f64, w: f64, h: f64) -> Result<(), String> {
     let slot = state.0.lock().unwrap();
