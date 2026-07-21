@@ -1,45 +1,32 @@
 import { describe, expect, it } from 'vitest'
-import { resolveSubtitleSelection, subtitleSwitchRequiresReload, transcodeNeeds } from './session'
+import { resolveSubtitleSelection, toDemuxedIndex } from './session'
 import { pickInitialTracks } from './usePlayback'
 import type { MediaStream } from '../lib/jellyfin'
 
-const streams: MediaStream[] = [
-  { Index: 0, Type: 'Video', Codec: 'h264' },
-  { Index: 1, Type: 'Audio', Codec: 'aac', IsDefault: true },
-  { Index: 2, Type: 'Audio', Codec: 'ac3' },
-  { Index: 3, Type: 'Subtitle', Codec: 'subrip', DeliveryMethod: 'External' },
-  { Index: 4, Type: 'Subtitle', Codec: 'pgssub', DeliveryMethod: 'Encode' }
-]
+describe('toDemuxedIndex', () => {
+  // video=0, audio=1, subs: 2 (External), 3 (embedded/PGS), 4 (External), 5 (embedded/ASS)
+  const subtitleStreams: MediaStream[] = [
+    { Index: 2, Type: 'Subtitle', DeliveryMethod: 'External' },
+    { Index: 3, Type: 'Subtitle', DeliveryMethod: 'Encode' },
+    { Index: 4, Type: 'Subtitle', DeliveryMethod: 'External' },
+    { Index: 5, Type: 'Subtitle', DeliveryMethod: 'Encode' }
+  ]
+  const sess = { subtitleStreams }
 
-describe('transcodeNeeds', () => {
-  it('no requests → no transcode', () => {
-    expect(transcodeNeeds(streams, {})).toEqual({ burnIn: false, audioSwitch: false })
+  it('no external subs before it → unchanged', () => {
+    expect(toDemuxedIndex(sess, 1)).toBe(1) // audio, before any subtitle
   })
 
-  it('text subtitle rides direct play', () => {
-    expect(transcodeNeeds(streams, { subtitleStreamIndex: 3 }).burnIn).toBe(false)
+  it('one external sub before it → shifted down by one', () => {
+    expect(toDemuxedIndex(sess, 3)).toBe(2) // embedded sub, after the one external sub at 2
   })
 
-  it('PGS subtitle needs burn-in', () => {
-    expect(transcodeNeeds(streams, { subtitleStreamIndex: 4 }).burnIn).toBe(true)
+  it('two external subs before it → shifted down by two', () => {
+    expect(toDemuxedIndex(sess, 5)).toBe(3) // embedded sub, after external subs at 2 and 4
   })
 
-  it('-1 (subs off) never burns in', () => {
-    expect(transcodeNeeds(streams, { subtitleStreamIndex: -1 }).burnIn).toBe(false)
-  })
-
-  it('container-default audio stays direct', () => {
-    expect(transcodeNeeds(streams, { audioStreamIndex: 1 }).audioSwitch).toBe(false)
-  })
-
-  it('non-default audio needs a transcode', () => {
-    expect(transcodeNeeds(streams, { audioStreamIndex: 2 }).audioSwitch).toBe(true)
-  })
-
-  it('no IsDefault flag → first audio track is the container default', () => {
-    const noFlags = streams.map((s) => ({ ...s, IsDefault: undefined }))
-    expect(transcodeNeeds(noFlags, { audioStreamIndex: 1 }).audioSwitch).toBe(false)
-    expect(transcodeNeeds(noFlags, { audioStreamIndex: 2 }).audioSwitch).toBe(true)
+  it('no subtitle streams at all → unchanged', () => {
+    expect(toDemuxedIndex({ subtitleStreams: [] }, 1)).toBe(1)
   })
 })
 
@@ -49,33 +36,40 @@ describe('resolveSubtitleSelection', () => {
       { index: 3, label: 'English', language: 'eng', url: '' },
       { index: 5, label: 'German', language: 'ger', url: '' }
     ],
-    subtitleStreams: [
-      { Index: 3, Type: 'Subtitle', DeliveryMethod: 'External' },
-      { Index: 4, Type: 'Subtitle', DeliveryMethod: 'Encode' },
-      { Index: 5, Type: 'Subtitle', DeliveryMethod: 'External' }
-    ] as MediaStream[],
-    mediaSource: {} as { DefaultSubtitleStreamIndex?: number },
-    playMethod: 'DirectPlay' as const
+    mediaSource: {} as { DefaultSubtitleStreamIndex?: number }
   }
   const on = { subtitlesEnabled: true }
   const off = { subtitlesEnabled: false }
 
   it('explicit text track → displayed and activated', () => {
-    expect(resolveSubtitleSelection(sess, 3, on)).toEqual({ display: 3, textTrack: 3 })
+    expect(resolveSubtitleSelection(sess, 3, on)).toEqual({
+      display: 3,
+      textTrack: 3,
+      embeddedTrack: null
+    })
   })
 
-  it('explicit burn-in → displayed but no text track (already in the pixels)', () => {
-    expect(resolveSubtitleSelection(sess, 4, on)).toEqual({ display: 4, textTrack: null })
+  it('explicit embedded (non-text) track → displayed, selected via mpv directly', () => {
+    expect(resolveSubtitleSelection(sess, 4, on)).toEqual({
+      display: 4,
+      textTrack: null,
+      embeddedTrack: 4
+    })
   })
 
   it('-1 → explicitly off, even with subtitles enabled', () => {
-    expect(resolveSubtitleSelection(sess, -1, on)).toEqual({ display: null, textTrack: null })
+    expect(resolveSubtitleSelection(sess, -1, on)).toEqual({
+      display: null,
+      textTrack: null,
+      embeddedTrack: null
+    })
   })
 
   it('no request + subtitles disabled → off', () => {
     expect(resolveSubtitleSelection(sess, undefined, off)).toEqual({
       display: null,
-      textTrack: null
+      textTrack: null,
+      embeddedTrack: null
     })
   })
 
@@ -83,64 +77,25 @@ describe('resolveSubtitleSelection', () => {
     const s = { ...sess, mediaSource: { DefaultSubtitleStreamIndex: 3 } }
     expect(
       resolveSubtitleSelection(s, undefined, { ...on, preferredSubtitleLanguage: 'ger' })
-    ).toEqual({ display: 5, textTrack: 5 })
+    ).toEqual({ display: 5, textTrack: 5, embeddedTrack: null })
   })
 
   it('no request → falls back to the server default text track', () => {
     const s = { ...sess, mediaSource: { DefaultSubtitleStreamIndex: 5 } }
-    expect(resolveSubtitleSelection(s, undefined, on)).toEqual({ display: 5, textTrack: 5 })
+    expect(resolveSubtitleSelection(s, undefined, on)).toEqual({
+      display: 5,
+      textTrack: 5,
+      embeddedTrack: null
+    })
   })
 
-  it('transcode + non-text server default → burned in, display only', () => {
-    const s = {
-      ...sess,
-      playMethod: 'Transcode' as const,
-      mediaSource: { DefaultSubtitleStreamIndex: 4 }
-    }
-    expect(resolveSubtitleSelection(s, undefined, on)).toEqual({ display: 4, textTrack: null })
-  })
-
-  it('direct play + non-text server default → nothing shown', () => {
+  it('no request, non-text server default → selected via mpv directly, no reload needed', () => {
     const s = { ...sess, mediaSource: { DefaultSubtitleStreamIndex: 4 } }
-    expect(resolveSubtitleSelection(s, undefined, on)).toEqual({ display: null, textTrack: null })
-  })
-})
-
-describe('subtitleSwitchRequiresReload', () => {
-  const sess = {
-    textTracks: [
-      { index: 3, label: 'English', language: 'eng', url: '' },
-      { index: 5, label: 'German', language: 'ger', url: '' }
-    ],
-    subtitleStreams: [
-      { Index: 3, Type: 'Subtitle', DeliveryMethod: 'External' },
-      { Index: 4, Type: 'Subtitle', DeliveryMethod: 'Encode' },
-      { Index: 5, Type: 'Subtitle', DeliveryMethod: 'External' }
-    ] as MediaStream[]
-  }
-
-  it('text → text: engine-only switch', () => {
-    expect(subtitleSwitchRequiresReload(sess, 3, 5)).toBe(false)
-  })
-
-  it('text → off: engine-only switch', () => {
-    expect(subtitleSwitchRequiresReload(sess, 3, null)).toBe(false)
-  })
-
-  it('off → burned: reload', () => {
-    expect(subtitleSwitchRequiresReload(sess, null, 4)).toBe(true)
-  })
-
-  it('burned → off: reload (burn-in lives in the transcoded pixels)', () => {
-    expect(subtitleSwitchRequiresReload(sess, 4, null)).toBe(true)
-  })
-
-  it('burned → text: reload', () => {
-    expect(subtitleSwitchRequiresReload(sess, 4, 3)).toBe(true)
-  })
-
-  it('off → off: nothing to do', () => {
-    expect(subtitleSwitchRequiresReload(sess, null, null)).toBe(false)
+    expect(resolveSubtitleSelection(s, undefined, on)).toEqual({
+      display: 4,
+      textTrack: null,
+      embeddedTrack: 4
+    })
   })
 })
 
