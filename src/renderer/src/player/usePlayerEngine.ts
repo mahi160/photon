@@ -38,6 +38,8 @@ export interface PlayerEngineApi {
   changeRate: (rate: number) => void
   setTextTrack: (index: number | null) => void
   setSubtitleDelay: (seconds: number) => void
+  selectAudioTrack: (index: number) => void
+  selectEmbeddedSubtitleTrack: (index: number | null) => void
   togglePiP: () => void
 }
 
@@ -178,6 +180,12 @@ export function usePlayerEngine(
   const setSubtitleDelay = useCallback((seconds: number) => {
     engineRef.current?.setSubtitleDelay(seconds)
   }, [])
+  const selectAudioTrack = useCallback((index: number) => {
+    engineRef.current?.selectAudioTrack(index)
+  }, [])
+  const selectEmbeddedSubtitleTrack = useCallback((index: number | null) => {
+    engineRef.current?.selectEmbeddedSubtitleTrack(index)
+  }, [])
 
   const togglePiP = useCallback(() => {
     const e = engineRef.current
@@ -207,6 +215,8 @@ export function usePlayerEngine(
     changeRate,
     setTextTrack,
     setSubtitleDelay,
+    selectAudioTrack,
+    selectEmbeddedSubtitleTrack,
     togglePiP
   }
 }

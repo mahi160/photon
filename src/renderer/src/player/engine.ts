@@ -37,6 +37,11 @@ export interface PlaybackEngine {
   setMuted(muted: boolean): void
   setTextTrack(index: number | null): void // jellyfin stream index, null = off
   setSubtitleDelay(seconds: number): void // text tracks only
+  // both take the media's own stream index (Jellyfin's MediaStream.Index) —
+  // always direct play (ADR-0008), so every track is already embedded in the
+  // file mpv itself demuxes, no server round-trip needed to switch either
+  selectAudioTrack(index: number): void // no "off" case — always a track
+  selectEmbeddedSubtitleTrack(index: number | null): void // non-text (PGS/VOBSUB/styled ASS); null = off
   enterPiP(): Promise<void>
   exitPiP(): Promise<void>
   currentTime(): number

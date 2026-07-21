@@ -151,6 +151,14 @@ export class MpvEngine implements PlaybackEngine {
     void invoke('mpv_set_subtitle_delay', { seconds })
   }
 
+  selectAudioTrack(index: number): void {
+    void invoke('mpv_select_track', { kind: 'audio', sourceIndex: index })
+  }
+
+  selectEmbeddedSubtitleTrack(index: number | null): void {
+    void invoke('mpv_select_track', { kind: 'sub', sourceIndex: index })
+  }
+
   // ponytail: PiP is deprioritized (#8) — no-op until then
   async enterPiP(): Promise<void> {
     /* no-op until #8 */
