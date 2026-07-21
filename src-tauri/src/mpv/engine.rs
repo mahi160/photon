@@ -24,9 +24,19 @@
 //! correct-first; a buffer pool / IOSurface zero-copy path is real upgrade
 //! work, not done here.
 //!
-//! ponytail: render loop is a fixed ~60fps timer tick (see `spawn_render_loop`
-//! in commands.rs), not driven by `mpv_render_context_set_update_callback` +
-//! a display link — same known ceiling the spike flagged.
+//! Render loop (`spawn_render_loop` in commands.rs) is woken by mpv's own
+//! `mpv_render_context_set_update_callback` (see `RenderWaker` below) as soon
+//! as a new frame is ready, rather than guessing on a fixed timer. Not a real
+//! display vsync lock (no `CVDisplayLink` — mpv's callback says "a frame is
+//! ready", not "the display's about to refresh") — that's a further, real
+//! per-platform upgrade, not done here.
+
+// The `cocoa` crate (still what this whole module is built on) points at
+// `objc2`/`objc2-app-kit`/`objc2-foundation` as its replacement, but porting
+// this file's raw NSView/NSWindow/CALayer calls is a real rewrite of the
+// compositing layer above, not a drive-by fix for a warning -- silenced
+// here, not fixed, until/unless that migration is actually undertaken.
+#![allow(deprecated)]
 
 use cocoa::appkit::NSWindow as CocoaNSWindow;
 use cocoa::base::{id, nil, BOOL, YES};
@@ -53,8 +63,9 @@ const MPV_RENDER_API_TYPE_SW: &[u8] = b"sw\0";
 use objc::{class, msg_send, sel, sel_impl};
 use std::ffi::{c_void, CStr, CString};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread::JoinHandle;
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Runtime, WebviewWindow};
 
 /// Snapshot pushed to the frontend on every observed-property change.
@@ -119,9 +130,45 @@ pub(crate) struct RenderSurface {
 // type's own mutex).
 unsafe impl Send for RenderSurface {}
 
+/// Wakes `spawn_render_loop` as soon as mpv's own
+/// `mpv_render_context_set_update_callback` reports a new frame is ready,
+/// instead of the loop guessing on a fixed timer. mpv calls `notify()`
+/// (via `on_render_update`, a plain C callback) from its own internal
+/// thread; the render loop calls `wait` on its own thread. `timeout` in
+/// `wait` is a safety net (e.g. the very first callback firing before the
+/// loop starts waiting), not the normal wakeup path.
+#[derive(Default)]
+pub(crate) struct RenderWaker {
+    ready: Mutex<bool>,
+    cv: Condvar,
+}
+
+impl RenderWaker {
+    fn notify(&self) {
+        *self.ready.lock().unwrap() = true;
+        self.cv.notify_one();
+    }
+
+    pub(crate) fn wait(&self, timeout: Duration) {
+        let guard = self.ready.lock().unwrap();
+        let (mut guard, _) = self.cv.wait_timeout_while(guard, timeout, |ready| !*ready).unwrap();
+        *guard = false;
+    }
+}
+
+// `cb_ctx` is `RenderWaker`'s address, set via `Arc::as_ptr` in `attach` and
+// kept alive for exactly as long as `render_ctx` can still call this (the
+// callback is unregistered in `teardown`, before `MpvEngine`'s own `waker`
+// field is dropped).
+unsafe extern "C" fn on_render_update(cb_ctx: *mut c_void) {
+    let waker = unsafe { &*(cb_ctx as *const RenderWaker) };
+    waker.notify();
+}
+
 pub struct MpvEngine {
     mpv: *mut mpv_handle,
     surface: Arc<Mutex<RenderSurface>>,
+    waker: Arc<RenderWaker>,
     stop: Arc<AtomicBool>,
     observer: Option<JoinHandle<()>>,
     // ponytail: `seek` and `select_track` (aid/sid) right after `loadfile`
@@ -420,6 +467,13 @@ impl MpvEngine {
                 "mpv_render_context_create",
             )?;
 
+            let waker = Arc::new(RenderWaker::default());
+            mpv_render_context_set_update_callback(
+                render_ctx,
+                Some(on_render_update),
+                Arc::as_ptr(&waker) as *mut c_void,
+            );
+
             observe(mpv, 1, "time-pos", mpv_format_MPV_FORMAT_DOUBLE);
             observe(mpv, 2, "pause", mpv_format_MPV_FORMAT_FLAG);
             observe(mpv, 3, "duration", mpv_format_MPV_FORMAT_DOUBLE);
@@ -446,6 +500,7 @@ impl MpvEngine {
             Ok(Self {
                 mpv,
                 surface,
+                waker,
                 stop,
                 observer: Some(observer),
                 pending,
@@ -458,6 +513,12 @@ impl MpvEngine {
     /// actually renders -- see `RenderSurface`'s doc.
     pub(crate) fn render_surface(&self) -> Arc<Mutex<RenderSurface>> {
         Arc::clone(&self.surface)
+    }
+
+    /// Clone of the render-waker handle, for `spawn_render_loop` to block on
+    /// instead of a fixed sleep -- see `RenderWaker`'s doc.
+    pub(crate) fn render_waker(&self) -> Arc<RenderWaker> {
+        Arc::clone(&self.waker)
     }
 
     fn command(&self, args: &[&str]) -> Result<(), String> {
@@ -634,9 +695,9 @@ impl RenderSurface {
 
     /// Renders one frame into an in-memory buffer and hands it to the
     /// view's layer as a `CGImage` (see module doc for why this is the
-    /// software render API, not OpenGL). Called on a fixed timer tick from
-    /// the render loop's own background thread (see `RenderSurface`'s doc),
-    /// and once synchronously at the end of `set_rect`.
+    /// software render API, not OpenGL). Called from the render loop's own
+    /// background thread each time mpv wakes `RenderWaker` (see that type's
+    /// doc), and once synchronously at the end of `set_rect`.
     ///
     /// `pub(crate)`: called directly by `spawn_render_loop` (commands.rs) via
     /// the cloned handle from `MpvEngine::render_surface`.
@@ -728,6 +789,10 @@ impl RenderSurface {
     /// nulling `render_ctx` afterward matters.
     fn teardown(&mut self) {
         unsafe {
+            // Unregister before freeing the context -- otherwise a callback
+            // could fire (mpv's own thread) referencing a `RenderWaker` that
+            // `MpvEngine`'s `Drop` is about to free once this returns.
+            mpv_render_context_set_update_callback(self.render_ctx, None, std::ptr::null_mut());
             let _: () = msg_send![self.view, removeFromSuperview];
             mpv_render_context_free(self.render_ctx);
         }

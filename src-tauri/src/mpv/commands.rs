@@ -107,35 +107,39 @@ where
     }
 }
 
-/// Fixed-interval render tick (see engine.rs's ponytail note on why this
-/// isn't update-callback-driven yet).
+/// Render tick, woken by mpv's own update callback (see engine.rs's
+/// `RenderWaker`) instead of a blind fixed-rate poll.
 pub fn spawn_render_loop<R: Runtime>(app: AppHandle<R>) {
     std::thread::spawn(move || loop {
-        // ponytail: fixed-rate poll, not vsync/update-callback driven (see
-        // engine.rs doc). render() now runs directly on this background
-        // thread instead of being marshalled onto the main thread every
-        // tick -- even after rendering at point resolution instead of full
-        // Retina backing resolution (quarter the bytes), the per-frame
-        // buffer alloc + CGImage build was still enough main-thread work to
-        // beachball the window at 30fps. CALayer.contents is documented as
-        // safe to set from a background thread (Core Animation's own
-        // threading model, unlike most of AppKit) -- this is the standard
-        // technique real custom video-compositing code uses for exactly
-        // this reason. `self.view`'s *other* AppKit calls (setFrame:,
-        // setHidden:) still only ever happen from set_rect() on the main
-        // thread (a Tauri command); render()'s own NSView touches are read
-        // only (bounds/isHidden/layer getters).
-        std::thread::sleep(std::time::Duration::from_millis(16));
-        if let Some(state) = app.try_state::<MpvState>() {
-            // MpvState is locked only long enough to clone this Arc, not for
-            // the render itself (see RenderSurface's doc) -- otherwise a
-            // slow software-render frame would hold the *same* lock every
-            // play/pause/seek/volume command needs, stalling input on every
-            // 16ms tick.
-            let surface = state.0.lock().unwrap().as_ref().map(|e| e.render_surface());
-            if let Some(surface) = surface {
-                surface.lock().unwrap().render();
-            }
-        }
+        // render() now runs directly on this background thread instead of
+        // being marshalled onto the main thread every tick -- even after
+        // rendering at point resolution instead of full Retina backing
+        // resolution (quarter the bytes), the per-frame buffer alloc +
+        // CGImage build was still enough main-thread work to beachball the
+        // window at 30fps. CALayer.contents is documented as safe to set
+        // from a background thread (Core Animation's own threading model,
+        // unlike most of AppKit) -- this is the standard technique real
+        // custom video-compositing code uses for exactly this reason.
+        // `self.view`'s *other* AppKit calls (setFrame:, setHidden:) still
+        // only ever happen from set_rect() on the main thread (a Tauri
+        // command); render()'s own NSView touches are read only
+        // (bounds/isHidden/layer getters).
+        let Some(state) = app.try_state::<MpvState>() else {
+            std::thread::sleep(std::time::Duration::from_millis(200));
+            continue;
+        };
+        // MpvState is locked only long enough to clone these two Arcs, not
+        // for the render itself (see RenderSurface's doc) -- otherwise a
+        // slow software-render frame would hold the *same* lock every
+        // play/pause/seek/volume command needs, stalling input behind it.
+        let handle = state.0.lock().unwrap().as_ref().map(|e| (e.render_surface(), e.render_waker()));
+        let Some((surface, waker)) = handle else {
+            std::thread::sleep(std::time::Duration::from_millis(200)); // not attached yet
+            continue;
+        };
+        // Blocks until mpv reports a new frame; the timeout is a safety net,
+        // not the normal wakeup path (see RenderWaker's doc).
+        waker.wait(std::time::Duration::from_millis(250));
+        surface.lock().unwrap().render();
     });
 }
