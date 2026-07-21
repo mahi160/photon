@@ -127,8 +127,14 @@ pub fn spawn_render_loop<R: Runtime>(app: AppHandle<R>) {
         // only (bounds/isHidden/layer getters).
         std::thread::sleep(std::time::Duration::from_millis(16));
         if let Some(state) = app.try_state::<MpvState>() {
-            if let Some(engine) = state.0.lock().unwrap().as_ref() {
-                engine.render();
+            // MpvState is locked only long enough to clone this Arc, not for
+            // the render itself (see RenderSurface's doc) -- otherwise a
+            // slow software-render frame would hold the *same* lock every
+            // play/pause/seek/volume command needs, stalling input on every
+            // 16ms tick.
+            let surface = state.0.lock().unwrap().as_ref().map(|e| e.render_surface());
+            if let Some(surface) = surface {
+                surface.lock().unwrap().render();
             }
         }
     });

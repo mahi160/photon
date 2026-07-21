@@ -83,10 +83,45 @@ struct PendingState {
     queued_text_sid: Option<Option<i64>>,      // set_text_track called before `loaded`; latest wins
 }
 
-pub struct MpvEngine {
-    mpv: *mut mpv_handle,
+/// The render-loop/rect state (render context, view, colorspace) --
+/// deliberately behind its *own* mutex, separate from `MpvState` (the
+/// Tauri-managed `Mutex<Option<MpvEngine>>` every command locks). Every
+/// other command (play/pause/seek/volume/select_track/...) only ever needs
+/// `MpvState` for a fast property-set; if render_ctx/view instead lived
+/// directly on `MpvEngine` guarded only by that same lock, a slow *software*
+/// render frame (module doc: "very slow, everything on the CPU") would hold
+/// `MpvState` for the frame's whole duration and stall every other command
+/// behind it. `spawn_render_loop` (commands.rs) now only holds `MpvState`
+/// long enough to clone this handle out, then renders through this mutex
+/// instead -- so a slow frame only ever blocks another *render* (loop tick
+/// vs. `set_rect`), never a play/pause/seek/volume command.
+///
+/// Teardown is explicit (`teardown`, called from `MpvEngine::drop` while
+/// holding this same mutex) rather than left to `Drop`/refcounting:
+/// `render_ctx` must be freed strictly before `mpv_terminate_destroy(mpv)`,
+/// and any render the loop thread has already started must be allowed to
+/// finish first, not raced. Locking this mutex from `drop` gets both for
+/// free (a concurrent `render()` holds the same lock for its duration), and
+/// nulling `render_ctx` afterward turns any `render()` call that acquires
+/// the lock *after* teardown (the loop thread had already cloned the handle
+/// before `MpvEngine` was dropped) into a safe no-op instead of a
+/// use-after-free.
+pub(crate) struct RenderSurface {
     render_ctx: *mut mpv_render_context,
     view: id, // plain, layer-backed NSView — not an NSOpenGLView, see module doc
+    // created once — CGColorSpace is the same for every frame, no reason to
+    // recreate it 5x/sec
+    colorspace: CGColorSpace,
+}
+
+// Raw AppKit/mpv pointers — see the struct doc for the exact cross-thread
+// contract (render loop's own thread + main thread, serialized by this
+// type's own mutex).
+unsafe impl Send for RenderSurface {}
+
+pub struct MpvEngine {
+    mpv: *mut mpv_handle,
+    surface: Arc<Mutex<RenderSurface>>,
     stop: Arc<AtomicBool>,
     observer: Option<JoinHandle<()>>,
     // ponytail: `seek` and `select_track` (aid/sid) right after `loadfile`
@@ -96,13 +131,9 @@ pub struct MpvEngine {
     // track-list populated. Queued here and applied by the observer thread on
     // MPV_EVENT_FILE_LOADED, when the core is actually ready to accept them.
     pending: Arc<Mutex<PendingState>>,
-    // created once — CGColorSpace is the same for every frame, no reason to
-    // recreate it 5x/sec
-    colorspace: CGColorSpace,
 }
 
-// Cocoa view/layer calls are only ever made from the main thread; the raw
-// mpv handle/render context are only touched from the main thread (commands,
+// The raw mpv handle is only ever touched from the main thread (commands,
 // render ticks) and the dedicated observer thread, which mpv's C API allows.
 unsafe impl Send for MpvEngine {}
 unsafe impl Sync for MpvEngine {}
@@ -323,17 +354,27 @@ impl MpvEngine {
             let stop = Arc::new(AtomicBool::new(false));
             let pending = Arc::new(Mutex::new(PendingState::default()));
             let observer = spawn_observer(app.clone(), mpv, stop.clone(), pending.clone());
+            let surface = Arc::new(Mutex::new(RenderSurface {
+                render_ctx,
+                view,
+                colorspace: CGColorSpace::create_device_rgb(),
+            }));
 
             Ok(Self {
                 mpv,
-                render_ctx,
-                view,
+                surface,
                 stop,
                 observer: Some(observer),
                 pending,
-                colorspace: CGColorSpace::create_device_rgb(),
             })
         }
+    }
+
+    /// Clone of the render-surface handle, for `spawn_render_loop`
+    /// (commands.rs) to hold *instead of* `MpvState`'s lock while it
+    /// actually renders -- see `RenderSurface`'s doc.
+    pub(crate) fn render_surface(&self) -> Arc<Mutex<RenderSurface>> {
+        Arc::clone(&self.surface)
     }
 
     fn command(&self, args: &[&str]) -> Result<(), String> {
@@ -482,6 +523,15 @@ impl MpvEngine {
     /// top-left origin, matching `getBoundingClientRect()`), or hides it
     /// entirely when the placeholder isn't visible/mounted.
     pub fn set_rect(&self, x: f64, y_top_left: f64, w: f64, h: f64) {
+        self.surface.lock().unwrap().set_rect(x, y_top_left, w, h);
+    }
+}
+
+impl RenderSurface {
+    /// Repositions the surface to the given content-view-local rect (points,
+    /// top-left origin, matching `getBoundingClientRect()`), or hides it
+    /// entirely when the placeholder isn't visible/mounted.
+    fn set_rect(&self, x: f64, y_top_left: f64, w: f64, h: f64) {
         unsafe {
             if w <= 0.0 || h <= 0.0 {
                 let _: () = msg_send![self.view, setHidden: YES];
@@ -502,9 +552,16 @@ impl MpvEngine {
     /// Renders one frame into an in-memory buffer and hands it to the
     /// view's layer as a `CGImage` (see module doc for why this is the
     /// software render API, not OpenGL). Called on a fixed timer tick from
-    /// the main thread.
-    pub fn render(&self) {
+    /// the render loop's own background thread (see `RenderSurface`'s doc),
+    /// and once synchronously at the end of `set_rect`.
+    ///
+    /// `pub(crate)`: called directly by `spawn_render_loop` (commands.rs) via
+    /// the cloned handle from `MpvEngine::render_surface`.
+    pub(crate) fn render(&self) {
         unsafe {
+            if self.render_ctx.is_null() {
+                return; // torn down (MpvEngine dropped) -- see `teardown`
+            }
             let hidden: BOOL = msg_send![self.view, isHidden];
             if hidden == YES {
                 return;
@@ -581,6 +638,18 @@ impl MpvEngine {
             let _: () = msg_send![class!(CATransaction), flush];
         }
     }
+
+    /// Frees the render context and removes the view. Called from
+    /// `MpvEngine::drop` while holding this surface's own mutex -- see the
+    /// struct doc for why this must happen here (not via `Drop`) and why
+    /// nulling `render_ctx` afterward matters.
+    fn teardown(&mut self) {
+        unsafe {
+            let _: () = msg_send![self.view, removeFromSuperview];
+            mpv_render_context_free(self.render_ctx);
+        }
+        self.render_ctx = std::ptr::null_mut();
+    }
 }
 
 impl Drop for MpvEngine {
@@ -592,9 +661,12 @@ impl Drop for MpvEngine {
         if let Some(h) = self.observer.take() {
             let _ = h.join();
         }
+        // Locking here blocks until any render the loop thread already
+        // started (it may be holding a cloned handle from before this drop
+        // began) finishes -- only then is it safe to free render_ctx/view,
+        // strictly before mpv_terminate_destroy below (see the struct doc).
+        self.surface.lock().unwrap().teardown();
         unsafe {
-            let _: () = msg_send![self.view, removeFromSuperview];
-            mpv_render_context_free(self.render_ctx);
             mpv_terminate_destroy(self.mpv);
         }
     }
