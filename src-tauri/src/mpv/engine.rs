@@ -238,6 +238,63 @@ fn apply_set_text_track(mpv: *mut mpv_handle, sid: Option<i64>) -> Result<(), St
     }
 }
 
+// Builds and sends a raw mpv_command from a handle -- free fn so the
+// observer thread (which only has the raw handle, not an MpvEngine) can
+// fire commands the same way MpvEngine::command does for &self call sites.
+// Fire-and-forget: callers here already treat failures as best-effort (a
+// missing tonemap label to remove is not an error worth surfacing).
+fn raw_command(mpv: *mut mpv_handle, args: &[&str]) {
+    let cstrs: Vec<CString> = args.iter().map(|s| CString::new(*s).unwrap()).collect();
+    let mut ptrs: Vec<*const std::os::raw::c_char> =
+        cstrs.iter().map(|s| s.as_ptr()).chain(std::iter::once(std::ptr::null())).collect();
+    unsafe {
+        mpv_command(mpv, ptrs.as_mut_ptr());
+    }
+}
+
+const HDR_TONEMAP_LABEL: &str = "phtonemap";
+
+// MPV_RENDER_API_TYPE_SW has no tone-mapping of its own -- confirmed in
+// mpv's own render.h: "certain multimedia job creation measures like HDR may
+// not work properly, and will have to be manually handled by for example
+// inserting filters." Its only pixel formats are 8-bit RGB (rgb0/bgr0/0bgr/
+// 0rgb), so real EDR/wide-gamut HDR display is out of reach on this render
+// path regardless (would need the GPU render API, ruled out in ADR-0005 for
+// the NSOpenGLView transparency bug) -- but PQ/HLG values reaching that 8-bit
+// RGB output *unmapped* would show blown-out/wrong colors, which this closes.
+//
+// Standard ffmpeg zscale+tonemap recipe (linear -> tonemap -> bt.709), the
+// same one widely used for HDR playback on any non-libplacebo pipeline.
+// `--tone-mapping` and friends (mpv's own built-in option family) are
+// explicitly gpu/gpu-next only per mpv's docs and do nothing on this render
+// path, hence going through a manual `--vf=lavfi=[...]` filter instead, per
+// the render.h note above.
+//
+// Gated on the decoded stream's actual transfer function ("gamma": "pq" or
+// "hlg") rather than applied unconditionally, so SDR playback -- the common
+// case -- pays zero extra cost on top of an already CPU-bound render path.
+// `active` tracks whether the filter is currently applied so a same-range
+// property re-fire (e.g. a seek) doesn't redundantly add/remove it.
+//
+// ponytail: verified against mpv's documented API and the standard community
+// filter recipe, not against a real HDR display/file (none available in this
+// sandbox) -- smoke-test with a real HDR10/HLG source before relying on this.
+fn apply_hdr_tonemap(mpv: *mut mpv_handle, gamma: &str, active: &mut bool) {
+    let is_hdr = gamma == "pq" || gamma == "hlg";
+    if is_hdr == *active {
+        return;
+    }
+    *active = is_hdr;
+    if is_hdr {
+        let filter = format!(
+            "@{HDR_TONEMAP_LABEL}:lavfi=[zscale=transfer=linear:npl=100,format=gbrpf32le,zscale=primaries=bt709,tonemap=hable,zscale=transfer=bt709:matrix=bt709,format=yuv420p]"
+        );
+        raw_command(mpv, &["vf", "add", &filter]);
+    } else {
+        raw_command(mpv, &["vf", "remove", &format!("@{HDR_TONEMAP_LABEL}")]);
+    }
+}
+
 fn apply_select_track(mpv: *mut mpv_handle, kind: &str, source_index: Option<i64>) -> Result<(), String> {
     let prop = match kind {
         "audio" => "aid",
@@ -299,10 +356,30 @@ impl MpvEngine {
             set_option(mpv, "osc", "no");
             set_option(mpv, "osd-level", "0");
             set_option(mpv, "keep-open", "yes");
-            set_option(mpv, "hwdec", "no"); // software render API only ever gets software-decoded frames anyway
+            // "-copy" hwdec modes decode on the hardware decoder, then copy
+            // the frame back into plain system RAM -- unlike plain
+            // `videotoolbox` (mpv's own docs: requires --vo=gpu/gpu-next),
+            // the copy variants aren't listed as needing a GPU vo, which is
+            // the whole point: the sw render API below consumes the copied
+            // CPU frame like any other. `auto-copy` picks the right one per
+            // platform from mpv's own actively-supported whitelist. Real CPU/
+            // battery win, especially for 4K HEVC/AV1 -- mpv's own docs call
+            // out that class of content as sometimes needing hw decoding to
+            // keep up at all.
+            set_option(mpv, "hwdec", "auto-copy");
             set_option(mpv, "terminal", "no");
             set_option(mpv, "input-default-bindings", "no");
             set_option(mpv, "input-vo-keyboard", "no");
+            // mpv's own default (`auto-safe`) forces stereo whenever the OS
+            // doesn't report an explicit system-preferred layout -- not
+            // guaranteed even when routed to a real AVR/soundbar over HDMI,
+            // per mpv's own HDMI warning under --audio-channels. Explicit
+            // whitelist lets genuine 5.1/7.1/Atmos-bed sources reach the
+            // output instead of always getting silently downmixed.
+            set_option(mpv, "audio-channels", "7.1,5.1,stereo");
+            // only affects a downmix that still happens (e.g. a stereo-only
+            // output device) -- avoids clipping there (default: no)
+            set_option(mpv, "audio-normalize-downmix", "yes");
 
             // Sane default subtitle appearance (issue #9): outlined text, no
             // background box, legible at a normal viewing distance without any
@@ -350,6 +427,12 @@ impl MpvEngine {
             observe(mpv, 5, "demuxer-cache-time", mpv_format_MPV_FORMAT_DOUBLE);
             observe(mpv, 6, "volume", mpv_format_MPV_FORMAT_DOUBLE);
             observe(mpv, 7, "mute", mpv_format_MPV_FORMAT_FLAG);
+            // drives the HDR tonemap filter (see apply_hdr_tonemap) -- the
+            // decoder's *actual* transfer function only becomes known once
+            // decoding starts, unlike track-list metadata available right at
+            // FILE_LOADED, so this needs its own observed property rather
+            // than a synchronous read in the FILE_LOADED handler.
+            observe(mpv, 8, "video-params/gamma", mpv_format_MPV_FORMAT_STRING);
 
             let stop = Arc::new(AtomicBool::new(false));
             let pending = Arc::new(Mutex::new(PendingState::default()));
@@ -685,6 +768,7 @@ fn spawn_observer<R: Runtime>(
     std::thread::spawn(move || {
         let mpv = mpv_addr as *mut mpv_handle;
         let mut tick = Tick::default();
+        let mut hdr_tonemap_active = false;
         loop {
             if stop.load(Ordering::SeqCst) {
                 return;
@@ -697,6 +781,14 @@ fn spawn_observer<R: Runtime>(
                     let name = unsafe { CStr::from_ptr(prop.name).to_string_lossy() };
                     if prop.data.is_null() {
                         continue;
+                    }
+                    if name == "video-params/gamma" {
+                        let ptr = unsafe { *(prop.data as *const *const std::os::raw::c_char) };
+                        if !ptr.is_null() {
+                            let gamma = unsafe { CStr::from_ptr(ptr).to_string_lossy() };
+                            apply_hdr_tonemap(mpv, &gamma, &mut hdr_tonemap_active);
+                        }
+                        continue; // not part of Tick, no UI event needed
                     }
                     match name.as_ref() {
                         "time-pos" => tick.time = unsafe { *(prop.data as *const f64) },

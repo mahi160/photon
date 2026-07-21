@@ -33,12 +33,18 @@ export function buildDeviceProfile(maxBitrate: number): object {
     'pcm_s24le'
   ]
 
-  // permissive video-range declaration per codec (SDR/HDR10/HLG, no Dolby
-  // Vision profile claimed — mpv has no dedicated DOVI tone-mapping path
-  // worth claiming here). Omitting this makes the server assume the client
-  // can't handle non-SDR and insert an HDR->SDR tonemap filter, i.e. a
-  // transcode, for no reason.
-  const hdrRanges = 'SDR|HDR10|HDR10Plus|HLG'
+  // permissive video-range declaration per codec, including every Dolby
+  // Vision variant Jellyfin's VideoRangeType enum defines (DOVI/
+  // DOVIWithHDR10/DOVIWithHLG/DOVIWithSDR/DOVIWithEL/DOVIWithHDR10Plus/
+  // DOVIWithELHDR10Plus) alongside HDR10/HDR10Plus/HLG. ffmpeg (mpv's decoder
+  // backend) decodes Dolby Vision streams -- at minimum via the HDR10-
+  // compatible base layer/RPU-agnostic path profiles 5/8 fall back to.
+  // Omitting any of these makes the server assume the client can't handle
+  // that range and insert an HDR->SDR tonemap filter, i.e. a transcode, for
+  // no reason (see jellyfin/jellyfin#16687 for the same class of bug on
+  // other clients that only declared a subset of these).
+  const hdrRanges =
+    'SDR|HDR10|HDR10Plus|HLG|DOVI|DOVIWithHDR10|DOVIWithHLG|DOVIWithSDR|DOVIWithEL|DOVIWithHDR10Plus|DOVIWithELHDR10Plus'
   const codecProfiles = videoCodecs.map((codec) => ({
     Type: 'Video',
     Codec: codec,
