@@ -47,8 +47,10 @@ own window (no separate mpv window, no `--wid` embedding). Server always
 decides direct-play/remux/transcode via a DeviceProfile — client has no
 custom transcoding logic or quality heuristics.
 
-Picture-in-Picture is not yet implemented on this engine (`enterPiP`/`exitPiP`
-are no-ops) — a mini-window substitute is planned (ADR-0006) but not built.
+Picture-in-Picture (ADR-0006) hands off to a spawned, standalone system `mpv`
+process (`--no-border --ontop`) rather than a real OS PiP panel — the only
+place Photon treats mpv as an optional, probed dependency; the PiP button
+hides itself when no system `mpv` is on `PATH`.
 
 ## Keyboard shortcuts
 
