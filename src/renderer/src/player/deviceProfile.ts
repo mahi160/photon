@@ -73,14 +73,26 @@ export function buildDeviceProfile(maxBitrate: number): object {
         BreakOnNonKeyFrames: true
       }
     ],
+    // The server's direct-play eligibility check runs GetSubtitleProfile()
+    // against whatever subtitle is currently requested and rejects direct
+    // play outright unless the result is Drop/External/Embed -- anything
+    // that falls through to its own Encode default (i.e. every format with
+    // no matching profile here) disqualifies direct play for the *whole*
+    // request, not just the subtitle, forcing a full transcode. Confirmed
+    // against jellyfin server's StreamBuilder.GetVideoDirectPlayProfile.
     SubtitleProfiles: [
-      // vtt External for anything text-convertible; every other format
-      // (pgssub/dvdsub/ass/ssa/etc.) is selected as an embedded mpv track
-      // instead (ADR-0008) — deliberately undeclared here, same as before:
-      // declaring an Encode profile for them short-circuits the server's own
-      // negotiation into burning them in server-side, which is exactly the
-      // transcode this profile is trying to avoid.
-      { Format: 'vtt', Method: 'External' }
+      // vtt External for text formats (subrip/ass/ssa/mov_text/etc, server
+      // converts on the fly) -- keeps these on the Text Subtitle path so
+      // delay/appearance styling keeps working (only text tracks support
+      // that, see engine.setTextTrack).
+      { Format: 'vtt', Method: 'External' },
+      // Embed for the image-based formats mpv selects as an embedded track
+      // instead (ADR-0008, engine.selectEmbeddedSubtitleTrack) -- this is
+      // what tells the server direct play doesn't need to burn these in.
+      // ass/ssa deliberately excluded: those stay on the vtt path above.
+      { Format: 'pgssub', Method: 'Embed' },
+      { Format: 'dvdsub', Method: 'Embed' },
+      { Format: 'dvbsub', Method: 'Embed' }
     ]
   }
 }
