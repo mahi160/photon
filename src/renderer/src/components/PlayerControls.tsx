@@ -21,6 +21,7 @@ export interface Props {
   muted: boolean
   rate: number
   pip: boolean
+  pipAvailable: boolean
   fullscreen: boolean
   audioStreams: MediaStream[]
   subtitleStreams: MediaStream[]
@@ -186,6 +187,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
               volume={p.volume}
               muted={p.muted}
               pip={p.pip}
+              pipAvailable={p.pipAvailable}
               fullscreen={p.fullscreen}
               audioStreams={p.audioStreams}
               audioIndex={p.audioIndex}

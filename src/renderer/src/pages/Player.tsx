@@ -74,15 +74,6 @@ export function Player(): React.JSX.Element {
     }
   }, [])
 
-  // PiP floats its own always-on-top window — minimize the app behind it on
-  // enter, bring it back on exit
-  const prevPip = useRef(false)
-  useEffect(() => {
-    if (engine.pip && !prevPip.current) void window.api.minimizeWindow()
-    else if (!engine.pip && prevPip.current) void window.api.restoreWindow()
-    prevPip.current = engine.pip
-  }, [engine.pip])
-
   const toggleFullscreen = useCallback(() => {
     setFullscreen((prev) => {
       const next = !prev
@@ -309,6 +300,7 @@ export function Player(): React.JSX.Element {
           muted={engine.muted}
           rate={engine.rate}
           pip={engine.pip}
+          pipAvailable={engine.pipAvailable}
           fullscreen={fullscreen}
           audioStreams={session.audioStreams}
           subtitleStreams={session.subtitleStreams}

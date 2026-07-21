@@ -18,7 +18,12 @@ interface Tick {
 
 // PlaybackEngine backed by in-process libmpv (render API, ADR-0003/0005),
 // composited under `element`'s on-screen rect instead of a <video> tag — see
-// src-tauri/src/mpv/engine.rs. PiP is a no-op here (deprioritized, #8).
+// src-tauri/src/mpv/engine.rs. PiP (ADR-0006 rev.) hands playback off to a
+// standalone, borderless/always-on-top *system* mpv process instead — see
+// src-tauri/src/pip.rs — pausing this in-process engine for the handoff so
+// there's no double audio, and resuming it at the position the spawned mpv
+// reports back on close (`pip://ended`, fired whether the user closed it or
+// `exitPiP` did).
 //
 // currentTime()/duration()/paused()/buffered() are synchronous per the
 // PlaybackEngine contract, but IPC to Rust is inherently async — this class
@@ -48,6 +53,10 @@ export class MpvEngine implements PlaybackEngine {
   // jellyfin stream index -> mpv's track id ("sid") for the current file,
   // populated by load() as it adds each external text subtitle
   private subtitleSids = new Map<number, number>()
+  // stashed for enterPiP -- the currently-loaded stream URL and last rate
+  // sent to mpv aren't otherwise tracked/observable off this engine
+  private url = ''
+  private rate = 1
 
   constructor(private element: HTMLElement) {
     const extraConfig = parseMpvConfig(useSettings.getState().mpvConfig)
@@ -82,6 +91,14 @@ export class MpvEngine implements PlaybackEngine {
       console.error('[playback] mpv error', payload)
       this.emit('error', 'Playback failed.')
     }).then((un) => this.unlisten.push(un))
+
+    // fires once the spawned PiP mpv process exits, for either reason (user
+    // closed its window, or exitPiP() killed it) -- single place that
+    // resumes this engine, so both paths behave identically
+    void listen<number>('pip://ended', ({ payload }) => {
+      this.seek(payload)
+      this.emit('pip', false)
+    }).then((un) => this.unlisten.push(un))
   }
 
   private emit<K extends keyof EngineEvents>(event: K, ...args: Parameters<EngineEvents[K]>): void {
@@ -103,6 +120,7 @@ export class MpvEngine implements PlaybackEngine {
   async load(req: LoadRequest): Promise<void> {
     await this.ready
     this.subtitleSids.clear()
+    this.url = req.url
     await invoke('mpv_load', { url: req.url, startSeconds: req.startSeconds })
     // mpv fetches subtitle URLs itself (its own HTTP stack, no CORS) — unlike
     // html5.ts there's no need to fetch/blob these through the main process
@@ -131,6 +149,7 @@ export class MpvEngine implements PlaybackEngine {
   }
 
   setRate(rate: number): void {
+    this.rate = rate
     void invoke('mpv_set_rate', { rate })
   }
 
@@ -167,12 +186,25 @@ export class MpvEngine implements PlaybackEngine {
     void invoke('mpv_select_track', { kind: 'sub', sourceIndex: index })
   }
 
-  // ponytail: PiP is deprioritized (#8) — no-op until then
   async enterPiP(): Promise<void> {
-    /* no-op until #8 */
+    if (!this.url) return
+    const wasPaused = this.last.paused
+    this.pause() // avoid double audio while the spawned mpv also plays this stream
+    await invoke('pip_start', {
+      url: this.url,
+      startSeconds: this.last.time,
+      volume: this.last.volume,
+      muted: this.last.muted,
+      rate: this.rate,
+      paused: wasPaused
+    })
+    this.emit('pip', true)
   }
+
+  // Just kills the spawned process -- `pip://ended` (above) does the actual
+  // resume, so closing it from here or from its own window behave the same.
   async exitPiP(): Promise<void> {
-    /* no-op until #8 */
+    await invoke('pip_stop')
   }
 
   currentTime(): number {
@@ -202,6 +234,7 @@ export class MpvEngine implements PlaybackEngine {
     for (const un of this.unlisten) un()
     this.unlisten = []
     this.subtitleSids.clear()
+    void invoke('pip_stop') // don't orphan a floating mpv window if the player unmounts mid-PiP
     void invoke('mpv_destroy')
   }
 }

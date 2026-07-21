@@ -37,6 +37,7 @@ export interface ControlsBarProps {
   volume: number
   muted: boolean
   pip: boolean
+  pipAvailable: boolean
   fullscreen: boolean
   audioStreams: MediaStream[]
   audioIndex?: number
@@ -96,6 +97,7 @@ type PlaybackMenusProps = Pick<
   | 'subtitleDelay'
   | 'subtitleDelayEnabled'
   | 'pip'
+  | 'pipAvailable'
   | 'fullscreen'
   | 'menuOpen'
   | 'onToggleMenu'
@@ -116,6 +118,7 @@ const PlaybackMenus = memo(function PlaybackMenus({
   subtitleDelay,
   subtitleDelayEnabled,
   pip,
+  pipAvailable,
   fullscreen,
   menuOpen,
   onToggleMenu,
@@ -240,17 +243,19 @@ const PlaybackMenus = memo(function PlaybackMenus({
         </BasePopover.Portal>
       </BasePopover.Root>
 
-      <Tip label={pip ? 'Exit Picture in Picture' : 'Picture in Picture'} kbd="P">
-        <button
-          className={`${styles.iconBtn} ${pip ? styles.iconBtnActive : ''}`}
-          onClick={onPiP}
-          onMouseDown={noFocusOnClick}
-          tabIndex={-1}
-          aria-label="Picture in Picture"
-        >
-          <Pip weight={pip ? 'Filled' : 'Outline'} className={styles.icon} />
-        </button>
-      </Tip>
+      {pipAvailable && (
+        <Tip label={pip ? 'Exit Picture in Picture' : 'Picture in Picture'} kbd="P">
+          <button
+            className={`${styles.iconBtn} ${pip ? styles.iconBtnActive : ''}`}
+            onClick={onPiP}
+            onMouseDown={noFocusOnClick}
+            tabIndex={-1}
+            aria-label="Picture in Picture"
+          >
+            <Pip weight={pip ? 'Filled' : 'Outline'} className={styles.icon} />
+          </button>
+        </Tip>
+      )}
 
       <Tip label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'} kbd="F">
         <button
@@ -275,6 +280,7 @@ export function ControlsBar({
   volume,
   muted,
   pip,
+  pipAvailable,
   fullscreen,
   audioStreams,
   audioIndex,
@@ -373,6 +379,7 @@ export function ControlsBar({
         subtitleDelay={subtitleDelay}
         subtitleDelayEnabled={subtitleDelayEnabled}
         pip={pip}
+        pipAvailable={pipAvailable}
         fullscreen={fullscreen}
         menuOpen={menuOpen}
         onToggleMenu={onToggleMenu}

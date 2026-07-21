@@ -25,6 +25,7 @@ export interface PlayerEngineApi {
   muted: boolean
   rate: number
   pip: boolean
+  pipAvailable: boolean
   error: string | null
   clearError: () => void
   currentTime: () => number
@@ -63,7 +64,14 @@ export function usePlayerEngine(
   const [muted, setMuted] = useState(initial.muted)
   const [rate, setRate] = useState(initial.rate)
   const [pip, setPip] = useState(false)
+  const [pipAvailable, setPipAvailable] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // system mpv is genuinely optional (unlike in-process playback) -- PiP
+  // just hides itself when there's nothing to spawn
+  useEffect(() => {
+    void window.api.pipAvailable().then(setPipAvailable)
+  }, [])
   const rateRef = useRef(initial.rate)
   // mirrors so adjustVolume/toggleMute keep stable identities (they feed
   // memoized controls) and can report the value they just set
@@ -190,9 +198,9 @@ export function usePlayerEngine(
 
   const togglePiP = useCallback(() => {
     const e = engineRef.current
-    if (!e) return
+    if (!e || !pipAvailable) return
     void (pip ? e.exitPiP() : e.enterPiP())
-  }, [pip])
+  }, [pip, pipAvailable])
 
   return {
     state,
@@ -203,6 +211,7 @@ export function usePlayerEngine(
     muted,
     rate,
     pip,
+    pipAvailable,
     error,
     clearError: useCallback(() => setError(null), []),
     currentTime,

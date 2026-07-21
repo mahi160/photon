@@ -1,5 +1,6 @@
 mod commands;
 mod mpv;
+mod pip;
 
 use mpv::commands::MpvState;
 
@@ -11,6 +12,7 @@ pub fn run() {
             None,
         ))
         .manage(MpvState::default())
+        .manage(pip::PipState::default())
         .invoke_handler(tauri::generate_handler![
             commands::session_get,
             commands::session_set,
@@ -19,6 +21,9 @@ pub fn run() {
             commands::app_minimize,
             commands::app_restore,
             commands::app_set_fullscreen,
+            pip::pip_available,
+            pip::pip_start,
+            pip::pip_stop,
             commands::app_set_login_item,
             commands::app_get_login_item,
             commands::app_set_hw_accel,
