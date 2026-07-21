@@ -1,6 +1,7 @@
 import { CaretLeft, Pause, Play } from 'reicon-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { type BaseItem, type MediaSegment, type MediaStream } from '../lib/jellyfin'
+import { noFocusOnClick } from '../lib/noFocusOnClick'
 import { Tip } from './Tip'
 import { TimelinePreview } from './TimelinePreview'
 import { ControlsBar } from './ControlsBar'
@@ -49,10 +50,13 @@ export interface Props {
 export function PlayerControls(p: Props): React.JSX.Element {
   const [menu, setMenu] = useState<'audio' | 'subs' | 'speed' | 'sync' | null>(null)
   // stable identity — ControlsBar's menu group is memoized against ticking time
-  const onToggleMenu = useCallback(
-    (m: 'audio' | 'subs' | 'speed' | 'sync', open: boolean) => setMenu(open ? m : null),
-    []
-  )
+  const onToggleMenu = useCallback((m: 'audio' | 'subs' | 'speed' | 'sync', open: boolean) => {
+    setMenu(open ? m : null)
+    // don't let a closed menu's trigger retain focus -- useHotkeys treats a
+    // focused control as "let the browser handle this key" instead of
+    // running our shortcuts (:focus-visible guard, see useHotkeys.ts)
+    if (!open) (document.activeElement as HTMLElement | null)?.blur()
+  }, [])
   const [hover, setHover] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const [dismissedFor, setDismissedFor] = useState<string | null>(null)
@@ -116,7 +120,13 @@ export function PlayerControls(p: Props): React.JSX.Element {
         >
           <div className={styles.topBar}>
             <Tip label="Back">
-              <button className={styles.iconBtn} onClick={p.onBack} aria-label="Back">
+              <button
+                className={styles.iconBtn}
+                onClick={p.onBack}
+                onMouseDown={noFocusOnClick}
+                tabIndex={-1}
+                aria-label="Back"
+              >
                 <CaretLeft className={styles.icon} />
               </button>
             </Tip>

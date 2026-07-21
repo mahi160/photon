@@ -18,6 +18,7 @@ pub fn run() {
             commands::app_version,
             commands::app_minimize,
             commands::app_restore,
+            commands::app_set_fullscreen,
             commands::app_set_login_item,
             commands::app_get_login_item,
             commands::app_set_hw_accel,

@@ -27,7 +27,7 @@ export function TrackSelectMenu({
   return (
     <BaseMenu.Root open={open} onOpenChange={onOpenChange}>
       <Tip label={ariaLabel}>
-        <BaseMenu.Trigger className={styles.iconBtn} aria-label={ariaLabel}>
+        <BaseMenu.Trigger className={styles.iconBtn} tabIndex={-1} aria-label={ariaLabel}>
           {label}
         </BaseMenu.Trigger>
       </Tip>

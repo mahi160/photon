@@ -49,6 +49,11 @@ pub fn app_restore(window: tauri::Window) {
 }
 
 #[tauri::command]
+pub fn app_set_fullscreen(window: tauri::Window, fullscreen: bool) {
+    let _ = window.set_fullscreen(fullscreen);
+}
+
+#[tauri::command]
 pub fn app_set_login_item(app: AppHandle, enabled: bool) {
     use tauri_plugin_autostart::ManagerExt;
     let mgr = app.autolaunch();

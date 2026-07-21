@@ -50,15 +50,27 @@ export function Player(): React.JSX.Element {
   const { message: toast, show: showToast } = useToast(1200)
   const { visible, setPinned, poke } = useAutoHideControls(engine.state)
 
-  // real fullscreen state (Esc exits natively; icon must follow), and never
-  // strand the app in fullscreen when leaving the player
+  // Native OS window fullscreen (Tauri's set_fullscreen), not the DOM
+  // Fullscreen API -- WebKit implements document.documentElement's Fullscreen
+  // API by presenting the fullscreen element in a *separate* window/layer
+  // outside the app's own NSWindow, which the mpv NSView (composited as a
+  // sibling under the *original* window's content view, see engine.rs) never
+  // gets carried into: fullscreen showed no video, and the real window
+  // underneath (still receiving actual clicks) could visually desync from
+  // whatever WebKit was presenting, making clicks land wrong. Native window
+  // fullscreen keeps everything in the same NSWindow/content view, so the
+  // mpv surface keeps compositing correctly.
   const [fullscreen, setFullscreen] = useState(false)
+  const fullscreenRef = useRef(false)
   useEffect(() => {
-    const onFs = (): void => setFullscreen(!!document.fullscreenElement)
-    document.addEventListener('fullscreenchange', onFs)
+    fullscreenRef.current = fullscreen
+  }, [fullscreen])
+  // never strand the app in fullscreen when leaving the player -- no native
+  // DOM Fullscreen auto-exit to rely on anymore, Esc is handled explicitly
+  // below
+  useEffect(() => {
     return () => {
-      document.removeEventListener('fullscreenchange', onFs)
-      if (document.fullscreenElement) void document.exitFullscreen()
+      if (fullscreenRef.current) void window.api.setFullscreen(false)
     }
   }, [])
 
@@ -72,8 +84,11 @@ export function Player(): React.JSX.Element {
   }, [engine.pip])
 
   const toggleFullscreen = useCallback(() => {
-    if (document.fullscreenElement) void document.exitFullscreen()
-    else void document.documentElement.requestFullscreen()
+    setFullscreen((prev) => {
+      const next = !prev
+      void window.api.setFullscreen(next)
+      return next
+    })
   }, [])
 
   // stable identities: these feed the player's track-select menus, which are
@@ -189,6 +204,10 @@ export function Player(): React.JSX.Element {
     arrowdown: () => bumpVolume(-0.05),
     f: (e) => {
       if (!e.repeat) toggleFullscreen()
+    },
+    escape: (e) => {
+      // exit only -- never enter fullscreen via Escape
+      if (!e.repeat && fullscreen) toggleFullscreen()
     },
     p: (e) => {
       if (!e.repeat) engine.togglePiP()

@@ -16,6 +16,7 @@ import {
   Volume
 } from 'reicon-react'
 import type { MediaStream, BaseItem } from '../lib/jellyfin'
+import { noFocusOnClick } from '../lib/noFocusOnClick'
 import { speeds } from '../player/engine'
 import { Stepper, type StepperClasses } from './Stepper'
 import { Tip } from './Tip'
@@ -131,8 +132,8 @@ const PlaybackMenus = memo(function PlaybackMenus({
         open={menuOpen === 'speed'}
         onOpenChange={(open) => onToggleMenu('speed', open)}
       >
-        <Tip label="Playback speed">
-          <BaseMenu.Trigger className={styles.iconBtn} aria-label="Playback speed">
+        <Tip label="Playback speed" kbd="< >">
+          <BaseMenu.Trigger className={styles.iconBtn} tabIndex={-1} aria-label="Playback speed">
             <span className={styles.rateLabel}>{rate}×</span>
           </BaseMenu.Trigger>
         </Tip>
@@ -174,7 +175,7 @@ const PlaybackMenus = memo(function PlaybackMenus({
         onOpenChange={(open) => onToggleMenu('subs', open)}
       >
         <Tip label="Subtitles">
-          <BaseSelect.Trigger className={styles.iconBtn} aria-label="Subtitles">
+          <BaseSelect.Trigger className={styles.iconBtn} tabIndex={-1} aria-label="Subtitles">
             <Cc weight={subtitleIndex !== null ? 'Filled' : 'Outline'} className={styles.icon} />
           </BaseSelect.Trigger>
         </Tip>
@@ -204,6 +205,7 @@ const PlaybackMenus = memo(function PlaybackMenus({
         <Tip label="Subtitle sync" kbd="[ ]">
           <BasePopover.Trigger
             className={styles.iconBtn}
+            tabIndex={-1}
             disabled={!subtitleDelayEnabled}
             aria-label="Subtitle sync"
           >
@@ -242,6 +244,8 @@ const PlaybackMenus = memo(function PlaybackMenus({
         <button
           className={`${styles.iconBtn} ${pip ? styles.iconBtnActive : ''}`}
           onClick={onPiP}
+          onMouseDown={noFocusOnClick}
+          tabIndex={-1}
           aria-label="Picture in Picture"
         >
           <Pip weight={pip ? 'Filled' : 'Outline'} className={styles.icon} />
@@ -249,7 +253,13 @@ const PlaybackMenus = memo(function PlaybackMenus({
       </Tip>
 
       <Tip label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'} kbd="F">
-        <button className={styles.iconBtn} onClick={onFullscreen} aria-label="Fullscreen">
+        <button
+          className={styles.iconBtn}
+          onClick={onFullscreen}
+          onMouseDown={noFocusOnClick}
+          tabIndex={-1}
+          aria-label="Fullscreen"
+        >
           {fullscreen ? <Minimize className={styles.icon} /> : <Maximize className={styles.icon} />}
         </button>
       </Tip>
@@ -290,7 +300,13 @@ export function ControlsBar({
   return (
     <div className={styles.controlsRow}>
       <Tip label={state === 'playing' ? 'Pause' : 'Play'} kbd="Space">
-        <button className={styles.playBtn} onClick={onTogglePlay} aria-label="Play or pause">
+        <button
+          className={styles.playBtn}
+          onClick={onTogglePlay}
+          onMouseDown={noFocusOnClick}
+          tabIndex={-1}
+          aria-label="Play or pause"
+        >
           {state === 'playing' ? (
             <Pause weight="Filled" className={styles.icon} />
           ) : (
@@ -301,7 +317,13 @@ export function ControlsBar({
 
       {onPlayNext && (
         <Tip label={nextEpisode ? `Next: ${nextEpisode.Name}` : 'Next episode'}>
-          <button className={styles.iconBtn} onClick={onPlayNext} aria-label="Next episode">
+          <button
+            className={styles.iconBtn}
+            onClick={onPlayNext}
+            onMouseDown={noFocusOnClick}
+            tabIndex={-1}
+            aria-label="Next episode"
+          >
             <ForwardStep weight="Filled" className={styles.icon} />
           </button>
         </Tip>
@@ -309,7 +331,13 @@ export function ControlsBar({
 
       <div className={styles.volumeGroup}>
         <Tip label={muted ? 'Unmute' : 'Mute'} kbd="M">
-          <button className={styles.iconBtn} onClick={onMute} aria-label="Mute">
+          <button
+            className={styles.iconBtn}
+            onClick={onMute}
+            onMouseDown={noFocusOnClick}
+            tabIndex={-1}
+            aria-label="Mute"
+          >
             {muted || volume === 0 ? (
               <Mute className={styles.icon} />
             ) : (
@@ -327,6 +355,7 @@ export function ControlsBar({
           className={styles.volume}
           style={{ '--vol': `${(muted ? 0 : volume) * 100}%` } as React.CSSProperties}
           aria-label="Volume"
+          tabIndex={-1}
           onWheel={(e) => onVolumeStep(e.deltaY < 0 ? 0.05 : -0.05)}
         />
       </div>

@@ -115,6 +115,7 @@ export function TimelinePreview({
           className={styles.timeline}
           style={{ '--pct': pct, '--buf': buf } as React.CSSProperties}
           aria-label="Timeline"
+          tabIndex={-1}
         />
         {chapters.map((c) => (
           <span

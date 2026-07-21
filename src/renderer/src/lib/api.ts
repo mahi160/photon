@@ -18,6 +18,7 @@ export interface Api {
   appVersion: () => Promise<string>
   minimizeWindow: () => Promise<void>
   restoreWindow: () => Promise<void>
+  setFullscreen: (fullscreen: boolean) => Promise<void>
   setLoginItem: (enabled: boolean) => Promise<void>
   getLoginItem: () => Promise<boolean>
   setHwAccel: (enabled: boolean) => Promise<void>
@@ -42,6 +43,7 @@ window.api = {
   appVersion: () => invoke('app_version'),
   minimizeWindow: () => invoke('app_minimize'),
   restoreWindow: () => invoke('app_restore'),
+  setFullscreen: (fullscreen) => invoke('app_set_fullscreen', { fullscreen }),
   setLoginItem: (enabled) => invoke('app_set_login_item', { enabled }),
   getLoginItem: () => invoke('app_get_login_item'),
   setHwAccel: (enabled) => invoke('app_set_hw_accel', { enabled }),
