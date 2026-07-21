@@ -338,6 +338,9 @@ export function usePlayback(
   useEffect(() => {
     const was = engineStateRef.current
     engineStateRef.current = engineState
+    // tell the OS the real state so its overlay button (and the action it
+    // dispatches) is correct — play/pause both map to togglePlay otherwise
+    navigator.mediaSession.playbackState = engineState === 'paused' ? 'paused' : 'playing'
     if (engineState === 'paused' && was === 'playing') {
       const sess = sessionRef.current
       if (sess) reportProgress(sess, currentTime(), true)

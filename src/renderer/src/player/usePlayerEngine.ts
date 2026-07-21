@@ -120,8 +120,9 @@ export function usePlayerEngine(
 
   const currentTime = useCallback(() => engineRef.current?.currentTime() ?? 0, [])
 
-  // decide off the element, not mirrored state — during 'buffering' the mirror
-  // can't tell playing-but-stalled from paused, and pause would be unreachable
+  // decide off the engine's freshest pause mirror (last tick), not the React
+  // `state` value — during 'buffering' `state` can't tell playing-but-stalled
+  // from paused, so toggling off it would make pause unreachable mid-buffer
   const togglePlay = useCallback(() => {
     const e = engineRef.current
     if (!e) return

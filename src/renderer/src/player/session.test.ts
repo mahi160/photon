@@ -60,6 +60,12 @@ describe('toDemuxedIndex', () => {
     expect(toDemuxedIndex(sess, 1)).toBe(1) // audio, before any subtitle
   })
 
+  it('external subs only *after* the target → not shifted', () => {
+    // target is the first external sub (index 2); the external at 4 is after
+    // it and must not count
+    expect(toDemuxedIndex(sess, 2)).toBe(2)
+  })
+
   it('one external sub before it → shifted down by one', () => {
     expect(toDemuxedIndex(sess, 3)).toBe(2) // embedded sub, after the one external sub at 2
   })

@@ -80,6 +80,7 @@ struct PendingState {
     loaded: bool, // has MPV_EVENT_FILE_LOADED fired for the *current* load() yet
     start_seconds: f64,
     queued_tracks: Vec<(String, Option<i64>)>, // (kind, source_index) selected before `loaded`
+    queued_text_sid: Option<Option<i64>>,      // set_text_track called before `loaded`; latest wins
 }
 
 pub struct MpvEngine {
@@ -181,6 +182,29 @@ fn find_track_id(mpv: *mut mpv_handle, kind: &str, source_index: i64) -> Result<
         }
     }
     Err(format!("select_track: no {kind} track with source index {source_index}"))
+}
+
+// Sets/clears the text-subtitle track by mpv's own "sid" (as returned by
+// add_subtitle). Free fn so both the main thread (once loaded) and the
+// observer thread (draining a queued selection on MPV_EVENT_FILE_LOADED) can
+// call it from a raw handle -- same pattern as apply_select_track.
+fn apply_set_text_track(mpv: *mut mpv_handle, sid: Option<i64>) -> Result<(), String> {
+    let name = CString::new("sid").unwrap();
+    unsafe {
+        match sid {
+            Some(id) => {
+                let mut v = id;
+                check(
+                    mpv_set_property(mpv, name.as_ptr(), mpv_format_MPV_FORMAT_INT64, &mut v as *mut _ as *mut c_void),
+                    "mpv_set_property (sid)",
+                )
+            }
+            None => {
+                let no = CString::new("no").unwrap();
+                check(mpv_set_property_string(mpv, name.as_ptr(), no.as_ptr()), "mpv_set_property_string (sid=no)")
+            }
+        }
+    }
 }
 
 fn apply_select_track(mpv: *mut mpv_handle, kind: &str, source_index: Option<i64>) -> Result<(), String> {
@@ -381,23 +405,21 @@ impl MpvEngine {
     }
 
     /// `sid`: mpv's track id from `add_subtitle`, or `None` to disable subs.
+    ///
+    /// Deferred to MPV_EVENT_FILE_LOADED exactly like `select_track` and
+    /// `seek`: mpv runs its automatic default-subtitle selection as *part of*
+    /// the async file load, so setting `sid` right after `loadfile` races that
+    /// autoselect -- if FILE_LOADED fires after this call, mpv clobbers the
+    /// chosen external sub. Queued when `!loaded` and applied by the observer
+    /// thread once the core is ready, after autoselect has run.
     pub fn set_text_track(&self, sid: Option<i64>) -> Result<(), String> {
-        let name = CString::new("sid").unwrap();
-        unsafe {
-            match sid {
-                Some(id) => {
-                    let mut v = id;
-                    check(
-                        mpv_set_property(self.mpv, name.as_ptr(), mpv_format_MPV_FORMAT_INT64, &mut v as *mut _ as *mut c_void),
-                        "mpv_set_property (sid)",
-                    )
-                }
-                None => {
-                    let no = CString::new("no").unwrap();
-                    check(mpv_set_property_string(self.mpv, name.as_ptr(), no.as_ptr()), "mpv_set_property_string (sid=no)")
-                }
-            }
+        let mut pending = self.pending.lock().unwrap();
+        if !pending.loaded {
+            pending.queued_text_sid = Some(sid);
+            return Ok(());
         }
+        drop(pending);
+        apply_set_text_track(self.mpv, sid)
     }
 
     pub fn set_subtitle_delay(&self, seconds: f64) -> Result<(), String> {
@@ -617,10 +639,14 @@ fn spawn_observer<R: Runtime>(
                     let _ = app.emit("mpv://tick", tick.clone());
                 }
                 x if x == mpv_event_id_MPV_EVENT_FILE_LOADED => {
-                    let (start, queued_tracks) = {
+                    let (start, queued_tracks, queued_text_sid) = {
                         let mut p = pending.lock().unwrap();
                         p.loaded = true;
-                        (std::mem::replace(&mut p.start_seconds, 0.0), std::mem::take(&mut p.queued_tracks))
+                        (
+                            std::mem::replace(&mut p.start_seconds, 0.0),
+                            std::mem::take(&mut p.queued_tracks),
+                            p.queued_text_sid.take(),
+                        )
                     };
                     if start > 0.0 {
                         let args = ["seek", &start.to_string(), "absolute"];
@@ -637,6 +663,11 @@ fn spawn_observer<R: Runtime>(
                     }
                     for (kind, source_index) in queued_tracks {
                         let _ = apply_select_track(mpv, &kind, source_index);
+                    }
+                    // after autoselect + any embedded-track selection above,
+                    // so a chosen external text sub wins the load-time race
+                    if let Some(sid) = queued_text_sid {
+                        let _ = apply_set_text_track(mpv, sid);
                     }
                 }
                 x if x == mpv_event_id_MPV_EVENT_END_FILE => {

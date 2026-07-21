@@ -134,12 +134,20 @@ export class MpvEngine implements PlaybackEngine {
     void invoke('mpv_set_rate', { rate })
   }
 
+  // chained on `ready`, not fire-and-forget: usePlayerEngine applies the
+  // persisted lastVolume/lastMuted at construction, before mpv_attach
+  // resolves — a bare invoke can win the (non-FIFO) MpvState lock race, hit
+  // the still-empty engine slot, and silently drop the initial value for the
+  // whole session. `.then` callbacks fire in registration order, so rapid
+  // slider changes stay ordered.
   setVolume(volume: number): void {
-    void invoke('mpv_set_volume', { volume: Math.max(0, Math.min(1, volume)) })
+    void this.ready.then(() =>
+      invoke('mpv_set_volume', { volume: Math.max(0, Math.min(1, volume)) })
+    )
   }
 
   setMuted(muted: boolean): void {
-    void invoke('mpv_set_muted', { muted })
+    void this.ready.then(() => invoke('mpv_set_muted', { muted }))
   }
 
   setTextTrack(index: number | null): void {
