@@ -51,6 +51,25 @@ export function toDemuxedIndex(
   return index - stripped
 }
 
+// Whether switching the *embedded* (non-text) subtitle selection from
+// `current` to `next` (null = off) needs a fresh PlaybackInfo negotiation
+// instead of an instant mpv-side switch. Under direct play (ADR-0008) mpv
+// owns every embedded track itself, so this is always false there. Under a
+// Transcode fallback there's no mpv-selectable embedded track at all --
+// deviceProfile.ts declares no Encode subtitle profile, so a non-text pick
+// only exists because the server burned it into that transcode's pixels,
+// and burned pixels can't be toggled by any mpv property. Entering OR
+// leaving one needs the server to build a new stream.
+export function embeddedSubtitleSwitchNeedsReload(
+  sess: Pick<PlaybackSession, 'playMethod' | 'textTracks'>,
+  current: number | null,
+  next: number | null
+): boolean {
+  if (sess.playMethod === 'DirectPlay') return false
+  const embedded = (index: number | null): boolean => index !== null && !isTextTrack(sess, index)
+  return embedded(current) || embedded(next)
+}
+
 interface PlaybackInfoResponse {
   MediaSources: MediaSource[]
   PlaySessionId: string

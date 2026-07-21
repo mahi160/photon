@@ -1,7 +1,50 @@
 import { describe, expect, it } from 'vitest'
-import { resolveSubtitleSelection, toDemuxedIndex } from './session'
+import {
+  embeddedSubtitleSwitchNeedsReload,
+  resolveSubtitleSelection,
+  toDemuxedIndex
+} from './session'
 import { pickInitialTracks } from './usePlayback'
 import type { MediaStream } from '../lib/jellyfin'
+
+describe('embeddedSubtitleSwitchNeedsReload', () => {
+  const textTracks = [{ index: 3, label: 'English', language: 'eng', url: '' }]
+
+  it('direct play: text → embedded never needs a reload', () => {
+    const sess = { playMethod: 'DirectPlay' as const, textTracks }
+    expect(embeddedSubtitleSwitchNeedsReload(sess, 3, 4)).toBe(false)
+  })
+
+  it('direct play: embedded → off never needs a reload', () => {
+    const sess = { playMethod: 'DirectPlay' as const, textTracks }
+    expect(embeddedSubtitleSwitchNeedsReload(sess, 4, null)).toBe(false)
+  })
+
+  it('transcode: off → embedded needs a reload (server must burn it in)', () => {
+    const sess = { playMethod: 'Transcode' as const, textTracks }
+    expect(embeddedSubtitleSwitchNeedsReload(sess, null, 4)).toBe(true)
+  })
+
+  it('transcode: embedded → off needs a reload (pixels already burned in)', () => {
+    const sess = { playMethod: 'Transcode' as const, textTracks }
+    expect(embeddedSubtitleSwitchNeedsReload(sess, 4, null)).toBe(true)
+  })
+
+  it('transcode: embedded → text needs a reload', () => {
+    const sess = { playMethod: 'Transcode' as const, textTracks }
+    expect(embeddedSubtitleSwitchNeedsReload(sess, 4, 3)).toBe(true)
+  })
+
+  it('transcode: text → text never needs a reload', () => {
+    const sess = { playMethod: 'Transcode' as const, textTracks }
+    expect(embeddedSubtitleSwitchNeedsReload(sess, 3, 3)).toBe(false)
+  })
+
+  it('transcode: off → off never needs a reload', () => {
+    const sess = { playMethod: 'Transcode' as const, textTracks }
+    expect(embeddedSubtitleSwitchNeedsReload(sess, null, null)).toBe(false)
+  })
+})
 
 describe('toDemuxedIndex', () => {
   // video=0, audio=1, subs: 2 (External), 3 (embedded/PGS), 4 (External), 5 (embedded/ASS)

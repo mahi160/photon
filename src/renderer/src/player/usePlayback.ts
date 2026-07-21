@@ -15,6 +15,7 @@ import {
   reportProgress,
   reportStart,
   reportStopped,
+  embeddedSubtitleSwitchNeedsReload,
   resolveSubtitleSelection,
   startPlayback,
   stopActiveEncoding,
@@ -405,24 +406,30 @@ export function usePlayback(
         })
         useTrackMemory.getState().remember(sess.item.Id, { subtitleStreamIndex: index })
       }
+      // Transcode fallback only: a non-text pick either side of this switch
+      // is/was burned into that stream's pixels, which only a fresh
+      // negotiation can change (direct play never hits this, see the helper)
+      if (embeddedSubtitleSwitchNeedsReload(sess, subtitleIndexRef.current, index)) {
+        void loadFor(sess.item, {
+          startSeconds: engineCurrentTime(),
+          audioStreamIndex: audioIndexRef.current,
+          subtitleStreamIndex: index ?? -1,
+          mediaSourceId: sess.mediaSource.Id
+        })
+        return
+      }
       setSubtitleIndex(index)
       // direct play (ADR-0008) — mpv selects any embedded track itself, text
-      // or not, no reload needed either way. Under a Transcode fallback,
-      // toDemuxedIndex/mpv's track-list belong to the source file mpv never
-      // sees under transcode, so a non-text pick there can't be applied live
-      // (ponytail: known ceiling, see ADR-0008) — the off-clear is always
-      // safe since it needs no source-index lookup.
+      // or not, no reload needed either way (guaranteed by the check above)
       if (index !== null && isTextTrack(sess, index)) {
         setTextTrack(index)
         selectEmbeddedSubtitleTrack(null) // clear a previously active embedded track, if any
       } else {
         setTextTrack(null)
-        if (index === null) selectEmbeddedSubtitleTrack(null)
-        else if (sess.playMethod === 'DirectPlay')
-          selectEmbeddedSubtitleTrack(toDemuxedIndex(sess, index))
+        selectEmbeddedSubtitleTrack(index === null ? null : toDemuxedIndex(sess, index))
       }
     },
-    [setTextTrack, selectEmbeddedSubtitleTrack]
+    [setTextTrack, selectEmbeddedSubtitleTrack, loadFor, engineCurrentTime]
   )
 
   const selectAudio = useCallback(
@@ -433,13 +440,23 @@ export function usePlayback(
       const language = sess.audioStreams.find((s) => s.Index === index)?.Language
       if (language) useSettings.getState().set({ preferredAudioLanguage: language })
       useTrackMemory.getState().remember(sess.item.Id, { audioStreamIndex: index })
-      // mpv switches its own embedded audio track instantly, no reload/
-      // re-buffer needed — only valid under direct play (ADR-0008); under a
-      // Transcode fallback the source-index mapping doesn't apply to the
-      // server's re-encoded track layout, so this is a no-op there
-      if (sess.playMethod === 'DirectPlay') selectAudioTrack(toDemuxedIndex(sess, index))
+      // Transcode fallback: its output carries only the one audio track the
+      // server already negotiated -- switching needs a fresh transcode with
+      // the new index, mpv has no second embedded track to select there.
+      if (sess.playMethod !== 'DirectPlay') {
+        void loadFor(sess.item, {
+          startSeconds: engineCurrentTime(),
+          audioStreamIndex: index,
+          subtitleStreamIndex: subtitleIndexRef.current ?? -1,
+          mediaSourceId: sess.mediaSource.Id
+        })
+        return
+      }
+      // direct play (ADR-0008) — mpv switches its own embedded audio track
+      // instantly, no reload/re-buffer needed
+      selectAudioTrack(toDemuxedIndex(sess, index))
     },
-    [selectAudioTrack]
+    [selectAudioTrack, loadFor, engineCurrentTime]
   )
 
   const changeDelay = useCallback(
