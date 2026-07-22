@@ -1,10 +1,8 @@
 // Installs `window.api`, backed by Tauri commands. Every call site (session
 // store, Settings, Player, ...) calls `window.api.*` — this is the one place
 // that talks to the native side.
-//
-// updater:* is stubbed — the release pipeline isn't ported yet (ticket #11),
-// and Settings' update UI shouldn't crash in the meantime.
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 
 export type UpdaterStatus =
   | { state: 'idle' | 'checking' | 'not-available' }
@@ -50,10 +48,12 @@ window.api = {
   getLoginItem: () => invoke('app_get_login_item'),
   setHwAccel: (enabled) => invoke('app_set_hw_accel', { enabled }),
   getHwAccel: () => invoke('app_get_hw_accel'),
-  // ponytail: auto-update isn't ported yet (#11) — persisted pref only
-  setAutoUpdate: () => Promise.resolve(),
-  getAutoUpdate: () => Promise.resolve(false),
-  getUpdaterStatus: () => Promise.resolve<UpdaterStatus>({ state: 'idle' }),
-  installUpdate: () => Promise.resolve(),
-  onUpdaterStatus: () => () => {}
+  setAutoUpdate: (enabled) => invoke('app_set_auto_update', { enabled }),
+  getAutoUpdate: () => invoke('app_get_auto_update'),
+  getUpdaterStatus: () => invoke('updater_get_status'),
+  installUpdate: () => invoke('updater_install'),
+  onUpdaterStatus: (cb) => {
+    const unlisten = listen<UpdaterStatus>('updater://status', ({ payload }) => cb(payload))
+    return () => void unlisten.then((un) => un())
+  }
 }
