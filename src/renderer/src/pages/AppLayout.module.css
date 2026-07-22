@@ -3,6 +3,10 @@
   flex-direction: column;
   block-size: 100%;
 
+  /* clears the overlay title bar's traffic lights (tauri.conf.json) -- they
+     get their own strip up top, .header sits below them like any other
+     content instead of trying to share a row with them */
+  padding-block-start: var(--titlebar-clearance);
   /* body no longer supplies this (ADR-0005) -- see base.css */
   background: var(--bg);
 }

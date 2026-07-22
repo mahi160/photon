@@ -123,7 +123,12 @@ export function PlayerControls(p: Props): React.JSX.Element {
           </div>
         )}
 
-        <div className={styles.topScrim}>
+        {/* overlay title bar (tauri.conf.json): traffic lights float over
+            this scrim instead of reserving their own strip -- marking it a
+            drag region gives the window a way to be moved from here; the
+            Back button/badges (real clickable elements) are excluded
+            automatically (see drag.js), no separate handling needed */}
+        <div className={styles.topScrim} data-tauri-drag-region>
           <div className={styles.topBar}>
             <Tip label="Back">
               <button

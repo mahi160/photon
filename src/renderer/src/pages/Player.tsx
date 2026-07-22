@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { invoke } from '@tauri-apps/api/core'
 import { itemQuery, mediaSegmentsQuery } from '../lib/queries'
 import {
   currentSession,
@@ -53,6 +54,18 @@ export function Player(): React.JSX.Element {
   const { message: toast, show: showToast } = useToast(1200)
   const { visible, setPinned, poke } = useAutoHideControls(engine.state)
   useWakeLock(engine.state === 'playing')
+  // native traffic-light dots (overlay title bar, tauri.conf.json) hide/show
+  // in lockstep with the rest of the controls -- they're AppKit-drawn, over
+  // the video, so CSS opacity/pointer-events (PlayerControls' own auto-hide)
+  // can't reach them; this is the one native-side echo of that same state.
+  useEffect(() => {
+    void invoke('app_set_traffic_lights_visible', { visible })
+  }, [visible])
+  // ...and always restored on the way out -- every other page expects them
+  // on, this must never leak past the player route
+  useEffect(() => {
+    return () => void invoke('app_set_traffic_lights_visible', { visible: true })
+  }, [])
   // AppLayout owns '?' + the overlay everywhere else, but the player route
   // is chrome-free (outside AppLayout, see router.tsx) -- without its own
   // copy there's no way to discover e.g. the chapter-skip shortcut while

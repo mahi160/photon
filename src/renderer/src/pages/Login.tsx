@@ -68,7 +68,10 @@ export function Login(): React.JSX.Element {
   }
 
   return (
-    <div className={styles.page}>
+    // overlay title bar (tauri.conf.json): this screen has no header of its
+    // own, so it's the only thing standing in for a drag region here (the
+    // form/inputs/buttons are excluded automatically, see drag.js)
+    <div className={styles.page} data-tauri-drag-region>
       <form onSubmit={submit} className={styles.form}>
         <h1 className={styles.brand}>
           <PhotonMark /> Photon

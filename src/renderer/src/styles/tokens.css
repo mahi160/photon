@@ -21,6 +21,14 @@
   --z-nav: 10;
   --z-overlay: 20;
   --z-toast: 30;
+
+  /* overlay title bar (tauri.conf.json): the traffic lights get their own
+     strip, content sits below them rather than beside/centered on them --
+     no measuring, no per-platform inset math, just a fixed clearance
+     generous enough to clear a compact *or* tall title bar on any macOS
+     version. AppLayout's header and the player's top bar both start below
+     this. */
+  --titlebar-clearance: 2rem;
 }
 
 /* accent colors are always chosen light (dark themes) or dark (light

@@ -17,7 +17,14 @@
 /* full-bleed gradient scrims instead of floating cards — the video stays
    the subject, controls just sit legibly on top of it */
 .topScrim {
-  padding: 1.25rem 1.5rem;
+  /* clears the overlay title bar's traffic lights (tauri.conf.json) --
+     same idea as AppLayout .shell: they get their own strip, this scrim's
+     content sits below them rather than beside them. Only matters while
+     .layer is actually visible -- the dots themselves are hidden the rest
+     of the time (usePlayerEngine's traffic-light sync, tied to the same
+     `visible` state as this whole layer, see Player.tsx). */
+  padding-block: var(--titlebar-clearance) 1.25rem;
+  padding-inline: 1.5rem;
   background: linear-gradient(to bottom, color-mix(in oklch, black 65%, transparent), transparent);
 }
 
@@ -143,7 +150,7 @@
 
 .clock {
   font-family: var(--font-mono);
-  font-size: 0.875rem;
+  font-size: 1.05rem;
   color: color-mix(in oklch, white 75%, transparent);
   text-shadow: 0 1px 8px color-mix(in oklch, black 60%, transparent);
 }

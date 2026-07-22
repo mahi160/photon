@@ -56,7 +56,11 @@ export function AppLayout(): React.JSX.Element {
 
   return (
     <div className={styles.shell}>
-      <header className={styles.header}>
+      {/* overlay title bar (tauri.conf.json): traffic lights float over this
+          bar instead of reserving their own strip -- this makes the empty
+          space in it (not the nav links/buttons themselves, see drag.js)
+          the window's drag handle */}
+      <header className={styles.header} data-tauri-drag-region>
         <Link to="/" className={styles.brand}>
           <PhotonMark /> Photon
         </Link>
