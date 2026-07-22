@@ -423,12 +423,16 @@ export function usePlayback(
       }
       setSubtitleIndex(index)
       // direct play (ADR-0008) — mpv selects any embedded track itself, text
-      // or not, no reload needed either way (guaranteed by the check above)
+      // or not, no reload needed either way (guaranteed by the check above).
+      // setTextTrack/selectEmbeddedSubtitleTrack both ultimately just set
+      // mpv's one "sid" property (different index resolution, same target) —
+      // exactly one of them must fire per switch, never both: the second
+      // call always wins, so a "clear the other kind first" call right
+      // before/after the real one doesn't clear anything, it just stomps the
+      // selection back off a moment after making it.
       if (index !== null && isTextTrack(sess, index)) {
         setTextTrack(index)
-        selectEmbeddedSubtitleTrack(null) // clear a previously active embedded track, if any
       } else {
-        setTextTrack(null)
         selectEmbeddedSubtitleTrack(index === null ? null : toDemuxedIndex(sess, index))
       }
     },

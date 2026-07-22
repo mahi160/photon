@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import type { EngineEvents, LoadRequest, PlaybackEngine } from './engine'
+import type { EngineEvents, LoadRequest, PlaybackEngine, TextTrackSource } from './engine'
 import { parseMpvConfig } from './mpvConfig'
 import { useSettings } from '../stores/settings'
 
@@ -50,10 +50,14 @@ export class MpvEngine implements PlaybackEngine {
   private resizeObserver: ResizeObserver
   private rectListenersAbort = new AbortController()
   private ready: Promise<void>
-  // stashed for enterPiP -- the currently-loaded stream URL and last rate
-  // sent to mpv aren't otherwise tracked/observable off this engine
+  // stashed for enterPiP -- the currently-loaded stream URL, last rate, and
+  // active text-subtitle (if any) aren't otherwise tracked/observable off
+  // this engine. Embedded (non-text) subtitle picks have no URL to hand a
+  // spawned PiP process, so PiP only ever carries text tracks over.
   private url = ''
   private rate = 1
+  private textTracks: TextTrackSource[] = []
+  private activeTextIndex: number | null = null
   // set once `mpv_attach` resolves (ADR-0009) -- see `renderBackend()`
   private backend: 'gpu' | 'cpu' | null = null
 
@@ -122,6 +126,8 @@ export class MpvEngine implements PlaybackEngine {
   async load(req: LoadRequest): Promise<void> {
     await this.ready
     this.url = req.url
+    this.textTracks = req.textTracks
+    this.activeTextIndex = null
     await invoke('mpv_load', { url: req.url, startSeconds: req.startSeconds })
     // mpv fetches subtitle URLs itself (its own HTTP stack, no CORS) — unlike
     // html5.ts there's no need to fetch/blob these through the main process.
@@ -181,8 +187,31 @@ export class MpvEngine implements PlaybackEngine {
     })
   }
 
+  // These three (unlike setVolume/setMuted above) resolve against server-
+  // reported track state (add_subtitle's index -> mpv "sid" map, or mpv's
+  // own demuxed track-list) that can legitimately not have what's asked --
+  // e.g. a text track whose sub-add never landed, or a source index mpv's
+  // own file never actually contains. Rust surfaces that as a rejected
+  // promise; fire-and-forget silently dropped it into an unhandled-
+  // rejection (only visible with devtools already open, no context) --
+  // logged here instead so "a subtitle just doesn't show up" always leaves
+  // a paper trail.
   setTextTrack(index: number | null): void {
+    this.activeTextIndex = index
     void invoke('mpv_set_text_track', { index })
+      .then(() => this.logTracks('setTextTrack', index))
+      .catch((e) => console.error('[playback] setTextTrack failed', index, e))
+  }
+
+  // ponytail: debug-only visibility for "added/selected without error, but
+  // nothing shows" -- dumps mpv's own real track-list (id/selected/codec/
+  // title/lang) so a silently-wrong sid or a genuinely trackless load is
+  // obvious from devtools instead of guessed at. Remove once subtitle
+  // selection has proven itself solid for a while.
+  private logTracks(from: string, arg: unknown): void {
+    void invoke('mpv_debug_tracks').then((tracks) =>
+      console.log(`[playback] track-list after ${from}(${JSON.stringify(arg)})`, tracks)
+    )
   }
 
   setSubtitleDelay(seconds: number): void {
@@ -190,24 +219,36 @@ export class MpvEngine implements PlaybackEngine {
   }
 
   selectAudioTrack(index: number): void {
-    void invoke('mpv_select_track', { kind: 'audio', sourceIndex: index })
+    void invoke('mpv_select_track', { kind: 'audio', sourceIndex: index }).catch((e) =>
+      console.error('[playback] selectAudioTrack failed', index, e)
+    )
   }
 
   selectEmbeddedSubtitleTrack(index: number | null): void {
     void invoke('mpv_select_track', { kind: 'sub', sourceIndex: index })
+      .then(() => this.logTracks('selectEmbeddedSubtitleTrack', index))
+      .catch((e) => console.error('[playback] selectEmbeddedSubtitleTrack failed', index, e))
   }
 
   async enterPiP(): Promise<void> {
     if (!this.url) return
     const wasPaused = this.last.paused
     this.pause() // avoid double audio while the spawned mpv also plays this stream
+    // hands the active *text* subtitle (if any) over via --sub-file -- the
+    // spawned mpv fetches it itself, same as sub-add does for the in-process
+    // engine, no auth/CORS concerns either. An embedded (non-text) pick has
+    // no URL to give it; PiP just plays without subs in that case, same as
+    // if none were selected at all.
+    const activeText = this.textTracks.find((t) => t.index === this.activeTextIndex)
     await invoke('pip_start', {
       url: this.url,
       startSeconds: this.last.time,
       volume: this.last.volume,
       muted: this.last.muted,
       rate: this.rate,
-      paused: wasPaused
+      paused: wasPaused,
+      subUrl: activeText?.url,
+      subLang: activeText?.language
     })
     this.emit('pip', true)
   }

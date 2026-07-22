@@ -192,6 +192,10 @@ export async function startPlayback(
   } else {
     throw new Error('Playback failed.')
   }
+  // Jellyfin appends its own "?ApiKey=" to DeliveryUrl server-side already
+  // (MediaInfoHelper.SetDeviceSpecificSubtitleInfo/StreamInfo.
+  // GetSubtitleStreamInfo, confirmed against jellyfin server source) --
+  // nothing to add here. `s.server + st.DeliveryUrl` is enough.
   const textTracks: TextTrackSource[] = subtitleStreams
     .filter((st) => st.DeliveryMethod === 'External' && st.DeliveryUrl)
     .map((st) => ({
