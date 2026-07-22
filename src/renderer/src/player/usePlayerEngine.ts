@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { MpvEngine } from './mpv'
 import type { LoadRequest, PlaybackEngine } from './engine'
 
@@ -71,7 +72,7 @@ export function usePlayerEngine(
   // system mpv is genuinely optional (unlike in-process playback) -- PiP
   // just hides itself when there's nothing to spawn
   useEffect(() => {
-    void window.api.pipAvailable().then(setPipAvailable)
+    void invoke<boolean>('pip_available').then(setPipAvailable)
   }, [])
   const rateRef = useRef(initial.rate)
   // mirrors so adjustVolume/toggleMute keep stable identities (they feed

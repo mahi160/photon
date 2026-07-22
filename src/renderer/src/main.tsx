@@ -1,5 +1,4 @@
 import './assets/main.css'
-import './lib/api'
 
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -10,6 +9,7 @@ import { useSession } from './stores/session'
 import { useSettings } from './stores/settings'
 import { resolveTheme } from './lib/theme'
 import { setClientVersion } from './lib/jellyfin'
+import { invoke } from '@tauri-apps/api/core'
 
 function applyAppearance(): void {
   const s = useSettings.getState()
@@ -31,11 +31,13 @@ const queryClient = new QueryClient({
   }
 })
 
-// restore session before the router mounts so auth guards see the real state;
-// runs alongside the real app version so the very first API call already
-// carries it instead of the "1.0.0" placeholder
-Promise.all([useSession.getState().restore(), window.api.appVersion().then(setClientVersion)]).then(
-  () => {
+// restore session before the router mounts so auth guards see the real state.
+// render must not depend on the (non-essential) app version call — if that
+// IPC rejects, the app must still mount.
+useSession
+  .getState()
+  .restore()
+  .finally(() => {
     createRoot(document.getElementById('root')!).render(
       <StrictMode>
         <QueryClientProvider client={queryClient}>
@@ -43,5 +45,9 @@ Promise.all([useSession.getState().restore(), window.api.appVersion().then(setCl
         </QueryClientProvider>
       </StrictMode>
     )
-  }
-)
+  })
+
+// fire-and-forget: version string is cosmetic, fetched in parallel
+invoke<string>('app_version')
+  .then(setClientVersion)
+  .catch(() => {})

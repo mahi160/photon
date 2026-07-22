@@ -70,8 +70,8 @@ export function Search(): React.JSX.Element {
   // instant: local index of movies + shows (ADR-0001)
   const index = useQuery(searchIndexQuery)
   const local = useMemo(
-    () => (hasQuery && index.data ? filterLocal(index.data, q) : []),
-    [index.data, q, hasQuery]
+    () => (debounced.length >= 2 && index.data ? filterLocal(index.data, debounced) : []),
+    [index.data, debounced]
   )
   const movies = local.filter((i) => i.Type === 'Movie')
   const shows = local.filter((i) => i.Type === 'Series')

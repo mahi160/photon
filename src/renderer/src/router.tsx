@@ -17,7 +17,7 @@ import { Shows } from './pages/Shows'
 import { Search } from './pages/Search'
 // heavy pages load lazily — the shell (login/home/library/search) stays in the
 // entry chunk; defaultPreload:'intent' prefetches these on link hover anyway.
-// Player especially: it pulls the whole player/ dir and (transitively) hls.js.
+// Player especially: it pulls the whole player/ dir.
 const MovieDetails = lazyRouteComponent(() => import('./pages/MovieDetails'), 'MovieDetails')
 const ShowDetails = lazyRouteComponent(() => import('./pages/ShowDetails'), 'ShowDetails')
 const Player = lazyRouteComponent(() => import('./pages/Player'), 'Player')

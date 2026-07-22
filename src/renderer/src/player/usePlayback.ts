@@ -200,7 +200,6 @@ export function usePlayback(
         setSession(sess)
         await engineLoad({
           url: sess.url,
-          hls: sess.hls,
           startSeconds: sess.startSeconds,
           textTracks: sess.textTracks
         })
@@ -357,8 +356,7 @@ export function usePlayback(
       const paused = engineStateRef.current === 'paused'
       reportProgress(sess, currentTime(), paused)
       // local watch stats — only time actually playing counts
-      if (engineStateRef.current === 'playing')
-        useWatchStats.getState().record(sess.item, 10, false)
+      if (engineStateRef.current === 'playing') useWatchStats.getState().record(sess.item, 10)
       // keep the OS media overlay's progress bar roughly honest
       const dur = ticksToSeconds(sess.mediaSource.RunTimeTicks)
       if (dur > 0) {

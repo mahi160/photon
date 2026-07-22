@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { libraryQuery, type SortKey } from '../lib/queries'
@@ -12,6 +12,11 @@ const sorts: { key: SortKey; label: string }[] = [
   { key: 'release', label: 'Release' }
 ]
 
+// merged libraries can hold thousands of items (AGENTS.md) — render this many
+// cards up front, then grow by the same amount each time the sentinel below
+// the grid scrolls into view. Caps DOM nodes without a virtualization dep.
+const PAGE_SIZE = 60
+
 export function LibraryGrid({
   type,
   title
@@ -22,6 +27,30 @@ export function LibraryGrid({
   const [sort, setSort] = useState<SortKey>('added')
   const { data, isPending, isError, refetch } = useQuery(libraryQuery(type, sort))
   const navigate = useNavigate()
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  // reset the window when the underlying list changes (sort/library refetch)
+  // -- render-time adjustment, not an effect (react docs: "adjusting state
+  // when a prop changes"), so it takes effect before the stale slice paints
+  const [prevData, setPrevData] = useState(data)
+  if (data !== prevData) {
+    setPrevData(data)
+    setVisibleCount(PAGE_SIZE)
+  }
+
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) setVisibleCount((n) => n + PAGE_SIZE)
+      },
+      { rootMargin: '600px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   // decision-paralysis killer: random unwatched movie → details page, which
   // runs a cancellable auto-play countdown (?surprise=1)
@@ -74,7 +103,7 @@ export function LibraryGrid({
         <div className={styles.status}>{`No ${noun} yet. Add media to your Jellyfin library.`}</div>
       )}
       <div className={styles.grid}>
-        {data?.map((item, i) =>
+        {data?.slice(0, visibleCount).map((item, i) =>
           // stagger only the first screenful — animating a full library's
           // worth of cards at once is just jank, not polish
           i < 12 ? (
@@ -90,6 +119,7 @@ export function LibraryGrid({
           )
         )}
       </div>
+      {data && visibleCount < data.length && <div ref={sentinelRef} aria-hidden />}
     </div>
   )
 }

@@ -33,7 +33,6 @@ export function StatsSettings(): React.JSX.Element {
   const total = sum(all)
   const movieTotal = all.reduce((t, d) => t + d.movieSecs, 0)
   const episodeTotal = all.reduce((t, d) => t + d.episodeSecs, 0)
-  const mpvTotal = all.reduce((t, d) => t + d.mpvSecs, 0)
   const topShows = Object.values(series)
     .sort((a, b) => b.secs - a.secs)
     .slice(0, 3)
@@ -89,12 +88,6 @@ export function StatsSettings(): React.JSX.Element {
           <span>Episodes</span>
           <span className={styles.statRowValue}>{fmtDur(episodeTotal)}</span>
         </div>
-        {mpvTotal > 0 && (
-          <div className={styles.statRow}>
-            <span>Played by mpv</span>
-            <span className={styles.statRowValue}>{fmtDur(mpvTotal)}</span>
-          </div>
-        )}
       </div>
 
       {topShows.length > 0 && (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ticksToSeconds, trickplayTile, trickplayUrl, type BaseItem } from '../lib/jellyfin'
 import styles from './PlayerControls.module.css'
 
@@ -23,7 +23,6 @@ export interface TimelinePreviewProps {
   currentTime: number
   bufferedEnd: number
   onSeek: (t: number) => void
-  onPreviewChange?: (preview: { x: number; t: number } | null) => void
 }
 
 export function TimelinePreview({
@@ -31,8 +30,7 @@ export function TimelinePreview({
   duration,
   currentTime,
   bufferedEnd,
-  onSeek,
-  onPreviewChange
+  onSeek
 }: TimelinePreviewProps): React.JSX.Element {
   const [preview, setPreview] = useState<{ x: number; t: number } | null>(null)
   const [showRemaining, setShowRemaining] = useState(false)
@@ -57,10 +55,6 @@ export function TimelinePreview({
 
   const pct = duration ? `${Math.min(100, (currentTime / duration) * 100)}%` : '0%'
   const buf = duration ? `${Math.min(100, (bufferedEnd / duration) * 100)}%` : '0%'
-
-  useEffect(() => {
-    onPreviewChange?.(preview)
-  }, [preview, onPreviewChange])
 
   return (
     <div className={styles.timelineRow}>

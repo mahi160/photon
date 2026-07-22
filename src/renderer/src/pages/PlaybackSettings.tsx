@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import { useSettings } from '../stores/settings'
 import { ToggleSwitch } from '../components/ToggleSwitch'
 import { SettingsSection, SettingsRow } from './SettingsSection'
@@ -35,11 +34,6 @@ export function PlaybackSettings(): React.JSX.Element {
   const subtitleBackgroundBox = useSettings((s) => s.subtitleBackgroundBox)
   const mpvConfig = useSettings((s) => s.mpvConfig)
   const set = useSettings((s) => s.set)
-  const [hwAccel, setHwAccel] = useState(true)
-
-  useEffect(() => {
-    void window.api.getHwAccel().then(setHwAccel)
-  }, [])
 
   return (
     <SettingsSection title="Playback">
@@ -56,16 +50,6 @@ export function PlaybackSettings(): React.JSX.Element {
             </option>
           ))}
         </select>
-      </SettingsRow>
-      <SettingsRow label="Hardware acceleration" hint="Takes effect after restart">
-        <ToggleSwitch
-          label="Hardware acceleration"
-          checked={hwAccel}
-          onChange={(v) => {
-            setHwAccel(v)
-            void window.api.setHwAccel(v)
-          }}
-        />
       </SettingsRow>
       <SettingsRow label="Autoplay next episode">
         <ToggleSwitch

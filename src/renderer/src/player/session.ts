@@ -19,7 +19,6 @@ export interface PlaybackSession {
   playSessionId: string
   playMethod: 'DirectPlay' | 'Transcode'
   url: string
-  hls: boolean
   textTracks: TextTrackSource[]
   audioStreams: MediaStream[]
   subtitleStreams: MediaStream[] // all subs, text-deliverable or embedded-only
@@ -193,14 +192,12 @@ export async function startPlayback(
   // reason left to ask for anything else. TranscodingUrl only happens when
   // the server itself decides direct play genuinely isn't possible.
   let url: string
-  let hls = false
   let playMethod: 'DirectPlay' | 'Transcode'
   if (ms.SupportsDirectPlay || ms.SupportsDirectStream) {
     url = directStreamUrl(item.Id, ms.Id)
     playMethod = 'DirectPlay'
   } else if (ms.TranscodingUrl) {
     url = s.server + ms.TranscodingUrl
-    hls = ms.TranscodingUrl.includes('.m3u8')
     playMethod = 'Transcode'
   } else {
     throw new Error('Playback failed.')
@@ -222,7 +219,6 @@ export async function startPlayback(
     playSessionId: info.PlaySessionId,
     playMethod,
     url,
-    hls,
     textTracks,
     audioStreams: streams.filter((st) => st.Type === 'Audio'),
     subtitleStreams,

@@ -133,8 +133,8 @@ export class MpvEngine implements PlaybackEngine {
     this.textTracks = req.textTracks
     this.activeTextIndex = null
     await invoke('mpv_load', { url: req.url, startSeconds: req.startSeconds })
-    // mpv fetches subtitle URLs itself (its own HTTP stack, no CORS) — unlike
-    // html5.ts there's no need to fetch/blob these through the main process.
+    // mpv fetches subtitle URLs itself (its own HTTP stack, no CORS) — no
+    // need to fetch/blob these through the main process.
     // Rust owns the index -> mpv "sid" mapping (and the load-race deferral
     // for it, see engine.rs's add_subtitle) -- no map to keep in sync here.
     await Promise.all(

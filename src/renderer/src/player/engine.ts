@@ -13,7 +13,6 @@ export interface TextTrackSource {
 
 export interface LoadRequest {
   url: string
-  hls: boolean
   startSeconds: number
   textTracks: TextTrackSource[]
 }

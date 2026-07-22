@@ -1,6 +1,6 @@
 //! Non-player IPC surface (issue #5): session storage, app/window info,
-//! launch-at-login, hardware-acceleration pref. Playback (mpv:*) and updater
-//! commands live elsewhere (mpv module) / aren't ported yet (ticket #11).
+//! launch-at-login. Playback (mpv:*) and updater commands live elsewhere
+//! (mpv module) / aren't ported yet (ticket #11).
 
 use keyring::Entry;
 use objc2_app_kit::{NSWindow, NSWindowButton};
@@ -34,19 +34,6 @@ pub fn session_clear() {
 #[tauri::command]
 pub fn app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
-}
-
-#[tauri::command]
-pub fn app_minimize(window: tauri::Window) {
-    let _ = window.minimize();
-}
-
-#[tauri::command]
-pub fn app_restore(window: tauri::Window) {
-    if window.is_minimized().unwrap_or(false) {
-        let _ = window.unminimize();
-    }
-    let _ = window.set_focus();
 }
 
 #[tauri::command]
@@ -88,9 +75,7 @@ pub fn app_get_login_item(app: AppHandle) -> bool {
 
 #[derive(Serialize, Deserialize, Default)]
 pub(crate) struct Prefs {
-    #[serde(default)]
-    disable_hw_accel: bool,
-    // ticket #11 -- mirrors disable_hw_accel; gates updater::spawn_check
+    // gates updater::spawn_check
     #[serde(default)]
     pub(crate) disable_auto_update: bool,
 }
@@ -116,23 +101,6 @@ fn write_prefs(app: &AppHandle, prefs: &Prefs) {
             let _ = fs::write(path, json);
         }
     }
-}
-
-// ponytail: persists the pref like Electron's version did, but there's no
-// single cross-platform Tauri/webview knob to actually disable GPU
-// compositing the way Chromium's --disable-gpu did. Real enforcement is a
-// per-platform follow-up (WebView2 env var on Windows, WEBKIT_DISABLE_
-// COMPOSITING_MODE on Linux); macOS's WKWebView has no public toggle at all.
-#[tauri::command]
-pub fn app_set_hw_accel(app: AppHandle, enabled: bool) {
-    let mut prefs = read_prefs(&app);
-    prefs.disable_hw_accel = !enabled;
-    write_prefs(&app, &prefs);
-}
-
-#[tauri::command]
-pub fn app_get_hw_accel(app: AppHandle) -> bool {
-    !read_prefs(&app).disable_hw_accel
 }
 
 #[tauri::command]

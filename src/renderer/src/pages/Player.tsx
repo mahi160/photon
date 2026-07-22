@@ -92,14 +92,14 @@ export function Player(): React.JSX.Element {
   // below
   useEffect(() => {
     return () => {
-      if (fullscreenRef.current) void window.api.setFullscreen(false)
+      if (fullscreenRef.current) void invoke('app_set_fullscreen', { fullscreen: false })
     }
   }, [])
 
   const toggleFullscreen = useCallback(() => {
     setFullscreen((prev) => {
       const next = !prev
-      void window.api.setFullscreen(next)
+      void invoke('app_set_fullscreen', { fullscreen: next })
       return next
     })
   }, [])

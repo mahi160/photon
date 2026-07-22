@@ -76,7 +76,12 @@ export async function jf<T>(
   }
   if (!res.ok) throw new JellyfinError(res.status, `${res.status} ${res.statusText}`)
   const text = await res.text()
-  return (text ? JSON.parse(text) : undefined) as T
+  if (!text) return undefined as T
+  try {
+    return JSON.parse(text) as T
+  } catch {
+    throw new JellyfinError(res.status, 'Malformed response from server.')
+  }
 }
 
 export function normalizeServer(input: string): string {

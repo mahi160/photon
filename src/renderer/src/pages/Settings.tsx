@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
-import type { UpdaterStatus } from '../lib/api'
+import { invoke } from '@tauri-apps/api/core'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '../lib/queryKeys'
+import {
+  getUpdaterStatus,
+  installUpdate,
+  onUpdaterStatus,
+  type UpdaterStatus
+} from '../lib/updater'
 import { useSession } from '../stores/session'
 import { useSettings } from '../stores/settings'
 import { ToggleSwitch } from '../components/ToggleSwitch'
@@ -25,11 +32,11 @@ export function Settings(): React.JSX.Element {
   const [updater, setUpdater] = useState<UpdaterStatus>({ state: 'idle' })
 
   useEffect(() => {
-    void window.api.appVersion().then(setVersion)
-    void window.api.getLoginItem().then(setLoginItem)
-    void window.api.getAutoUpdate().then(setAutoUpdate)
-    void window.api.getUpdaterStatus().then(setUpdater)
-    return window.api.onUpdaterStatus(setUpdater)
+    void invoke<string>('app_version').then(setVersion)
+    void invoke<boolean>('app_get_login_item').then(setLoginItem)
+    void invoke<boolean>('app_get_auto_update').then(setAutoUpdate)
+    void getUpdaterStatus().then(setUpdater)
+    return onUpdaterStatus(setUpdater)
   }, [])
 
   const updateHint =
@@ -78,7 +85,7 @@ export function Settings(): React.JSX.Element {
                 checked={loginItem}
                 onChange={(v) => {
                   setLoginItem(v)
-                  void window.api.setLoginItem(v)
+                  void invoke('app_set_login_item', { enabled: v })
                 }}
               />
             </SettingsRow>
@@ -88,7 +95,7 @@ export function Settings(): React.JSX.Element {
                 checked={autoUpdate}
                 onChange={(v) => {
                   setAutoUpdate(v)
-                  void window.api.setAutoUpdate(v)
+                  void invoke('app_set_auto_update', { enabled: v })
                 }}
               />
             </SettingsRow>
@@ -102,7 +109,16 @@ export function Settings(): React.JSX.Element {
               hint={`Signed in as ${session?.userName ?? ''}`}
             >
               <div className={styles.buttons}>
-                <button className={styles.ghostBtn} onClick={() => queryClient.invalidateQueries()}>
+                <button
+                  className={styles.ghostBtn}
+                  onClick={() =>
+                    // don't refetch the search index: staleTime:Infinity,
+                    // fetched once per launch on purpose (ADR-0001)
+                    queryClient.invalidateQueries({
+                      predicate: (q) => q.queryKey.join('.') !== queryKeys.search.index().join('.')
+                    })
+                  }
+                >
                   Reconnect
                 </button>
                 <button
@@ -133,7 +149,7 @@ export function Settings(): React.JSX.Element {
           <SettingsSection title="About">
             <SettingsRow label={`Photon ${version}`} hint={updateHint ?? 'MIT License'}>
               {updater.state === 'downloaded' ? (
-                <button className={styles.ghostBtn} onClick={() => window.api.installUpdate()}>
+                <button className={styles.ghostBtn} onClick={() => installUpdate()}>
                   Restart to update
                 </button>
               ) : (
