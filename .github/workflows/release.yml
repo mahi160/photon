@@ -2,9 +2,9 @@ name: Release
 
 # semantic-release computes the version from conventional commits and tags/
 # releases (as a draft) on every push to prod — normally a PR merge. The
-# platform builds below only run once a release actually happens, and
-# undraft it only after all three succeed (never publish a release with
-# missing binaries).
+# platform build below only runs once a release actually happens, and
+# undrafts it only once that build succeeds (never publish a release with
+# missing binaries). macOS-only today -- see build-macos's own comment.
 on:
   push:
     branches: [prod]
@@ -41,17 +41,53 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # TODO(#11): platform builds + publish. The Electron/electron-builder path
-  # this used to run (pnpm build && electron-builder --publish, then
-  # undraft once all three succeeded) is gone (ADR-0003 onward: Tauri +
-  # in-process libmpv is the shell now) — the Tauri bundler/signing/updater
-  # replacement isn't wired up yet. Until then, semantic-release above still
-  # versions/tags/changelogs releases, but leaves them as drafts — the
-  # previous auto-undraft-once-builds-succeed step is intentionally removed
-  # rather than made to undraft a release with no binaries attached.
-  publish-release:
-    if: false # re-enable once #11 lands real platform builds
+  # ticket #11: macOS-only for now, ad-hoc signed (AGENTS.md's Gatekeeper
+  # note) via Tauri's own bundler + updater signing (TAURI_SIGNING_PRIVATE_KEY
+  # secrets, not an Apple Developer cert -- that part is unchanged/still not
+  # done, see AGENTS.md). Windows/Linux builds are NOT wired up here despite
+  # being in ticket #11's acceptance criteria: build.rs's `pkg_config::
+  # probe_library("mpv")` needs real libmpv dev headers/libs on the runner,
+  # and ADR-0004's vendored --enable-lgpl libmpv build (the only real
+  # solution across all three platforms/architectures, incl. cross-compiling
+  # macOS Intel from an arm64 GH runner) "isn't wired up yet" -- guessing at
+  # Windows vcpkg/pkg-config setup or Linux's exact libmpv-dev package name
+  # with no way to run this workflow and observe a real failure isn't a
+  # substitute for that. Re-visit once ADR-0004 lands.
+  build-macos:
     needs: [release]
+    if: needs.release.outputs.published == 'true'
+    permissions:
+      contents: write
+    runs-on: macos-latest # arm64 -- native only, no --target cross-build (see comment above)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+      - run: brew install mpv
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+      - run: pnpm install --frozen-lockfile
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ needs.release.outputs.tag }}
+          releaseDraft: true
+
+  publish-release:
+    needs: [release, build-macos]
+    if: needs.release.outputs.published == 'true'
     runs-on: ubuntu-latest
     steps:
       - env:

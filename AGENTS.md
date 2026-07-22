@@ -94,10 +94,11 @@ hook locally, CI on PRs). Merging into `prod` runs semantic-release: computes
 next version from commit types, tags, updates `CHANGELOG.md`, drafts a GitHub
 Release.
 
-**Not wired up yet**: the platform-build-and-publish half of the pipeline
-(Tauri bundler artifacts, code signing, the auto-updater) — that's tracked
-work, not done. `release.yml`'s build/publish jobs are disabled until it
-lands; semantic-release itself (versioning/changelog/tagging) still runs.
+Platform builds/publishing (ticket #11): `release.yml` builds and publishes
+a macOS artifact (Tauri bundler, ad-hoc signed, updater-signed) once a
+release is cut, then undrafts it. Windows/Linux builds aren't wired up yet
+— blocked on ADR-0004's vendored libmpv (real per-platform libmpv dev
+headers/libs in CI, not just local `brew install mpv`).
 
 ## macOS Gatekeeper note
 
@@ -108,6 +109,14 @@ positive, not a corrupt download. One-time fix after moving to Applications:
 ```bash
 xattr -cr /Applications/Photon.app
 ```
+
+The in-app auto-updater (Tauri's updater plugin, ticket #11) doesn't change
+this — it verifies its own update-package signature (a separate Tauri-signing
+keypair, unrelated to Apple code signing) but installs the same ad-hoc-signed
+`.app`, so a fresh install after auto-updating can still need the same
+`xattr -cr` fix. CI only builds/publishes macOS today; Windows/Linux release
+builds remain blocked on ADR-0004's vendored libmpv (real dev headers/libs
+for those platforms/architectures aren't set up in CI yet).
 
 ## Agent skills
 
