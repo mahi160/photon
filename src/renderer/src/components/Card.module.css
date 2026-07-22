@@ -230,3 +230,25 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* episode cards only: subtitle becomes a button (links to the episode
+   itself, see Card.tsx) -- same look as .subtitle, just interactive */
+.subtitleLink {
+  overflow: hidden;
+  display: block;
+  inline-size: 100%;
+
+  margin-block-start: 0.15rem;
+  text-align: start;
+
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--fg-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subtitleLink:hover,
+.subtitleLink:focus-visible {
+  color: var(--accent);
+}

@@ -16,39 +16,44 @@ import {
 import styles from './Details.module.css'
 
 function EpisodeRow({ ep, onPlay }: { ep: BaseItem; onPlay: () => void }): React.JSX.Element {
+  const navigate = useNavigate()
   const pct = ep.UserData?.PlayedPercentage
   const img = imageUrl(ep, 320)
 
+  // two sibling buttons, not nested (Card convention, AGENTS.md): thumb
+  // plays, title opens details. WatchedButton sits beside the thumb button
+  // (not inside it) for the same reason -- a <button> can't nest a <button>.
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onPlay}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onPlay()
-        }
-      }}
-      className={styles.episodeRow}
-    >
-      <div className={styles.episodeThumb}>
-        {img && <img src={img} alt="" loading="lazy" />}
-        {pct !== undefined && pct > 0 && pct < 100 && (
-          <div className={styles.episodeProgress}>
-            <div className={styles.episodeProgressFill} style={{ inlineSize: `${pct}%` }} />
-          </div>
-        )}
+    <div className={styles.episodeRow}>
+      <div className={styles.episodeThumbWrap}>
+        <button
+          type="button"
+          onClick={onPlay}
+          aria-label={`Play ${ep.Name}`}
+          className={styles.episodeThumb}
+        >
+          {img && <img src={img} alt="" loading="lazy" />}
+          {pct !== undefined && pct > 0 && pct < 100 && (
+            <div className={styles.episodeProgress}>
+              <div className={styles.episodeProgressFill} style={{ inlineSize: `${pct}%` }} />
+            </div>
+          )}
+        </button>
         <WatchedButton
           item={ep}
           className={styles.episodeWatchedToggle}
           activeClassName={styles.episodeWatchedToggleActive}
-          stopPropagation
         />
       </div>
       <div className={styles.episodeNum}>{ep.IndexNumber ?? ''}</div>
       <div className={styles.episodeInfo}>
-        <div className={styles.episodeTitle}>{ep.Name}</div>
+        <button
+          type="button"
+          className={styles.episodeTitle}
+          onClick={() => navigate({ to: '/episode/$itemId', params: { itemId: ep.Id } })}
+        >
+          {ep.Name}
+        </button>
         <p className={styles.episodeOverview}>{ep.Overview}</p>
       </div>
     </div>

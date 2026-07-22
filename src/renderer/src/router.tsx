@@ -20,6 +20,7 @@ import { Search } from './pages/Search'
 // Player especially: it pulls the whole player/ dir.
 const MovieDetails = lazyRouteComponent(() => import('./pages/MovieDetails'), 'MovieDetails')
 const ShowDetails = lazyRouteComponent(() => import('./pages/ShowDetails'), 'ShowDetails')
+const EpisodeDetails = lazyRouteComponent(() => import('./pages/EpisodeDetails'), 'EpisodeDetails')
 const Player = lazyRouteComponent(() => import('./pages/Player'), 'Player')
 const Settings = lazyRouteComponent(() => import('./pages/Settings'), 'Settings')
 
@@ -88,6 +89,11 @@ const showDetailsRoute = createRoute({
   path: '/shows/$seriesId',
   component: ShowDetails
 })
+const episodeDetailsRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/episode/$itemId',
+  component: EpisodeDetails
+})
 
 // player is chrome-free, outside the shell
 const playerRoute = createRoute({
@@ -115,7 +121,8 @@ const routeTree = rootRoute.addChildren([
       searchRoute,
       settingsRoute,
       movieDetailsRoute,
-      showDetailsRoute
+      showDetailsRoute,
+      episodeDetailsRoute
     ]),
     playerRoute
   ])

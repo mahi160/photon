@@ -119,6 +119,49 @@
   box-shadow: var(--shadow-2);
 }
 
+/* EpisodeDetails' hero thumb -- episodes are 16:9, not the movie/show 2:3
+   poster, but needs to fill the same ‘top’ flex slot so .info's top padding
+   still lines up */
+.episodePoster {
+  flex-shrink: 0;
+  inline-size: clamp(14rem, 30vw, 20rem);
+}
+
+.episodePosterImg,
+.episodePosterPlaceholder {
+  aspect-ratio: 16 / 9;
+  inline-size: 100%;
+  border-radius: var(--radius-m);
+
+  object-fit: cover;
+  background: var(--surface-2);
+  box-shadow: var(--shadow-2);
+}
+
+.nextEpisodeCard {
+  inline-size: clamp(16rem, 40vw, 20rem);
+}
+
+.epSeriesLink {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.epSeriesLink:hover {
+  color: var(--fg);
+  text-decoration: underline;
+}
+
+.epNumberLine {
+  margin-block-start: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--fg-faint);
+}
+
 .info {
   flex: 1;
   min-inline-size: 16rem;
@@ -422,8 +465,6 @@
 }
 
 .episodeRow {
-  cursor: pointer;
-
   display: flex;
   gap: 1.15rem;
   align-items: center;
@@ -442,7 +483,7 @@
   background: var(--surface-1);
 }
 
-.episodeThumb {
+.episodeThumbWrap {
   position: relative;
 
   overflow: hidden;
@@ -453,6 +494,16 @@
   border-radius: var(--radius-s);
 
   background: var(--surface-2);
+}
+
+/* button, not a div: fills .episodeThumbWrap so the visual box is identical
+   to before, but is now a real sibling to .episodeWatchedToggle instead of
+   its parent -- a <button> can't nest a <button> */
+.episodeThumb {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  cursor: pointer;
 }
 
 .episodeThumb img {
@@ -529,9 +580,17 @@
 }
 
 .episodeTitle {
+  display: block;
+  text-align: start;
+
+  font-family: inherit;
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--fg);
+}
+
+.episodeTitle:hover {
+  text-decoration: underline;
 }
 
 .episodeOverview {

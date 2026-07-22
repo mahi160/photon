@@ -7,7 +7,8 @@ import { WatchedButton } from './WatchedButton'
 import styles from './Card.module.css'
 
 // Card semantics (CONTEXT.md): click card / hover play button = play,
-// click title label = details. Same everywhere.
+// click title label = details. For episodes specifically: title links to
+// the series (what you're browsing), subtitle links to the episode itself.
 export function Card({
   item,
   wide = false
@@ -27,19 +28,26 @@ export function Card({
     navigate({ to: '/player/$itemId', params: { itemId: item.Id } })
   }
 
-  function details(e: React.MouseEvent): void {
+  // episodes: title row links to the *series* (what you're actually
+  // browsing for), subtitle links to the episode itself -- movies/shows
+  // keep the plain title-links-to-itself behavior
+  function openTitle(e: React.MouseEvent): void {
     e.stopPropagation()
     if (item.Type === 'Movie') navigate({ to: '/movies/$itemId', params: { itemId: item.Id } })
-    else if (item.Type === 'Series')
-      navigate({ to: '/shows/$seriesId', params: { seriesId: item.Id } })
-    else if (item.SeriesId)
-      navigate({ to: '/shows/$seriesId', params: { seriesId: item.SeriesId } })
+    else if (item.Type === 'Series' || item.Type === 'Episode')
+      navigate({ to: '/shows/$seriesId', params: { seriesId: (item.SeriesId ?? item.Id)! } })
   }
 
-  const subtitle =
-    item.Type === 'Episode'
-      ? `${item.SeriesName ?? ''} · S${item.ParentIndexNumber ?? '?'}E${item.IndexNumber ?? '?'}`
-      : (item.ProductionYear ?? '')
+  function openEpisode(e: React.MouseEvent): void {
+    e.stopPropagation()
+    navigate({ to: '/episode/$itemId', params: { itemId: item.Id } })
+  }
+
+  const isEpisode = item.Type === 'Episode'
+  const titleLabel = isEpisode ? (item.SeriesName ?? '') : item.Name
+  const subtitle = isEpisode
+    ? `S${item.ParentIndexNumber ?? '?'}:E${item.IndexNumber ?? '?'} - ${item.Name}`
+    : (item.ProductionYear ?? '')
 
   return (
     <div className={`${styles.card} ${wide ? styles.wide : ''}`}>
@@ -66,8 +74,8 @@ export function Card({
         {isNew && <span className={styles.newBadge}>NEW</span>}
       </button>
       <div className={styles.meta}>
-        <button onClick={details} className={styles.title} title={item.Name}>
-          {item.Name}
+        <button onClick={openTitle} className={styles.title} title={titleLabel}>
+          {titleLabel}
         </button>
         <div className={styles.quickActions}>
           <FavoriteButton
@@ -84,7 +92,13 @@ export function Card({
           />
         </div>
       </div>
-      <div className={styles.subtitle}>{subtitle}</div>
+      {isEpisode ? (
+        <button onClick={openEpisode} className={styles.subtitleLink} title={item.Name}>
+          {subtitle}
+        </button>
+      ) : (
+        <div className={styles.subtitle}>{subtitle}</div>
+      )}
     </div>
   )
 }
