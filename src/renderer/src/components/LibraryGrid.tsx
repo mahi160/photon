@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 import { useVirtualizer } from '@tanstack/react-virtual'
@@ -22,11 +22,15 @@ const COLUMN_GAP_PX = 16 // 1rem
 const ESTIMATED_ROW_PX = 280
 
 // how many columns actually fit at the current container width — same
-// arithmetic `repeat(auto-fill, minmax(...))` does, recomputed on resize
-function useColumnCount(ref: React.RefObject<HTMLElement | null>): number {
+// arithmetic `repeat(auto-fill, minmax(...))` does, recomputed on resize.
+// State-backed callback ref, not a plain useRef: the grid div only mounts
+// once `data` has loaded (it's behind a conditional), so a plain useRef's
+// effect (deps never change) would fire once against a still-null .current
+// and never observe anything, leaving columns stuck at the initial 1.
+function useColumnCount(): [number, (el: HTMLElement | null) => void] {
+  const [el, setEl] = useState<HTMLElement | null>(null)
   const [columns, setColumns] = useState(1)
   useEffect(() => {
-    const el = ref.current
     if (!el) return
     const observer = new ResizeObserver(([entry]) => {
       const width = entry.contentRect.width
@@ -34,8 +38,8 @@ function useColumnCount(ref: React.RefObject<HTMLElement | null>): number {
     })
     observer.observe(el)
     return () => observer.disconnect()
-  }, [ref])
-  return columns
+  }, [el])
+  return [columns, setEl]
 }
 
 export function LibraryGrid({
@@ -49,8 +53,7 @@ export function LibraryGrid({
   const { data, isPending, isError, refetch } = useQuery(libraryQuery(type, sort))
   const navigate = useNavigate()
 
-  const gridRef = useRef<HTMLDivElement>(null)
-  const columns = useColumnCount(gridRef)
+  const [columns, gridRef] = useColumnCount()
   const rowCount = data ? Math.ceil(data.length / columns) : 0
 
   const virtualizer = useVirtualizer({
