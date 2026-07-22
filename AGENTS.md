@@ -109,6 +109,20 @@ positive, not a corrupt download. One-time fix after moving to Applications:
 xattr -cr /Applications/Photon.app
 ```
 
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `mahi160/photon`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five-role vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`), unchanged. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: root `CONTEXT.md` (created lazily) + `docs/adr/`. See `docs/agents/domain.md`.
+
 ## License
 
 MIT
