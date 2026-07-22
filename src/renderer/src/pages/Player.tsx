@@ -18,7 +18,9 @@ import { useHotkeys } from '../lib/useHotkeys'
 import { useToast } from '../hooks/useToast'
 import { useMediaSession } from '../hooks/useMediaSession'
 import { useAutoHideControls } from '../hooks/useAutoHideControls'
+import { useWakeLock } from '../hooks/useWakeLock'
 import { queryKeys } from '../lib/queryKeys'
+import { ShortcutsOverlay } from './Shortcuts'
 import styles from './Player.module.css'
 
 function segmentNoun(type: string): string {
@@ -50,6 +52,12 @@ export function Player(): React.JSX.Element {
   // extract toast and auto-hide controls
   const { message: toast, show: showToast } = useToast(1200)
   const { visible, setPinned, poke } = useAutoHideControls(engine.state)
+  useWakeLock(engine.state === 'playing')
+  // AppLayout owns '?' + the overlay everywhere else, but the player route
+  // is chrome-free (outside AppLayout, see router.tsx) -- without its own
+  // copy there's no way to discover e.g. the chapter-skip shortcut while
+  // actually watching something
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
   // Native OS window fullscreen (Tauri's set_fullscreen), not the DOM
   // Fullscreen API -- WebKit implements document.documentElement's Fullscreen
@@ -180,51 +188,56 @@ export function Player(): React.JSX.Element {
 
   // keyboard shortcuts (PRD: Navigation); repeat-guarded where holding the
   // key would flap the state instead of progressing it
-  useHotkeys({
-    space: (e) => {
-      if (!e.repeat) engine.togglePlay()
+  useHotkeys(
+    {
+      space: (e) => {
+        if (!e.repeat) engine.togglePlay()
+      },
+      arrowleft: () => {
+        engine.seekBy(-10)
+        poke()
+      },
+      arrowright: () => {
+        engine.seekBy(10)
+        poke()
+      },
+      arrowup: () => bumpVolume(0.05),
+      arrowdown: () => bumpVolume(-0.05),
+      f: (e) => {
+        if (!e.repeat) toggleFullscreen()
+      },
+      escape: (e) => {
+        // exit only -- never enter fullscreen via Escape
+        if (!e.repeat && fullscreen) toggleFullscreen()
+      },
+      p: (e) => {
+        if (!e.repeat) engine.togglePiP()
+      },
+      m: (e) => {
+        if (!e.repeat) toggleMuteWithToast()
+      },
+      s: (e) => {
+        if (e.repeat || !activeSegment) return
+        seek(ticksToSeconds(activeSegment.EndTicks))
+        showToast(`Skipped ${segmentNoun(activeSegment.Type)}`)
+      },
+      'shift+arrowright': () => jumpChapter(1),
+      'shift+arrowleft': () => jumpChapter(-1),
+      'shift+>': () => stepSpeed(1),
+      'shift+<': () => stepSpeed(-1),
+      '[': () => shiftSubtitleDelay(-0.5),
+      ']': () => shiftSubtitleDelay(0.5),
+      a: (e) => {
+        if (!e.repeat) cycleAudio()
+      },
+      c: (e) => {
+        if (!e.repeat) cycleSubtitle()
+      },
+      '?': () => setShortcutsOpen((v) => !v),
+      'shift+?': () => setShortcutsOpen((v) => !v)
     },
-    arrowleft: () => {
-      engine.seekBy(-10)
-      poke()
-    },
-    arrowright: () => {
-      engine.seekBy(10)
-      poke()
-    },
-    arrowup: () => bumpVolume(0.05),
-    arrowdown: () => bumpVolume(-0.05),
-    f: (e) => {
-      if (!e.repeat) toggleFullscreen()
-    },
-    escape: (e) => {
-      // exit only -- never enter fullscreen via Escape
-      if (!e.repeat && fullscreen) toggleFullscreen()
-    },
-    p: (e) => {
-      if (!e.repeat) engine.togglePiP()
-    },
-    m: (e) => {
-      if (!e.repeat) toggleMuteWithToast()
-    },
-    s: (e) => {
-      if (e.repeat || !activeSegment) return
-      seek(ticksToSeconds(activeSegment.EndTicks))
-      showToast(`Skipped ${segmentNoun(activeSegment.Type)}`)
-    },
-    'shift+arrowright': () => jumpChapter(1),
-    'shift+arrowleft': () => jumpChapter(-1),
-    'shift+>': () => stepSpeed(1),
-    'shift+<': () => stepSpeed(-1),
-    '[': () => shiftSubtitleDelay(-0.5),
-    ']': () => shiftSubtitleDelay(0.5),
-    a: (e) => {
-      if (!e.repeat) cycleAudio()
-    },
-    c: (e) => {
-      if (!e.repeat) cycleSubtitle()
-    }
-  })
+    { ignoreFocusGuard: true }
+  )
 
   // plain functions — useHotkeys reads through a ref, no stable identity needed
   function jumpChapter(dir: 1 | -1): void {
@@ -369,6 +382,7 @@ export function Player(): React.JSX.Element {
         />
       )}
       {toast && <div className={styles.toast}>{toast}</div>}
+      <ShortcutsOverlay open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
   )
 }

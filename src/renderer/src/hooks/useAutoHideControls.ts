@@ -9,7 +9,7 @@ export interface UseAutoHideApi {
 
 export function useAutoHideControls(
   playbackState: 'playing' | 'paused' | 'buffering',
-  hideDelay = 3000
+  hideDelay = 6000
 ): UseAutoHideApi {
   const [visible, setVisible] = useState(true)
   const [pinned, setPinned] = useState(false)

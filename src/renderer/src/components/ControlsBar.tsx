@@ -150,6 +150,7 @@ const PlaybackMenus = memo(function PlaybackMenus({
                     onRate(s)
                     onToggleMenu('speed', false)
                   }}
+                  tabIndex={-1}
                   className={`${styles.menuItem} ${rate === s ? styles.menuItemActive : ''}`}
                 >
                   {s}×
@@ -185,11 +186,16 @@ const PlaybackMenus = memo(function PlaybackMenus({
         <BaseSelect.Portal>
           <BaseSelect.Positioner alignItemWithTrigger side="top" sideOffset={10}>
             <BaseSelect.Popup className={styles.menu}>
-              <BaseSelect.Item value={null} className={styles.menuItem}>
+              <BaseSelect.Item value={null} tabIndex={-1} className={styles.menuItem}>
                 <BaseSelect.ItemText>Off</BaseSelect.ItemText>
               </BaseSelect.Item>
               {subtitleStreams.map((s) => (
-                <BaseSelect.Item key={s.Index} value={s.Index} className={styles.menuItem}>
+                <BaseSelect.Item
+                  key={s.Index}
+                  value={s.Index}
+                  tabIndex={-1}
+                  className={styles.menuItem}
+                >
                   <BaseSelect.ItemText>
                     {s.DisplayTitle ?? `Subtitle ${s.Index}`}
                     {s.DeliveryMethod !== 'External' && ' (burned-in)'}

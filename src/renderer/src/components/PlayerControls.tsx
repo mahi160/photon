@@ -59,7 +59,6 @@ export function PlayerControls(p: Props): React.JSX.Element {
     // running our shortcuts (:focus-visible guard, see useHotkeys.ts)
     if (!open) (document.activeElement as HTMLElement | null)?.blur()
   }, [])
-  const [hover, setHover] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const [dismissedFor, setDismissedFor] = useState<string | null>(null)
   const [pulse, setPulse] = useState<{ kind: 'playing' | 'paused'; id: number } | null>(null)
@@ -84,11 +83,17 @@ export function PlayerControls(p: Props): React.JSX.Element {
     }
   }, [p.state])
 
-  // pin controls on hover or open menu
+  // pin controls open while a menu/popover is open -- hovering the dock
+  // *without* one open no longer pins indefinitely (see
+  // useAutoHideControls.ts): a motionless cursor resting over the controls
+  // used to keep them up forever, which is the "overlay never goes away"
+  // report -- any real mouse movement still re-pokes the same idle timer
+  // via .stage's own onMouseMove, menu open/close is the only other case
+  // that needs to override it.
   const { onPinChange } = p
   useEffect(() => {
-    onPinChange(hover || menu !== null)
-  }, [hover, menu, onPinChange])
+    onPinChange(menu !== null)
+  }, [menu, onPinChange])
 
   const remaining = p.duration - p.time
   const showNextUp =
@@ -115,11 +120,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
           </div>
         )}
 
-        <div
-          className={styles.topScrim}
-          onPointerEnter={() => setHover(true)}
-          onPointerLeave={() => setHover(false)}
-        >
+        <div className={styles.topScrim}>
           <div className={styles.topBar}>
             <Tip label="Back">
               <button
@@ -171,12 +172,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
           </div>
         </div>
 
-        <div
-          className={styles.dock}
-          onPointerEnter={() => setHover(true)}
-          onPointerLeave={() => setHover(false)}
-          onWheel={(e) => p.onVolumeStep(e.deltaY < 0 ? 0.05 : -0.05)}
-        >
+        <div className={styles.dock} onWheel={(e) => p.onVolumeStep(e.deltaY < 0 ? 0.05 : -0.05)}>
           <div className={styles.dockInner}>
             <TimelinePreview
               item={p.item}

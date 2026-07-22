@@ -41,6 +41,7 @@ export function TrackSelectMenu({
                   onSelect(t.Index)
                   onOpenChange(false)
                 }}
+                tabIndex={-1}
                 className={`${styles.menuItem} ${value === t.Index ? styles.menuItemActive : ''}`}
               >
                 {t.DisplayTitle ?? `Track ${t.Index}`}
