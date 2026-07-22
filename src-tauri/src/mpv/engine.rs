@@ -295,6 +295,42 @@ fn find_track_id(mpv: *mut mpv_handle, kind: &str, source_index: i64) -> Result<
     Err(format!("select_track: no {kind} track with source index {source_index}"))
 }
 
+/// One row of `debug_track_list`'s dump -- deliberately loose/stringly-typed
+/// (every field best-effort) since this exists purely to eyeball mpv's real
+/// state from devtools when a subtitle silently doesn't render (added/
+/// selected without error, but nothing shows): whether the track exists at
+/// all, which one mpv thinks is selected, and what it thinks the track's
+/// own format/title/lang is, all in one shot.
+#[derive(Clone, serde::Serialize)]
+pub struct TrackDebugInfo {
+    pub id: i64,
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub selected: bool,
+    pub codec: Option<String>,
+    pub title: Option<String>,
+    pub lang: Option<String>,
+    pub ff_index: Option<i64>,
+}
+
+fn debug_track_list(mpv: *mut mpv_handle) -> Result<Vec<TrackDebugInfo>, String> {
+    let count = get_property_int(mpv, "track-list/count")?;
+    let mut out = Vec::new();
+    for i in 0..count {
+        let p = |field: &str| get_property_string(mpv, &format!("track-list/{i}/{field}"));
+        out.push(TrackDebugInfo {
+            id: get_property_int(mpv, &format!("track-list/{i}/id")).unwrap_or(-1),
+            kind: p("type").unwrap_or_default(),
+            selected: p("selected").map(|s| s == "yes").unwrap_or(false),
+            codec: p("codec").ok(),
+            title: p("title").ok(),
+            lang: p("lang").ok(),
+            ff_index: get_property_int(mpv, &format!("track-list/{i}/ff-index")).ok(),
+        });
+    }
+    Ok(out)
+}
+
 // Issues the actual `sub-add` command and reads back mpv's assigned "sid".
 // Free fn so both the main thread (add_subtitle, once loaded) and the
 // observer thread (draining a queued add on MPV_EVENT_FILE_LOADED) can call
@@ -686,6 +722,11 @@ impl MpvEngine {
         }
         drop(pending);
         apply_select_track(self.mpv, kind, source_index)
+    }
+
+    /// Debug-only dump of mpv's real track-list -- see `TrackDebugInfo`'s doc.
+    pub fn debug_track_list(&self) -> Result<Vec<TrackDebugInfo>, String> {
+        debug_track_list(self.mpv)
     }
 
     unsafe fn set_flag(&self, name: &str, value: bool) -> Result<(), String> {
