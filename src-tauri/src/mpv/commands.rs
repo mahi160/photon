@@ -5,15 +5,19 @@ use tauri::{AppHandle, Manager, Runtime, State};
 #[derive(Default)]
 pub struct MpvState(pub Mutex<Option<MpvEngine>>);
 
+/// Returns "gpu" or "cpu" -- whichever render backend `MpvEngine::attach`
+/// (ADR-0009) landed on, for the player overlay's CPU-fallback badge.
 #[tauri::command]
-pub fn mpv_attach<R: Runtime>(app: AppHandle<R>, state: State<'_, MpvState>, extra_config: Vec<(String, String)>) -> Result<(), String> {
+pub fn mpv_attach<R: Runtime>(app: AppHandle<R>, state: State<'_, MpvState>, extra_config: Vec<(String, String)>) -> Result<String, String> {
     let mut slot = state.0.lock().unwrap();
-    if slot.is_some() {
-        return Ok(()); // idempotent — usePlayerEngine only constructs the engine once
+    if let Some(e) = slot.as_ref() {
+        return Ok(e.render_backend().to_string()); // idempotent — usePlayerEngine only constructs the engine once
     }
     let window = app.get_webview_window("main").ok_or("no main window")?;
-    *slot = Some(MpvEngine::attach(&app, &window, &extra_config)?);
-    Ok(())
+    let engine = MpvEngine::attach(&app, &window, &extra_config)?;
+    let backend = engine.render_backend().to_string();
+    *slot = Some(engine);
+    Ok(backend)
 }
 
 #[tauri::command]

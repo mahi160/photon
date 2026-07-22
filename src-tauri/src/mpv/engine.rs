@@ -1,28 +1,9 @@
-//! In-process libmpv render-API engine (ADR-0003/0005).
-//!
-//! Renders via mpv's *software* render API (`MPV_RENDER_API_TYPE_SW`) into a
-//! plain buffer, then hands each frame to a `CALayer` (via `layer.contents`)
-//! on a layer-backed `NSView` inserted below the window's (transparent)
-//! WKWebView, at a rect the frontend keeps synced to a placeholder DOM
-//! element. No subtitles/PiP yet (tickets #7/#8).
-//!
-//! ponytail: NOT the OpenGL render API, on purpose. Tried that first
-//! (`MPV_RENDER_API_TYPE_OPENGL` into an `NSOpenGLView`) and it rendered
-//! successfully (mpv reported no errors, playback ticked forward correctly)
-//! but only ever painted flat gray, never real frames. Researched rather
-//! than guessed further: `NSOpenGLView` is not layer-backed, so it composites
-//! through a legacy pre-Core-Animation "surface" plane that doesn't blend
-//! correctly with a modern layer-backed (Metal) `WKWebView` above it — and
-//! independently, transparent OpenGL surfaces have been broken on macOS
-//! since 10.11 (`NSOpenGLCPSurfaceOpacity` is simply ignored). Layer-backing
-//! an `NSOpenGLView` directly is also documented to cause distortion/severe
-//! performance loss. The software render API sidesteps all of it: a plain
-//! `CALayer.contents = CGImage` assignment is native, fully-supported
-//! Core Animation compositing, no OpenGL/Core-Animation interop involved.
-//! Slower than GPU rendering (mpv's own docs: "very slow, because everything
-//! ... runs on the CPU") and allocates a fresh frame buffer every render —
-//! correct-first; a buffer pool / IOSurface zero-copy path is real upgrade
-//! work, not done here.
+//! In-process libmpv render-API engine (ADR-0003/0005/0009), platform-
+//! agnostic half: mpv lifecycle, command dispatch, the pending-operations
+//! queue, and tick/property observation. Every actual Cocoa/OpenGL/Metal
+//! call lives behind `RenderSurface` (`mpv/mac/`, ADR-0009) — this file
+//! never learns which backend (`SoftwareSurface`/`GpuSurface`) is active,
+//! or that a GPU→CPU fallback happened.
 //!
 //! Render loop (`spawn_render_loop` in commands.rs) is woken by mpv's own
 //! `mpv_render_context_set_update_callback` (see `RenderWaker` below) as soon
@@ -31,40 +12,9 @@
 //! ready", not "the display's about to refresh") — that's a further, real
 //! per-platform upgrade, not done here.
 
-// The `cocoa` crate (still what this whole module is built on) points at
-// `objc2`/`objc2-app-kit`/`objc2-foundation` as its replacement, but porting
-// this file's raw NSView/NSWindow/CALayer calls is a real rewrite of the
-// compositing layer above, not a drive-by fix for a warning -- silenced
-// here, not fixed, until/unless that migration is actually undertaken.
-#![allow(deprecated)]
-// The unexpected_cfgs warnings this file's msg_send!/sel_impl! call sites
-// also generate (objc 0.2.x's own pre-`--check-cfg` cargo-clippy detection
-// trick) aren't suppressible with a source-level #[allow] here -- see the
-// [lints.rust] table in Cargo.toml instead.
-
-use cocoa::appkit::NSWindow as CocoaNSWindow;
-use cocoa::base::{id, nil, BOOL, YES};
-use cocoa::foundation::{NSPoint, NSRect, NSSize};
-use core_graphics::color_space::CGColorSpace;
-use core_graphics::data_provider::CGDataProvider;
-use core_graphics::image::{CGImage, CGImageAlphaInfo};
-use foreign_types::ForeignType;
+use super::mac::{self, Backend, RenderSurface};
 use libmpv_sys::*;
-
-// libmpv-sys 3.1.0's published pregenerated bindings predate mpv's software
-// render API (added upstream well after that snapshot was taken) even though
-// our actual installed mpv (0.41.0) headers have it -- confirmed by grepping
-// them directly. Regenerating via the crate's own `use-bindgen` feature was
-// the "correct" fix, but its pinned bindgen (0.54, ~2020) can't parse our
-// current headers at all (panics on an anonymous union). These four values
-// are stable/documented in mpv's render.h and unlikely to ever change
-// (they're a public C API), so defining them locally is the pragmatic fix.
-const MPV_RENDER_PARAM_SW_SIZE: mpv_render_param_type = 17;
-const MPV_RENDER_PARAM_SW_FORMAT: mpv_render_param_type = 18;
-const MPV_RENDER_PARAM_SW_STRIDE: mpv_render_param_type = 19;
-const MPV_RENDER_PARAM_SW_POINTER: mpv_render_param_type = 20;
-const MPV_RENDER_API_TYPE_SW: &[u8] = b"sw\0";
-use objc::{class, msg_send, sel, sel_impl};
+use objc2_app_kit::NSWindow;
 use std::collections::HashMap;
 use std::ffi::{c_void, CStr, CString};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -104,41 +54,108 @@ struct PendingState {
     text_track_ids: HashMap<i64, i64>,
 }
 
-/// The render-loop/rect state (render context, view, colorspace) --
-/// deliberately behind its *own* mutex, separate from `MpvState` (the
-/// Tauri-managed `Mutex<Option<MpvEngine>>` every command locks). Every
-/// other command (play/pause/seek/volume/select_track/...) only ever needs
-/// `MpvState` for a fast property-set; if render_ctx/view instead lived
-/// directly on `MpvEngine` guarded only by that same lock, a slow *software*
-/// render frame (module doc: "very slow, everything on the CPU") would hold
-/// `MpvState` for the frame's whole duration and stall every other command
-/// behind it. `spawn_render_loop` (commands.rs) now only holds `MpvState`
-/// long enough to clone this handle out, then renders through this mutex
-/// instead -- so a slow frame only ever blocks another *render* (loop tick
-/// vs. `set_rect`), never a play/pause/seek/volume command.
-///
-/// Teardown is explicit (`teardown`, called from `MpvEngine::drop` while
-/// holding this same mutex) rather than left to `Drop`/refcounting:
-/// `render_ctx` must be freed strictly before `mpv_terminate_destroy(mpv)`,
-/// and any render the loop thread has already started must be allowed to
-/// finish first, not raced. Locking this mutex from `drop` gets both for
-/// free (a concurrent `render()` holds the same lock for its duration), and
-/// nulling `render_ctx` afterward turns any `render()` call that acquires
-/// the lock *after* teardown (the loop thread had already cloned the handle
-/// before `MpvEngine` was dropped) into a safe no-op instead of a
-/// use-after-free.
-pub(crate) struct RenderSurface {
-    render_ctx: *mut mpv_render_context,
-    view: id, // plain, layer-backed NSView — not an NSOpenGLView, see module doc
-    // created once — CGColorSpace is the same for every frame, no reason to
-    // recreate it 5x/sec
-    colorspace: CGColorSpace,
+/// Everything queued before `loaded` became true, moved out in the exact
+/// order `spawn_observer`'s MPV_EVENT_FILE_LOADED handler applies it: seek
+/// first, subtitle adds next (so a queued text-track selection below can
+/// resolve against them, see `add_subtitle`'s doc), embedded track selection,
+/// then text-track selection last (so it wins the race against mpv's own
+/// post-load autoselect, see `set_text_track`'s doc). A pure data move, no
+/// FFI -- `PendingState::drain` is unit-tested directly (below); the FFI
+/// side (`spawn_observer`) just executes this snapshot in field order.
+struct DrainedQueue {
+    start_seconds: f64,
+    subtitle_adds: Vec<(String, Option<String>, i64)>,
+    tracks: Vec<(String, Option<i64>)>,
+    text_index: Option<Option<i64>>,
 }
 
-// Raw AppKit/mpv pointers — see the struct doc for the exact cross-thread
-// contract (render loop's own thread + main thread, serialized by this
-// type's own mutex).
-unsafe impl Send for RenderSurface {}
+impl PendingState {
+    fn drain(&mut self) -> DrainedQueue {
+        self.loaded = true;
+        DrainedQueue {
+            start_seconds: std::mem::replace(&mut self.start_seconds, 0.0),
+            subtitle_adds: std::mem::take(&mut self.queued_subtitle_adds),
+            tracks: std::mem::take(&mut self.queued_tracks),
+            text_index: self.queued_text_index.take(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod pending_state_tests {
+    use super::*;
+
+    #[test]
+    fn drain_returns_queued_items_in_insertion_order_and_clears_them() {
+        let mut pending = PendingState { start_seconds: 12.5, ..Default::default() };
+        pending.queued_subtitle_adds.push(("a.vtt".into(), Some("eng".into()), 1));
+        pending.queued_subtitle_adds.push(("b.vtt".into(), None, 2));
+        pending.queued_tracks.push(("audio".into(), Some(3)));
+        pending.queued_tracks.push(("sub".into(), None));
+        pending.queued_text_index = Some(Some(2));
+
+        let drained = pending.drain();
+
+        assert_eq!(drained.start_seconds, 12.5);
+        assert_eq!(
+            drained.subtitle_adds,
+            vec![("a.vtt".to_string(), Some("eng".to_string()), 1), ("b.vtt".to_string(), None, 2)]
+        );
+        assert_eq!(drained.tracks, vec![("audio".to_string(), Some(3)), ("sub".to_string(), None)]);
+        assert_eq!(drained.text_index, Some(Some(2)));
+
+        // queues are consumed, not just read -- a second load's file-loaded
+        // event must never re-apply a previous load's queued operations
+        assert!(pending.loaded);
+        assert_eq!(pending.start_seconds, 0.0);
+        assert!(pending.queued_subtitle_adds.is_empty());
+        assert!(pending.queued_tracks.is_empty());
+        assert_eq!(pending.queued_text_index, None);
+    }
+
+    #[test]
+    fn drain_with_nothing_queued_is_a_harmless_no_op() {
+        let mut pending = PendingState::default();
+        let drained = pending.drain();
+        assert_eq!(drained.start_seconds, 0.0);
+        assert!(drained.subtitle_adds.is_empty());
+        assert!(drained.tracks.is_empty());
+        assert_eq!(drained.text_index, None);
+        assert!(pending.loaded);
+    }
+
+    #[test]
+    fn text_track_off_is_distinct_from_nothing_queued() {
+        // `Some(None)` ( = explicit "turn subs off") must survive drain and
+        // not collapse into the "nothing was queued" `None` case.
+        let mut pending = PendingState { queued_text_index: Some(None), ..Default::default() };
+        assert_eq!(pending.drain().text_index, Some(None));
+    }
+}
+
+// `surface`'s `Arc<Mutex<Box<dyn RenderSurface>>>` (below, on `MpvEngine`) is
+// deliberately behind its *own* mutex, separate from `MpvState` (the
+// Tauri-managed `Mutex<Option<MpvEngine>>` every command locks). Every other
+// command (play/pause/seek/volume/select_track/...) only ever needs
+// `MpvState` for a fast property-set; if the render surface instead lived
+// directly on `MpvEngine` guarded only by that same lock, a slow *software*
+// render frame (`mpv/mac/software.rs`'s doc: "very slow, everything on the
+// CPU") would hold `MpvState` for the frame's whole duration and stall every
+// other command behind it. `spawn_render_loop` (commands.rs) now only holds
+// `MpvState` long enough to clone this handle out, then renders through this
+// mutex instead -- so a slow frame only ever blocks another *render* (loop
+// tick vs. `set_rect`), never a play/pause/seek/volume command.
+//
+// Teardown is explicit (`RenderSurface::teardown`, called from
+// `MpvEngine::drop` while holding this same mutex) rather than left to
+// `Drop`/refcounting: each backend's render context must be freed strictly
+// before `mpv_terminate_destroy(mpv)`, and any render the loop thread has
+// already started must be allowed to finish first, not raced. Locking this
+// mutex from `drop` gets both for free (a concurrent `render()` holds the
+// same lock for its duration), and nulling out the backend's render context
+// inside `teardown` turns any `render()` call that acquires the lock *after*
+// teardown (the loop thread had already cloned the handle before
+// `MpvEngine` was dropped) into a safe no-op instead of a use-after-free.
 
 /// Wakes `spawn_render_loop` as soon as mpv's own
 /// `mpv_render_context_set_update_callback` reports a new frame is ready,
@@ -166,21 +183,27 @@ impl RenderWaker {
     }
 }
 
-// `cb_ctx` is `RenderWaker`'s address, set via `Arc::as_ptr` in `attach` and
-// kept alive for exactly as long as `render_ctx` can still call this (the
-// callback is unregistered in `teardown`, before `MpvEngine`'s own `waker`
-// field is dropped).
-unsafe extern "C" fn on_render_update(cb_ctx: *mut c_void) {
+// `cb_ctx` is `RenderWaker`'s address, set via `Arc::as_ptr` by whichever
+// backend (`mpv/mac/software.rs`/`gpu.rs`) creates the mpv render context,
+// and kept alive for exactly as long as that context can still call this
+// (the callback is unregistered in `teardown`, before `MpvEngine`'s own
+// `waker` field is dropped). `pub(crate)`: registered from `mpv/mac/`, not
+// just this file.
+pub(crate) unsafe extern "C" fn on_render_update(cb_ctx: *mut c_void) {
     let waker = unsafe { &*(cb_ctx as *const RenderWaker) };
     waker.notify();
 }
 
 pub struct MpvEngine {
     mpv: *mut mpv_handle,
-    surface: Arc<Mutex<RenderSurface>>,
+    surface: Arc<Mutex<Box<dyn RenderSurface>>>,
     waker: Arc<RenderWaker>,
     stop: Arc<AtomicBool>,
     observer: Option<JoinHandle<()>>,
+    // which backend `mac::attach` actually landed on -- surfaced to the
+    // frontend (`mpv_attach`'s return value) for the player overlay's
+    // CPU-fallback badge (issue #12); never used to branch behavior here.
+    backend: Backend,
     // ponytail: `seek` and `select_track` (aid/sid) right after `loadfile`
     // both race the (async) load and fail/no-op — confirmed against raw mpv
     // IPC, not just this FFI layer: mpv_command('loadfile', ...) returns as
@@ -410,27 +433,18 @@ impl MpvEngine {
         window: &WebviewWindow<R>,
         extra_config: &[(String, String)],
     ) -> Result<Self, String> {
+        // # Safety: `ns_window()` hands back a raw, non-owning `NSWindow*`
+        // (the window itself keeps ownership). Neither this cast nor the
+        // `mpv/mac/` backends' own `NSView::alloc` check main-thread
+        // affinity -- `attach`'s whole call chain (from the `mpv_attach`
+        // Tauri command down) never did on cocoa/objc 0.2.x either;
+        // preserved as-is rather than adding a new runtime check as a
+        // drive-by part of the objc2 migration (ADR-0009).
+        let ns_window_ptr = window.ns_window().map_err(|e| e.to_string())?;
+        let ns_window: &NSWindow = unsafe { &*(ns_window_ptr as *const NSWindow) };
+        let content_view = ns_window.contentView().ok_or("no content view")?;
+
         unsafe {
-            let ns_window = window.ns_window().map_err(|e| e.to_string())? as id;
-            let content_view: id = CocoaNSWindow::contentView(ns_window);
-
-            let zero_frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(0.0, 0.0));
-            let view: id = msg_send![class!(NSView), alloc];
-            let view: id = msg_send![view, initWithFrame: zero_frame];
-            if view.is_null() {
-                return Err("failed to create NSView".into());
-            }
-            let _: () = msg_send![view, setWantsLayer: YES];
-            let _: () = msg_send![view, setAutoresizingMask: 0u64]; // positioned explicitly on every rect update
-            let _: () = msg_send![view, setHidden: YES]; // hidden until the frontend reports a real rect
-
-            let below: isize = -1; // NSWindowBelow (NSWindowOrderingMode is a signed NSInteger)
-            let _: () = msg_send![content_view, addSubview: view positioned: below relativeTo: nil];
-            // addSubview: retains view; release our own alloc'd reference now
-            // that the content view owns one (removeFromSuperview in Drop
-            // below releases that one in turn)
-            let _: () = msg_send![view, release];
-
             let mpv = mpv_create();
             if mpv.is_null() {
                 return Err("mpv_create failed".into());
@@ -487,29 +501,13 @@ impl MpvEngine {
 
             check(mpv_initialize(mpv), "mpv_initialize")?;
 
-            let api_type_ptr = MPV_RENDER_API_TYPE_SW.as_ptr() as *const std::os::raw::c_char;
-            let mut params = [
-                mpv_render_param {
-                    type_: mpv_render_param_type_MPV_RENDER_PARAM_API_TYPE,
-                    data: api_type_ptr as *mut c_void,
-                },
-                mpv_render_param {
-                    type_: mpv_render_param_type_MPV_RENDER_PARAM_INVALID,
-                    data: std::ptr::null_mut(),
-                },
-            ];
-            let mut render_ctx: *mut mpv_render_context = std::ptr::null_mut();
-            check(
-                mpv_render_context_create(&mut render_ctx, mpv, params.as_mut_ptr()),
-                "mpv_render_context_create",
-            )?;
-
             let waker = Arc::new(RenderWaker::default());
-            mpv_render_context_set_update_callback(
-                render_ctx,
-                Some(on_render_update),
-                Arc::as_ptr(&waker) as *mut c_void,
-            );
+            // Owns picking + creating the actual render context (SW vs GL
+            // params differ), the GPU-vs-CPU fallback decision, and
+            // registering `on_render_update` against whichever it picked --
+            // see `mac::attach`'s doc.
+            let (surface, backend) = mac::attach(mpv, &content_view, &waker)?;
+            let surface = Arc::new(Mutex::new(surface));
 
             observe(mpv, 1, "time-pos", mpv_format_MPV_FORMAT_DOUBLE);
             observe(mpv, 2, "pause", mpv_format_MPV_FORMAT_FLAG);
@@ -528,11 +526,6 @@ impl MpvEngine {
             let stop = Arc::new(AtomicBool::new(false));
             let pending = Arc::new(Mutex::new(PendingState::default()));
             let observer = spawn_observer(app.clone(), mpv, stop.clone(), pending.clone());
-            let surface = Arc::new(Mutex::new(RenderSurface {
-                render_ctx,
-                view,
-                colorspace: CGColorSpace::create_device_rgb(),
-            }));
 
             Ok(Self {
                 mpv,
@@ -540,6 +533,7 @@ impl MpvEngine {
                 waker,
                 stop,
                 observer: Some(observer),
+                backend,
                 pending,
             })
         }
@@ -548,7 +542,7 @@ impl MpvEngine {
     /// Clone of the render-surface handle, for `spawn_render_loop`
     /// (commands.rs) to hold *instead of* `MpvState`'s lock while it
     /// actually renders -- see `RenderSurface`'s doc.
-    pub(crate) fn render_surface(&self) -> Arc<Mutex<RenderSurface>> {
+    pub(crate) fn render_surface(&self) -> Arc<Mutex<Box<dyn RenderSurface>>> {
         Arc::clone(&self.surface)
     }
 
@@ -556,6 +550,12 @@ impl MpvEngine {
     /// instead of a fixed sleep -- see `RenderWaker`'s doc.
     pub(crate) fn render_waker(&self) -> Arc<RenderWaker> {
         Arc::clone(&self.waker)
+    }
+
+    /// "gpu" or "cpu" -- which backend `attach` actually landed on (ADR-0009).
+    /// Surfaced through the `mpv_attach` command's return value.
+    pub fn render_backend(&self) -> &'static str {
+        self.backend.as_str()
     }
 
     fn command(&self, args: &[&str]) -> Result<(), String> {
@@ -718,135 +718,6 @@ impl MpvEngine {
     }
 }
 
-impl RenderSurface {
-    /// Repositions the surface to the given content-view-local rect (points,
-    /// top-left origin, matching `getBoundingClientRect()`), or hides it
-    /// entirely when the placeholder isn't visible/mounted.
-    fn set_rect(&self, x: f64, y_top_left: f64, w: f64, h: f64) {
-        unsafe {
-            if w <= 0.0 || h <= 0.0 {
-                let _: () = msg_send![self.view, setHidden: YES];
-                return;
-            }
-            let superview: id = msg_send![self.view, superview];
-            let parent_bounds: NSRect = msg_send![superview, bounds];
-            // AppKit's NSView origin is bottom-left; the frontend reports
-            // top-left (CSS) coordinates.
-            let y = parent_bounds.size.height - y_top_left - h;
-            let frame = NSRect::new(NSPoint::new(x, y), NSSize::new(w, h));
-            let _: () = msg_send![self.view, setFrame: frame];
-            let _: () = msg_send![self.view, setHidden: cocoa::base::NO as BOOL];
-        }
-        self.render();
-    }
-
-    /// Renders one frame into an in-memory buffer and hands it to the
-    /// view's layer as a `CGImage` (see module doc for why this is the
-    /// software render API, not OpenGL). Called from the render loop's own
-    /// background thread each time mpv wakes `RenderWaker` (see that type's
-    /// doc), and once synchronously at the end of `set_rect`.
-    ///
-    /// `pub(crate)`: called directly by `spawn_render_loop` (commands.rs) via
-    /// the cloned handle from `MpvEngine::render_surface`.
-    pub(crate) fn render(&self) {
-        unsafe {
-            if self.render_ctx.is_null() {
-                return; // torn down (MpvEngine dropped) -- see `teardown`
-            }
-            let hidden: BOOL = msg_send![self.view, isHidden];
-            if hidden == YES {
-                return;
-            }
-            // ponytail: rendering at *point* resolution, not the 2x/HiDPI
-            // backing-store resolution `convertRectToBacking:` would give us.
-            // Quarters the per-frame buffer/CGImage cost on Retina displays,
-            // which is what actually made 30fps possible instead of
-            // beachballing (see spawn_render_loop's doc) -- most streamed
-            // video isn't native 4K anyway, so this is rarely a visible loss.
-            // CALayer's default contentsScale (1.0) matches a point-sized
-            // image correctly; no extra config needed.
-            let bounds: NSRect = msg_send![self.view, bounds];
-            let (w, h) = (bounds.size.width as i32, bounds.size.height as i32);
-            if w <= 0 || h <= 0 {
-                return;
-            }
-
-            let stride: usize = (w as usize) * 4;
-            let mut frame = vec![0u8; stride * (h as usize)];
-
-            let mut size = [w, h];
-            let format = CString::new("rgb0").unwrap(); // opaque RGB + padding byte, no real alpha needed
-            let mut stride_val: usize = stride;
-            let mut params = [
-                mpv_render_param {
-                    type_: MPV_RENDER_PARAM_SW_SIZE,
-                    data: size.as_mut_ptr() as *mut c_void,
-                },
-                mpv_render_param {
-                    type_: MPV_RENDER_PARAM_SW_FORMAT,
-                    data: format.as_ptr() as *mut c_void,
-                },
-                mpv_render_param {
-                    type_: MPV_RENDER_PARAM_SW_STRIDE,
-                    data: &mut stride_val as *mut _ as *mut c_void,
-                },
-                mpv_render_param {
-                    type_: MPV_RENDER_PARAM_SW_POINTER,
-                    data: frame.as_mut_ptr() as *mut c_void,
-                },
-                mpv_render_param {
-                    type_: mpv_render_param_type_MPV_RENDER_PARAM_INVALID,
-                    data: std::ptr::null_mut(),
-                },
-            ];
-            let rc = mpv_render_context_render(self.render_ctx, params.as_mut_ptr());
-            if rc < 0 {
-                return; // no frame ready yet or a transient error — try again next tick
-            }
-
-            let provider = CGDataProvider::from_buffer(Arc::new(frame));
-            let image = CGImage::new(
-                w as usize,
-                h as usize,
-                8,
-                32,
-                stride,
-                &self.colorspace,
-                CGImageAlphaInfo::CGImageAlphaNoneSkipLast as u32,
-                &provider,
-                false,
-                0, // kCGRenderingIntentDefault
-            );
-            let layer: id = msg_send![self.view, layer];
-            let _: () = msg_send![layer, setContents: (image.as_ptr() as id)];
-            // Core Animation normally flushes implicit transactions on the
-            // next run-loop pass of whichever thread touched the layer --
-            // this render loop runs on a plain std::thread with no run loop
-            // at all, so without an explicit flush the contents change just
-            // sits pending forever (screen shows the punched-through hole to
-            // nothing: solid black) even though mpv genuinely produced a
-            // real frame. Forces it to the window server immediately.
-            let _: () = msg_send![class!(CATransaction), flush];
-        }
-    }
-
-    /// Frees the render context and removes the view. Called from
-    /// `MpvEngine::drop` while holding this surface's own mutex -- see the
-    /// struct doc for why this must happen here (not via `Drop`) and why
-    /// nulling `render_ctx` afterward matters.
-    fn teardown(&mut self) {
-        unsafe {
-            // Unregister before freeing the context -- otherwise a callback
-            // could fire (mpv's own thread) referencing a `RenderWaker` that
-            // `MpvEngine`'s `Drop` is about to free once this returns.
-            mpv_render_context_set_update_callback(self.render_ctx, None, std::ptr::null_mut());
-            let _: () = msg_send![self.view, removeFromSuperview];
-            mpv_render_context_free(self.render_ctx);
-        }
-        self.render_ctx = std::ptr::null_mut();
-    }
-}
-
 impl Drop for MpvEngine {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::SeqCst);
@@ -915,18 +786,9 @@ fn spawn_observer<R: Runtime>(
                     let _ = app.emit("mpv://tick", tick.clone());
                 }
                 x if x == mpv_event_id_MPV_EVENT_FILE_LOADED => {
-                    let (start, subtitle_adds, queued_tracks, queued_text_index) = {
-                        let mut p = pending.lock().unwrap();
-                        p.loaded = true;
-                        (
-                            std::mem::replace(&mut p.start_seconds, 0.0),
-                            std::mem::take(&mut p.queued_subtitle_adds),
-                            std::mem::take(&mut p.queued_tracks),
-                            p.queued_text_index.take(),
-                        )
-                    };
-                    if start > 0.0 {
-                        let args = ["seek", &start.to_string(), "absolute"];
+                    let drained = pending.lock().unwrap().drain();
+                    if drained.start_seconds > 0.0 {
+                        let args = ["seek", &drained.start_seconds.to_string(), "absolute"];
                         let cstrs: Vec<CString> =
                             args.iter().map(|s| CString::new(*s).unwrap()).collect();
                         let mut ptrs: Vec<*const std::os::raw::c_char> = cstrs
@@ -940,17 +802,17 @@ fn spawn_observer<R: Runtime>(
                     }
                     // adds first -- queued_text_index below resolves against
                     // whatever lands in `text_track_ids` here
-                    for (url, lang, index) in subtitle_adds {
+                    for (url, lang, index) in drained.subtitle_adds {
                         if let Ok(sid) = apply_add_subtitle(mpv, &url, lang.as_deref()) {
                             pending.lock().unwrap().text_track_ids.insert(index, sid);
                         }
                     }
-                    for (kind, source_index) in queued_tracks {
+                    for (kind, source_index) in drained.tracks {
                         let _ = apply_select_track(mpv, &kind, source_index);
                     }
                     // after autoselect + any embedded-track selection above,
                     // so a chosen external text sub wins the load-time race
-                    if let Some(index) = queued_text_index {
+                    if let Some(index) = drained.text_index {
                         let sid = match index {
                             None => None,
                             Some(idx) => pending.lock().unwrap().text_track_ids.get(&idx).copied(),

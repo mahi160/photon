@@ -9,15 +9,6 @@ edition = "2021"
 name = "photon_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
-# objc 0.2.x's msg_send!/sel_impl! macros expand to a `cfg(feature =
-# "cargo-clippy")` check internally (a pre-`--check-cfg` clippy-detection
-# trick from a now-unmaintained crate) -- fires at every call site using
-# those macros. A source-level #[allow(unexpected_cfgs)] doesn't suppress it
-# (rustc's check-cfg diagnostic isn't scoped by the macro's call-site
-# attributes here), so it has to be silenced at the lint-config level instead.
-[lints.rust]
-unexpected_cfgs = { level = "allow", check-cfg = ['cfg(feature, values("cargo-clippy"))'] }
-
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 pkg-config = "0.3"
@@ -32,7 +23,21 @@ libmpv-sys = "3"
 libc = "0.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-cocoa = "0.26"
-objc = "0.2"
+# objc2 crate family (ADR-0009) -- replaces cocoa/objc 0.2.x everywhere in
+# `mpv/` so the whole module has one Obj-C interop story, not two. Default
+# features left on for the AppKit/QuartzCore crates (each already ships a
+# near-complete default set; hand-picking a feature subset would just be
+# busywork this module has no need for). objc2-metal/objc2-io-surface are
+# `mpv/mac/gpu.rs`-only (checkpoint 3).
+objc2 = "0.6"
+objc2-app-kit = "0.3"
+objc2-foundation = "0.3"
+objc2-core-foundation = "0.3"
+objc2-quartz-core = "0.3"
+# "objc2-io-surface": off by default on objc2-metal itself (an optional
+# cross-crate interop feature, not part of its own kitchen-sink default) --
+# needed for the IOSurface-backed texture `mpv/mac/gpu.rs` builds (ADR-0009).
+objc2-metal = { version = "0.3", features = ["objc2-io-surface"] }
+objc2-io-surface = "0.3"
 core-graphics = "0.24"
 foreign-types = "0.5"
