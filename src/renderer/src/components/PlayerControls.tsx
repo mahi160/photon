@@ -13,7 +13,10 @@ export interface Props {
   visible: boolean
   item: BaseItem
   playMethod: 'DirectPlay' | 'Transcode'
-  mediaBadges: string[]
+  specialBadges: string[]
+  // ADR-0009 -- true only when playback fell back to the CPU render path;
+  // GPU rendering (the normal case) shows nothing (issue #12)
+  cpuFallback: boolean
   state: 'playing' | 'paused' | 'buffering'
   time: number
   duration: number
@@ -146,25 +149,25 @@ export function PlayerControls(p: Props): React.JSX.Element {
             </div>
             {p.state === 'buffering' && <div className={styles.spinner} />}
             <div className={styles.topRight}>
-              {p.mediaBadges.map((b) => (
+              {p.specialBadges.map((b) => (
                 <span key={b} className={styles.methodBadge}>
                   {b}
                 </span>
               ))}
-              <span
-                className={styles.methodBadge}
-                title={
-                  p.playMethod === 'DirectPlay'
-                    ? 'Playing the original file'
-                    : 'Converted by the server'
-                }
-              >
+              {p.playMethod !== 'DirectPlay' && (
+                <span className={styles.methodBadge} title="Converted by the server">
+                  <span className={styles.methodDot} data-method="transcode" />
+                  transcode
+                </span>
+              )}
+              {p.cpuFallback && (
                 <span
-                  className={styles.methodDot}
-                  data-method={p.playMethod === 'DirectPlay' ? 'direct' : 'transcode'}
-                />
-                {p.playMethod === 'DirectPlay' ? 'direct' : 'transcode'}
-              </span>
+                  className={styles.methodBadge}
+                  title="GPU rendering unavailable on this machine -- playing back via the slower CPU path"
+                >
+                  CPU
+                </span>
+              )}
               <span className={styles.clock}>
                 {new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
               </span>

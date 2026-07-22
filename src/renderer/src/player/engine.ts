@@ -47,6 +47,11 @@ export interface PlaybackEngine {
   selectEmbeddedSubtitleTrack(index: number | null): void // non-text (PGS/VOBSUB/styled ASS); null = off
   enterPiP(): Promise<void>
   exitPiP(): Promise<void>
+  // Which render backend attach() actually landed on (ADR-0009, macOS only
+  // today) -- `null` until attach resolves, or on an engine with no such
+  // concept. Drives the player overlay's CPU-fallback badge only; never
+  // gates behavior.
+  renderBackend(): 'gpu' | 'cpu' | null
   currentTime(): number
   duration(): number
   paused(): boolean

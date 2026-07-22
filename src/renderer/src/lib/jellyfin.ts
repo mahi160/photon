@@ -227,6 +227,26 @@ export function mediaBadges(streams: MediaStream[]): string[] {
   return out
 }
 
+// player-overlay-only badges (issue #12): only the notable attributes --
+// 4K, HDR/HDR10+/Dolby Vision variants, and Dolby Atmos. Plain codec names,
+// resolutions below 4K, and stereo/plain-surround layouts stay off the
+// overlay so the normal case (1080p, standard codecs, direct play) doesn't
+// clutter it -- the full breakdown (mediaBadges) still shows on the
+// movie/show details pages, unchanged.
+export function playerSpecialBadges(streams: MediaStream[]): string[] {
+  const v = streams.find((s) => s.Type === 'Video')
+  const a =
+    streams.find((s) => s.Type === 'Audio' && s.IsDefault) ??
+    streams.find((s) => s.Type === 'Audio')
+  const out: string[] = []
+  if (v?.Width && v.Width >= 3800) out.push('4K')
+  const range = v?.VideoRangeType
+  if (range && range !== 'SDR')
+    out.push(range.startsWith('DOVI') ? 'Dolby Vision' : range === 'HDR10Plus' ? 'HDR10+' : range)
+  if (a?.Profile?.includes('Atmos')) out.push('Atmos')
+  return out
+}
+
 export interface MediaSource {
   Id: string
   Name?: string

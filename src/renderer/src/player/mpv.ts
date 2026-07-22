@@ -54,10 +54,15 @@ export class MpvEngine implements PlaybackEngine {
   // sent to mpv aren't otherwise tracked/observable off this engine
   private url = ''
   private rate = 1
+  // set once `mpv_attach` resolves (ADR-0009) -- see `renderBackend()`
+  private backend: 'gpu' | 'cpu' | null = null
 
   constructor(private element: HTMLElement) {
     const extraConfig = parseMpvConfig(useSettings.getState().mpvConfig)
-    this.ready = invoke('mpv_attach', { extraConfig }).then(() => this.syncRect())
+    this.ready = invoke<string>('mpv_attach', { extraConfig }).then((backend) => {
+      this.backend = backend === 'gpu' ? 'gpu' : 'cpu'
+      return this.syncRect()
+    })
 
     this.resizeObserver = new ResizeObserver(() => this.syncRect())
     this.resizeObserver.observe(element)
@@ -211,6 +216,10 @@ export class MpvEngine implements PlaybackEngine {
   // resume, so closing it from here or from its own window behave the same.
   async exitPiP(): Promise<void> {
     await invoke('pip_stop')
+  }
+
+  renderBackend(): 'gpu' | 'cpu' | null {
+    return this.backend
   }
 
   currentTime(): number {

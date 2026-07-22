@@ -29,6 +29,7 @@ export interface PlayerEngineApi {
   error: string | null
   clearError: () => void
   currentTime: () => number
+  renderBackend: () => 'gpu' | 'cpu' | null
   load: (req: LoadRequest) => Promise<void>
   togglePlay: () => void
   seek: (seconds: number) => void
@@ -126,6 +127,7 @@ export function usePlayerEngine(
   )
 
   const currentTime = useCallback(() => engineRef.current?.currentTime() ?? 0, [])
+  const renderBackend = useCallback(() => engineRef.current?.renderBackend() ?? null, [])
 
   // decide off the engine's freshest pause mirror (last tick), not the React
   // `state` value — during 'buffering' `state` can't tell playing-but-stalled
@@ -214,6 +216,7 @@ export function usePlayerEngine(
     error,
     clearError: useCallback(() => setError(null), []),
     currentTime,
+    renderBackend,
     load,
     togglePlay,
     seek,

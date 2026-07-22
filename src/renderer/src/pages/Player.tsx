@@ -5,7 +5,7 @@ import { itemQuery, mediaSegmentsQuery } from '../lib/queries'
 import {
   currentSession,
   jf,
-  mediaBadges,
+  playerSpecialBadges,
   secondsToTicks,
   ticksToSeconds,
   type ItemsResult
@@ -291,10 +291,10 @@ export function Player(): React.JSX.Element {
   )
 
   const displayDuration = engine.duration || ticksToSeconds(session?.mediaSource.RunTimeTicks)
-  // quality/HDR/audio-codec tags shown beside the direct/transcode badge
-  // (details pages show the same via mediaBadges; the player OSD reuses it)
-  const qualityBadges = useMemo(
-    () => mediaBadges(session?.mediaSource.MediaStreams ?? []),
+  // only the notable quality/HDR/audio tags (issue #12) -- the full
+  // breakdown (mediaBadges) is a details-pages-only thing now
+  const specialBadges = useMemo(
+    () => playerSpecialBadges(session?.mediaSource.MediaStreams ?? []),
     [session]
   )
 
@@ -343,7 +343,8 @@ export function Player(): React.JSX.Element {
           visible={visible}
           item={session.item}
           playMethod={session.playMethod}
-          mediaBadges={qualityBadges}
+          specialBadges={specialBadges}
+          cpuFallback={engine.renderBackend() === 'cpu'}
           state={engine.state}
           time={engine.time}
           duration={displayDuration}
