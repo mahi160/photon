@@ -11,7 +11,7 @@ metadata/user/plugin management, casting, mobile/browser support.
 ## Stack
 
 Tauri (Rust shell) + React + TypeScript + Vite, TanStack Router/Query, Zustand,
-Tailwind v4. In-process libmpv (render API) is the sole playback engine —
+CSS Modules. In-process libmpv (render API) is the sole playback engine —
 see `src-tauri/src/mpv/` and ADR-0003/0005. Single Jellyfin server per
 install. Movies/Shows grids merge all server libraries of that type — library
 boundaries are invisible in the UI.
@@ -61,6 +61,8 @@ hides itself when no system `mpv` is on `PATH`.
 | ↑ / ↓     | Volume                  |
 | Shift+←/→ | Previous / next chapter |
 | S         | Skip intro / segment    |
+| A         | Cycle audio track       |
+| C         | Cycle subtitle track    |
 | < / >     | Playback speed          |
 | [ / ]     | Subtitle delay          |
 | F         | Fullscreen              |
