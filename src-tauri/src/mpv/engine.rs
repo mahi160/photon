@@ -307,18 +307,32 @@ fn find_track_id(mpv: *mut mpv_handle, kind: &str, source_index: i64) -> Result<
 // select` immediately makes the new track current, so reading the
 // now-current "sid" property right after (mpv_command is synchronous -- it
 // only returns once the command has been processed) reliably gives the
-// right id. Momentarily selecting each track while mapping is harmless:
-// callers always follow up with an explicit `set_text_track` for whichever
-// one the user actually wants.
+// right id.
+//
+// Momentarily selecting each track while mapping is *not* harmless, as
+// first assumed: with more than one text track to add, every add along the
+// way visibly selects that track before the next one runs -- seen as
+// subtitles cycling through every language for a moment on load, before
+// settling on the real pick. Restoring whatever was selected *before* this
+// add, right after reading the new sid, keeps that read trick but removes
+// the visible side effect -- callers still always follow up with an
+// explicit `set_text_track` for whichever one the user actually wants, same
+// as before.
 fn apply_add_subtitle(mpv: *mut mpv_handle, url: &str, lang: Option<&str>) -> Result<i64, String> {
     let lang = lang.unwrap_or("");
+    let previous: Option<i64> = match get_property_string(mpv, "sid") {
+        Ok(s) if s != "no" => s.parse().ok(),
+        _ => None,
+    };
     let cstrs: Vec<CString> = ["sub-add", url, "select", "", lang].iter().map(|s| CString::new(*s).unwrap()).collect();
     let mut ptrs: Vec<*const std::os::raw::c_char> =
         cstrs.iter().map(|s| s.as_ptr()).chain(std::iter::once(std::ptr::null())).collect();
     unsafe {
         check(mpv_command(mpv, ptrs.as_mut_ptr()), "mpv_command")?;
     }
-    get_property_int(mpv, "sid")
+    let sid = get_property_int(mpv, "sid")?;
+    let _ = apply_set_text_track(mpv, previous); // best-effort restore, see doc above
+    Ok(sid)
 }
 
 // Sets/clears the text-subtitle track by mpv's own "sid" (resolved from a
