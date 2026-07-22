@@ -21,7 +21,7 @@ boundaries are invisible in the UI.
 - **Server** — the one Jellyfin server Photon is signed in to. Not "instance/backend/connection".
 - **Card** — a poster tile anywhere in the app. Click card/hover-play → plays; click title → opens details. Not "tile/thumbnail/item".
 - **Movies / Shows** — the two browsable catalogs; each merges every server library of its type. Not "library" as a UI concept.
-- **Text Subtitle** — a track the server can deliver as text (e.g. VTT). Only text subs support delay/appearance styling. Not "soft sub".
+- **Text Subtitle** — a track the server can deliver as text (e.g. SRT). Only text subs support delay/appearance styling. Not "soft sub".
 - **Burned-in Subtitle** — rendered into the video by the server transcoder (PGS/VOBSUB/styled ASS). Delay/styling disabled for these. Not "hardsub".
 - **Continue Watching** — server-provided partially-watched list, ordered by recency. The only resume surface. Not "resume list".
 
