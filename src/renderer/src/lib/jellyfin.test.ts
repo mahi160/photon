@@ -40,6 +40,20 @@ describe('mediaBadges', () => {
   it('no streams → no badges', () => {
     expect(mediaBadges([])).toEqual([])
   })
+
+  it('NTSC frame rates round to their nominal fps', () => {
+    const ntsc: MediaStream[] = [
+      {
+        Index: 0,
+        Type: 'Video',
+        Codec: 'h264',
+        Width: 1920,
+        RealFrameRate: 23.976,
+        VideoRangeType: 'SDR'
+      }
+    ]
+    expect(mediaBadges(ntsc)).toEqual(['1080p', 'H264', '24fps'])
+  })
 })
 
 describe('playerSpecialBadges', () => {

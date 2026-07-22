@@ -200,6 +200,7 @@ export interface MediaStream {
   IsExternal?: boolean
   Width?: number
   Height?: number
+  RealFrameRate?: number // e.g. 23.976, 29.97, 59.94 -- Jellyfin's actual measured source rate
   VideoRangeType?: string // SDR | HDR10 | HDR10Plus | HLG | DOVI…
   ChannelLayout?: string // '5.1', '7.1', 'stereo'
   Profile?: string // audio profile, e.g. 'Dolby TrueHD + Dolby Atmos'
@@ -225,6 +226,8 @@ export function mediaBadges(streams: MediaStream[]): string[] {
               : 'SD'
     )
   if (v?.Codec) out.push(v.Codec.toUpperCase())
+  // rounded -- NTSC rates (23.976/29.97/59.94) read as their nominal 24/30/60
+  if (v?.RealFrameRate) out.push(`${Math.round(v.RealFrameRate)}fps`)
   const range = v?.VideoRangeType
   if (range && range !== 'SDR')
     out.push(range.startsWith('DOVI') ? 'Dolby Vision' : range === 'HDR10Plus' ? 'HDR10+' : range)
