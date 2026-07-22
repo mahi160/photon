@@ -180,7 +180,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-
   margin-block-start: 0.75rem;
 }
 
@@ -319,8 +318,8 @@
 
 .iconToggleActive,
 .iconToggleActive:hover {
-  color: var(--accent-fg);
   border-color: transparent;
+  color: var(--accent-fg);
   background: var(--accent);
 }
 
@@ -423,6 +422,8 @@
 }
 
 .episodeRow {
+  cursor: pointer;
+
   display: flex;
   gap: 1.15rem;
   align-items: center;
@@ -432,7 +433,6 @@
   padding: 0.75rem;
   border-radius: var(--radius-m);
 
-  cursor: pointer;
   text-align: start;
 
   transition: background-color var(--dur-fast) var(--ease);
@@ -507,8 +507,8 @@
 }
 
 .episodeWatchedToggleActive {
-  opacity: 1;
   color: var(--accent);
+  opacity: 1;
   background: var(--scrim-soft);
 }
 

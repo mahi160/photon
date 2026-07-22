@@ -54,9 +54,12 @@ select {
 
 button {
   cursor: pointer;
+
   padding: 0;
   border: none;
+
   text-align: inherit;
+
   background: none;
 }
 
@@ -86,9 +89,10 @@ kbd {
   outline-offset: 2px;
 }
 
-/* Electron bundles a fixed, modern Chromium — no ::-webkit-scrollbar fallback needed.
-   The ::-webkit-scrollbar-thumb rule below isn't a compat fallback, standard
-   scrollbar-color has no radius control, so it's kept for the rounded thumb only. */
+/* Tauri's webviews (WebKitGTK, WKWebView, WebView2) are all WebKit/Blink
+   descended, so ::-webkit-scrollbar-thumb works everywhere Photon ships —
+   this isn't a compat fallback, standard scrollbar-color just has no radius
+   control, so it's kept for the rounded thumb only. */
 * {
   scrollbar-color: var(--border-strong) transparent;
   scrollbar-width: thin;

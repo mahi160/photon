@@ -1,8 +1,9 @@
 .mark {
+  overflow: visible;
+  flex-shrink: 0;
+
   inline-size: 1em;
   block-size: 1em;
-  flex-shrink: 0;
-  overflow: visible;
 
   filter: drop-shadow(0 0 6px color-mix(in oklch, var(--accent) 60%, transparent));
 }

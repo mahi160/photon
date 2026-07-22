@@ -74,16 +74,13 @@
   border-color: var(--accent-border);
 }
 
-.textInput {
-  inline-size: 6rem;
-  font-family: var(--font-mono);
-}
-
 .mpvConfigInput {
+  resize: vertical;
+
   inline-size: 22rem;
   min-block-size: 5rem;
   padding: 0.5rem 0.7rem;
-  resize: vertical;
+
   font-family: var(--font-mono);
   font-size: 0.8rem;
   line-height: 1.4;
@@ -122,46 +119,6 @@
   transform: translateX(1rem);
 }
 
-.stepperGroup {
-  display: flex;
-  gap: 0.4rem;
-  align-items: center;
-}
-
-.stepBtn {
-  display: grid;
-  flex-shrink: 0;
-  place-items: center;
-
-  inline-size: 1.8rem;
-  block-size: 1.8rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-s);
-
-  font-size: 1rem;
-
-  background: var(--surface-1);
-
-  transition: background-color var(--dur-fast) var(--ease);
-}
-
-.stepBtn:hover {
-  background: var(--surface-3);
-}
-
-.stepInput {
-  inline-size: 4rem;
-  padding-block: 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-s);
-
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  text-align: center;
-
-  background: var(--surface-1);
-}
-
 .slabRow {
   display: flex;
   gap: 0.25rem;
@@ -192,32 +149,6 @@
 .slabActive {
   color: var(--fg);
   background: var(--surface-3);
-}
-
-.swatchRow {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.swatch {
-  inline-size: 1.75rem;
-  block-size: 1.75rem;
-  border: 2px solid transparent;
-  border-radius: var(--radius-full);
-
-  box-shadow: var(--shadow-1);
-
-  transition:
-    transform var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease);
-}
-
-.swatch:hover {
-  transform: scale(1.08);
-}
-
-.swatchActive {
-  border-color: var(--fg);
 }
 
 .buttons {

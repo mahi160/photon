@@ -13,6 +13,7 @@ export interface Props {
   visible: boolean
   item: BaseItem
   playMethod: 'DirectPlay' | 'Transcode'
+  mediaBadges: string[]
   state: 'playing' | 'paused' | 'buffering'
   time: number
   duration: number
@@ -144,6 +145,11 @@ export function PlayerControls(p: Props): React.JSX.Element {
             </div>
             {p.state === 'buffering' && <div className={styles.spinner} />}
             <div className={styles.topRight}>
+              {p.mediaBadges.map((b) => (
+                <span key={b} className={styles.methodBadge}>
+                  {b}
+                </span>
+              ))}
               <span
                 className={styles.methodBadge}
                 title={

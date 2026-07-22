@@ -96,6 +96,7 @@ export function Login(): React.JSX.Element {
             className={styles.field}
             placeholder="Username"
             spellCheck={false}
+            autoComplete="username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
@@ -108,6 +109,7 @@ export function Login(): React.JSX.Element {
             className={styles.field}
             type="password"
             placeholder="Password"
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />

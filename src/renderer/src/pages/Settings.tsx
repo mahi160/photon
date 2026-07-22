@@ -21,13 +21,11 @@ export function Settings(): React.JSX.Element {
   const [tab, setTab] = useState<'preferences' | 'stats'>('preferences')
   const [version, setVersion] = useState('')
   const [loginItem, setLoginItem] = useState(false)
-  const [autoUpdate, setAutoUpdate] = useState(true)
   const [updater, setUpdater] = useState<UpdaterStatus>({ state: 'idle' })
 
   useEffect(() => {
     void window.api.appVersion().then(setVersion)
     void window.api.getLoginItem().then(setLoginItem)
-    void window.api.getAutoUpdate().then(setAutoUpdate)
     void window.api.getUpdaterStatus().then(setUpdater)
     return window.api.onUpdaterStatus(setUpdater)
   }, [])
@@ -79,16 +77,6 @@ export function Settings(): React.JSX.Element {
                 onChange={(v) => {
                   setLoginItem(v)
                   void window.api.setLoginItem(v)
-                }}
-              />
-            </SettingsRow>
-            <SettingsRow label="Auto update" hint="Check for new versions on launch">
-              <ToggleSwitch
-                label="Auto update"
-                checked={autoUpdate}
-                onChange={(v) => {
-                  setAutoUpdate(v)
-                  void window.api.setAutoUpdate(v)
                 }}
               />
             </SettingsRow>

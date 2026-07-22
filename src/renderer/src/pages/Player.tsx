@@ -5,6 +5,7 @@ import { itemQuery, mediaSegmentsQuery } from '../lib/queries'
 import {
   currentSession,
   jf,
+  mediaBadges,
   secondsToTicks,
   ticksToSeconds,
   type ItemsResult
@@ -216,7 +217,13 @@ export function Player(): React.JSX.Element {
     'shift+>': () => stepSpeed(1),
     'shift+<': () => stepSpeed(-1),
     '[': () => shiftSubtitleDelay(-0.5),
-    ']': () => shiftSubtitleDelay(0.5)
+    ']': () => shiftSubtitleDelay(0.5),
+    a: (e) => {
+      if (!e.repeat) cycleAudio()
+    },
+    c: (e) => {
+      if (!e.repeat) cycleSubtitle()
+    }
   })
 
   // plain functions — useHotkeys reads through a ref, no stable identity needed
@@ -235,6 +242,26 @@ export function Player(): React.JSX.Element {
     showToast(dir === 1 ? 'Next chapter' : 'Previous chapter')
   }
 
+  // keyboard-reachable equivalent of the audio/subtitle menus (which live in
+  // base-ui popovers with tabIndex={-1} — the player's controls are mouse or
+  // hotkey only, see useHotkeys.ts)
+  function cycleAudio(): void {
+    if (!session || session.audioStreams.length < 2) return
+    const current = player.audioIndex ?? session.mediaSource.DefaultAudioStreamIndex
+    const streams = session.audioStreams
+    const i = streams.findIndex((s) => s.Index === current)
+    const next = streams[(i + 1) % streams.length]
+    player.selectAudio(next.Index)
+    showToast(`Audio: ${next.DisplayTitle ?? `Track ${next.Index}`}`)
+  }
+
+  function cycleSubtitle(): void {
+    if (!session || !session.subtitleStreams.length) return
+    const streams = session.subtitleStreams
+    const i = streams.findIndex((s) => s.Index === player.subtitleIndex)
+    selectSubtitle(i + 1 >= streams.length ? null : streams[i + 1].Index)
+  }
+
   function stepSpeed(dir: 1 | -1): void {
     const i = speeds.indexOf(engine.rate)
     const next =
@@ -251,6 +278,12 @@ export function Player(): React.JSX.Element {
   )
 
   const displayDuration = engine.duration || ticksToSeconds(session?.mediaSource.RunTimeTicks)
+  // quality/HDR/audio-codec tags shown beside the direct/transcode badge
+  // (details pages show the same via mediaBadges; the player OSD reuses it)
+  const qualityBadges = useMemo(
+    () => mediaBadges(session?.mediaSource.MediaStreams ?? []),
+    [session]
+  )
 
   return (
     <div
@@ -287,11 +320,17 @@ export function Player(): React.JSX.Element {
           </button>
         </div>
       )}
+      {!player.error && !session && (
+        <div className={styles.loadingLayer}>
+          <div className={styles.loadingSpinner} />
+        </div>
+      )}
       {!player.error && session && (
         <PlayerControls
           visible={visible}
           item={session.item}
           playMethod={session.playMethod}
+          mediaBadges={qualityBadges}
           state={engine.state}
           time={engine.time}
           duration={displayDuration}

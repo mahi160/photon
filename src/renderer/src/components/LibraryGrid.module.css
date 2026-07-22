@@ -88,13 +88,6 @@
   gap: 1.75rem 1rem;
 }
 
-/* big libraries: skip layout/paint for offscreen cards — the CSS-only
-   virtualization; a real windowing lib only if this ever stops being enough */
-.grid > * {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 11rem auto 21rem;
-}
-
 .surpriseBtn {
   padding: 0.3rem 0.9rem;
   border: 1px solid var(--surface-3);
@@ -112,8 +105,8 @@
 }
 
 .surpriseBtn:hover {
-  color: var(--fg);
   border-color: var(--accent);
+  color: var(--fg);
 }
 
 .gridItem {

@@ -73,6 +73,8 @@ export function ShortcutsOverlay({
                 <Item label="Mute" keys={['M']} />
                 <Item label="Fullscreen" keys={['F']} />
                 <Item label="Exit fullscreen" keys={['Esc']} />
+                <Item label="Cycle audio track" keys={['A']} />
+                <Item label="Cycle subtitle track" keys={['C']} />
                 <Item label="Picture in picture" keys={['P']} />
                 <Item label="Skip intro / segment" hint="When the skip button shows" keys={['S']} />
                 <Item label="Previous / next chapter" keys={['⇧', '← →']} />

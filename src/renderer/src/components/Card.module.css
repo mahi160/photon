@@ -58,8 +58,8 @@
 }
 
 .actionBtnActive {
-  opacity: 1;
   color: var(--accent);
+  opacity: 1;
 }
 
 .poster {
@@ -201,8 +201,8 @@
 .title {
   overflow: hidden;
   display: block;
-
   flex: 1;
+
   min-inline-size: 0;
 
   font-size: 0.9375rem;

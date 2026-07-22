@@ -98,15 +98,18 @@ export function StatsSettings(): React.JSX.Element {
       </div>
 
       {topShows.length > 0 && (
-        <div className={styles.statRows}>
-          {topShows.map((s, i) => (
-            <div key={s.name} className={styles.statRow}>
-              <span>
-                <span className={styles.statRank}>#{i + 1}</span> {s.name}
-              </span>
-              <span className={styles.statRowValue}>{fmtDur(s.secs)}</span>
-            </div>
-          ))}
+        <div>
+          <h2 className={styles.sectionTitle}>Top shows</h2>
+          <div className={styles.statRows}>
+            {topShows.map((s, i) => (
+              <div key={s.name} className={styles.statRow}>
+                <span>
+                  <span className={styles.statRank}>#{i + 1}</span> {s.name}
+                </span>
+                <span className={styles.statRowValue}>{fmtDur(s.secs)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

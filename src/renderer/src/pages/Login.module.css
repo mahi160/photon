@@ -203,8 +203,8 @@
 }
 
 .qcBtn:hover:not(:disabled) {
-  color: var(--fg);
   border-color: var(--accent);
+  color: var(--fg);
 }
 
 .qcBtn:disabled {

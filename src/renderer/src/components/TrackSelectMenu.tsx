@@ -47,9 +47,11 @@ export function TrackSelectMenu({
               </BaseMenu.Item>
             ))}
             {!tracks.length && (
-              <BaseMenu.Item onClick={() => {}} className={styles.menuItem}>
+              // plain text, not a BaseMenu.Item -- nothing to select when the
+              // track list is empty, so it shouldn't look/behave clickable
+              <div className={styles.menuItem} aria-disabled="true">
                 {defaultLabel ?? 'Default'}
-              </BaseMenu.Item>
+              </div>
             )}
           </BaseMenu.Popup>
         </BaseMenu.Positioner>

@@ -13,9 +13,13 @@ function ThemeToggle(): React.JSX.Element {
   const theme = useSettings((s) => s.theme)
   const set = useSettings((s) => s.set)
   const dark = resolvedDark(theme)
+  // theme === 'system' has no fixed next state to name -- clicking still
+  // works (it commits to the resolved opposite) but the tooltip says so,
+  // since it silently drops the OS-follow preference set in Settings
+  const label = `${dark ? 'Light' : 'Dark'} theme${theme === 'system' ? ' (overrides System)' : ''}`
 
   return (
-    <Tip label={dark ? 'Light theme' : 'Dark theme'}>
+    <Tip label={label}>
       <button
         className={styles.iconBtn}
         aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
