@@ -194,7 +194,12 @@ export function EpisodeDetails(): React.JSX.Element {
         </div>
         {nextEpisode && (
           <div className={styles.epSection}>
-            <h2 className={styles.epHeadTitle}>Next Episode</h2>
+            {/* .epHead (not just the bare title) -- it's the one carrying the
+                margin-block-end gap before whatever comes next, see
+                Details.module.css */}
+            <div className={styles.epHead}>
+              <h2 className={styles.epHeadTitle}>Next Episode</h2>
+            </div>
             <div className={styles.nextEpisodeCard}>
               <Card item={nextEpisode} wide />
             </div>

@@ -17,10 +17,16 @@ const subtitleSizes = [
   { value: 80, label: 'Extra large' }
 ]
 
+// Gruvbox Material / Rosé Pine accents instead of generic web colors
+// (#FFFF00 yellow, #00FFFF cyan) -- softer, matches the app's own calm
+// aesthetic instead of clashing with it over the video.
 const subtitleColors = [
   { value: '#FFFFFF', label: 'White' },
-  { value: '#FFFF00', label: 'Yellow' },
-  { value: '#00FFFF', label: 'Cyan' }
+  { value: '#D8A657', label: 'Gruvbox Yellow' },
+  { value: '#89B482', label: 'Gruvbox Aqua' },
+  { value: '#F6C177', label: 'Rosé Pine Gold' },
+  { value: '#9CCFD8', label: 'Rosé Pine Foam' },
+  { value: '#EBBCBA', label: 'Rosé Pine Rose' }
 ]
 
 export function PlaybackSettings(): React.JSX.Element {
