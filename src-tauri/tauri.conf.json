@@ -31,6 +31,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -38,5 +39,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYyREQwN0I1MDVDQkQ2RkYKUldULzFzc0Z0UWZkWXVaeVlOcS9DYnJPbGJjcWJsUjJQSWNnNEdjNE9yU3V2NUtzaXBaYXN4SmcK",
+      "endpoints": [
+        "https://github.com/mahi160/photon/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

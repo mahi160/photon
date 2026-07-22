@@ -67,9 +67,12 @@ pub fn app_get_login_item(app: AppHandle) -> bool {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-struct Prefs {
+pub(crate) struct Prefs {
     #[serde(default)]
     disable_hw_accel: bool,
+    // ticket #11 -- mirrors disable_hw_accel; gates updater::spawn_check
+    #[serde(default)]
+    pub(crate) disable_auto_update: bool,
 }
 
 fn prefs_file(app: &AppHandle) -> Option<std::path::PathBuf> {
@@ -78,7 +81,9 @@ fn prefs_file(app: &AppHandle) -> Option<std::path::PathBuf> {
     Some(dir.join("prefs.json"))
 }
 
-fn read_prefs(app: &AppHandle) -> Prefs {
+// pub(crate): updater.rs reads disable_auto_update at startup to decide
+// whether to check at all.
+pub(crate) fn read_prefs(app: &AppHandle) -> Prefs {
     prefs_file(app)
         .and_then(|p| fs::read_to_string(p).ok())
         .and_then(|s| serde_json::from_str(&s).ok())
@@ -100,10 +105,24 @@ fn write_prefs(app: &AppHandle, prefs: &Prefs) {
 // COMPOSITING_MODE on Linux); macOS's WKWebView has no public toggle at all.
 #[tauri::command]
 pub fn app_set_hw_accel(app: AppHandle, enabled: bool) {
-    write_prefs(&app, &Prefs { disable_hw_accel: !enabled });
+    let mut prefs = read_prefs(&app);
+    prefs.disable_hw_accel = !enabled;
+    write_prefs(&app, &prefs);
 }
 
 #[tauri::command]
 pub fn app_get_hw_accel(app: AppHandle) -> bool {
     !read_prefs(&app).disable_hw_accel
+}
+
+#[tauri::command]
+pub fn app_set_auto_update(app: AppHandle, enabled: bool) {
+    let mut prefs = read_prefs(&app);
+    prefs.disable_auto_update = !enabled;
+    write_prefs(&app, &prefs);
+}
+
+#[tauri::command]
+pub fn app_get_auto_update(app: AppHandle) -> bool {
+    !read_prefs(&app).disable_auto_update
 }
