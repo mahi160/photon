@@ -1,4 +1,5 @@
 use super::engine::MpvEngine;
+use super::profile::RenderProfiler;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, Runtime, State};
 
@@ -110,6 +111,7 @@ where
 /// Render tick, woken by mpv's own update callback (see engine.rs's
 /// `RenderWaker`) instead of a blind fixed-rate poll.
 pub fn spawn_render_loop<R: Runtime>(app: AppHandle<R>) {
+    let profiler = RenderProfiler::new();
     std::thread::spawn(move || loop {
         // render() now runs directly on this background thread instead of
         // being marshalled onto the main thread every tick -- even after
@@ -140,6 +142,6 @@ pub fn spawn_render_loop<R: Runtime>(app: AppHandle<R>) {
         // Blocks until mpv reports a new frame; the timeout is a safety net,
         // not the normal wakeup path (see RenderWaker's doc).
         waker.wait(std::time::Duration::from_millis(250));
-        surface.lock().unwrap().render();
+        profiler.time(|| surface.lock().unwrap().render());
     });
 }

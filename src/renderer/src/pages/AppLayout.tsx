@@ -89,7 +89,10 @@ export function AppLayout(): React.JSX.Element {
           </Link>
         </Tip>
       </header>
-      <main className={styles.main}>
+      {/* data-scroll-root: LibraryGrid's virtualizer needs a handle on the
+          actual scrolling ancestor (this, not the window -- .main is the
+          overflow-y:auto element, see AppLayout.module.css) */}
+      <main className={styles.main} data-scroll-root>
         <Outlet />
       </main>
       <ShortcutsOverlay open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />

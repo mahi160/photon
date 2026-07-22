@@ -9,9 +9,11 @@
 //! plain `NSOpenGLView` doesn't work here (transparency/layer-backing), and
 //! why the real GPU path (`GpuSurface`) instead goes through an off-screen
 //! FBO + IOSurface + `CAMetalLayer`. Slower than GPU rendering (mpv's own
-//! docs: "very slow, because everything ... runs on the CPU") and allocates
-//! a fresh frame buffer every render -- correct-first; a buffer pool is real
-//! upgrade work, not done here.
+//! docs: "very slow, because everything ... runs on the CPU"). Frame
+//! buffers are pooled (see `BUFFER_POOL_CAP`) instead of allocated fresh
+//! every render -- CoreGraphics decides when it's actually done with a
+//! given buffer (its release callback, not our render loop), so a buffer
+//! only rejoins the pool once CG says so; this can't tear.
 
 use super::RenderSurface;
 use crate::mpv::engine::{on_render_update, RenderWaker};
@@ -28,7 +30,7 @@ use objc2_foundation::{NSPoint, NSRect, NSSize};
 use objc2_quartz_core::CATransaction;
 use std::ffi::{c_void, CString};
 use std::os::raw::c_char;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 const MPV_RENDER_PARAM_SW_SIZE: mpv_render_param_type = 17;
 const MPV_RENDER_PARAM_SW_FORMAT: mpv_render_param_type = 18;
@@ -36,12 +38,48 @@ const MPV_RENDER_PARAM_SW_STRIDE: mpv_render_param_type = 19;
 const MPV_RENDER_PARAM_SW_POINTER: mpv_render_param_type = 20;
 const MPV_RENDER_API_TYPE_SW: &[u8] = b"sw\0";
 
+// double/triple buffering headroom -- CALayer/the window server can still
+// be compositing the previous frame(s) when we go looking for a free
+// buffer; a small cap just bounds how many distinct allocations can be
+// alive at once, not a hard correctness requirement (see PooledBuffer::drop)
+const BUFFER_POOL_CAP: usize = 4;
+
+// Handed to CGDataProvider (via an Arc) instead of a plain Vec<u8> so we get
+// a callback for exactly when CoreGraphics is truly done reading it (the
+// data provider's release callback runs on Drop) -- the buffer only rejoins
+// `pool` at that point, never the instant we hand it off to CoreGraphics.
+struct PooledBuffer {
+    data: Vec<u8>,
+    pool: Arc<Mutex<Vec<Vec<u8>>>>,
+}
+
+impl AsRef<[u8]> for PooledBuffer {
+    fn as_ref(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+impl Drop for PooledBuffer {
+    fn drop(&mut self) {
+        let buf = std::mem::take(&mut self.data);
+        if let Ok(mut pool) = self.pool.lock() {
+            if pool.len() < BUFFER_POOL_CAP {
+                pool.push(buf);
+            }
+        }
+    }
+}
+
 pub(crate) struct SoftwareSurface {
     render_ctx: *mut mpv_render_context,
     view: Retained<NSView>,
     // created once -- CGColorSpace is the same for every frame, no reason to
     // recreate it 5x/sec
     colorspace: CGColorSpace,
+    // recycled Vec<u8> allocations, keyed by nothing -- render() just grabs
+    // whichever is free and resizes it (a no-op once it's grown to the
+    // current frame size, which is the steady-state case)
+    buffer_pool: Arc<Mutex<Vec<Vec<u8>>>>,
 }
 
 // `view` (an AppKit object) and `render_ctx`/mpv FFI calls aren't
@@ -89,7 +127,12 @@ impl SoftwareSurface {
             mpv_render_context_set_update_callback(render_ctx, Some(on_render_update), Arc::as_ptr(waker) as *mut c_void);
         }
 
-        Ok(Self { render_ctx, view, colorspace: CGColorSpace::create_device_rgb() })
+        Ok(Self {
+            render_ctx,
+            view,
+            colorspace: CGColorSpace::create_device_rgb(),
+            buffer_pool: Arc::new(Mutex::new(Vec::with_capacity(BUFFER_POOL_CAP)))
+        })
     }
 }
 
@@ -139,7 +182,12 @@ self.view.setFrame(NSRect::new(NSPoint::new(x, y), NSSize::new(w, h)));
         }
 
         let stride: usize = (w as usize) * 4;
-        let mut frame = vec![0u8; stride * (h as usize)];
+        let len = stride * (h as usize);
+        // reuse a pooled allocation when one's free -- `resize` is a no-op
+        // once it's already grown to `len` (the steady-state case, size
+        // only changes on window resize)
+        let mut data = self.buffer_pool.lock().map(|mut p| p.pop()).unwrap_or_default().unwrap_or_default();
+        data.resize(len, 0);
 
         let mut size = [w, h];
         let format = CString::new("rgb0").unwrap(); // opaque RGB + padding byte, no real alpha needed
@@ -148,15 +196,24 @@ self.view.setFrame(NSRect::new(NSPoint::new(x, y), NSSize::new(w, h)));
             mpv_render_param { type_: MPV_RENDER_PARAM_SW_SIZE, data: size.as_mut_ptr() as *mut c_void },
             mpv_render_param { type_: MPV_RENDER_PARAM_SW_FORMAT, data: format.as_ptr() as *mut c_void },
             mpv_render_param { type_: MPV_RENDER_PARAM_SW_STRIDE, data: &mut stride_val as *mut _ as *mut c_void },
-            mpv_render_param { type_: MPV_RENDER_PARAM_SW_POINTER, data: frame.as_mut_ptr() as *mut c_void },
+            mpv_render_param { type_: MPV_RENDER_PARAM_SW_POINTER, data: data.as_mut_ptr() as *mut c_void },
             mpv_render_param { type_: mpv_render_param_type_MPV_RENDER_PARAM_INVALID, data: std::ptr::null_mut() },
         ];
         let rc = unsafe { mpv_render_context_render(self.render_ctx, params.as_mut_ptr()) };
         if rc < 0 {
-            return; // no frame ready yet or a transient error -- try again next tick
+            // no frame ready yet or a transient error -- return the buffer
+            // to the pool instead of just dropping it, so a transient miss
+            // doesn't force a one-off reallocation on the next tick
+            if let Ok(mut pool) = self.buffer_pool.lock() {
+                if pool.len() < BUFFER_POOL_CAP {
+                    pool.push(data);
+                }
+            }
+            return;
         }
 
-        let provider = CGDataProvider::from_buffer(Arc::new(frame));
+        let provider =
+            CGDataProvider::from_buffer(Arc::new(PooledBuffer { data, pool: self.buffer_pool.clone() }));
         let image = CGImage::new(
             w as usize,
             h as usize,
@@ -200,5 +257,28 @@ self.view.setFrame(NSRect::new(NSPoint::new(x, y), NSSize::new(w, h)));
         }
         self.view.removeFromSuperview();
         self.render_ctx = std::ptr::null_mut();
+    }
+}
+
+#[cfg(test)]
+mod pool_tests {
+    use super::*;
+
+    #[test]
+    fn dropping_a_pooled_buffer_returns_it_to_the_pool() {
+        let pool = Arc::new(Mutex::new(Vec::new()));
+        let buf = PooledBuffer { data: vec![1, 2, 3], pool: pool.clone() };
+        assert!(pool.lock().unwrap().is_empty());
+        drop(buf);
+        assert_eq!(pool.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn pool_never_grows_past_its_cap() {
+        let pool = Arc::new(Mutex::new(Vec::new()));
+        for _ in 0..BUFFER_POOL_CAP + 3 {
+            drop(PooledBuffer { data: vec![0; 4], pool: pool.clone() });
+        }
+        assert_eq!(pool.lock().unwrap().len(), BUFFER_POOL_CAP);
     }
 }

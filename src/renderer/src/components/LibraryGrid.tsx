@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { libraryQuery, type SortKey } from '../lib/queries'
 import { useSettings } from '../stores/settings'
 import { Card } from './Card'
@@ -12,10 +13,30 @@ const sorts: { key: SortKey; label: string }[] = [
   { key: 'release', label: 'Release' }
 ]
 
-// merged libraries can hold thousands of items (AGENTS.md) — render this many
-// cards up front, then grow by the same amount each time the sentinel below
-// the grid scrolls into view. Caps DOM nodes without a virtualization dep.
-const PAGE_SIZE = 60
+// must match .grid's `minmax(10.5rem, 1fr)` / `gap: 1.75rem 1rem` — the
+// virtualizer chunks items into rows itself (no built-in grid mode), so the
+// row math here has to mirror the CSS grid it's replacing
+const MIN_CARD_PX = 168 // 10.5rem
+const COLUMN_GAP_PX = 16 // 1rem
+// Card.module.css's own `contain-intrinsic-size` guess for a card's height
+const ESTIMATED_ROW_PX = 280
+
+// how many columns actually fit at the current container width — same
+// arithmetic `repeat(auto-fill, minmax(...))` does, recomputed on resize
+function useColumnCount(ref: React.RefObject<HTMLElement | null>): number {
+  const [columns, setColumns] = useState(1)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new ResizeObserver(([entry]) => {
+      const width = entry.contentRect.width
+      setColumns(Math.max(1, Math.floor((width + COLUMN_GAP_PX) / (MIN_CARD_PX + COLUMN_GAP_PX))))
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [ref])
+  return columns
+}
 
 export function LibraryGrid({
   type,
@@ -27,30 +48,19 @@ export function LibraryGrid({
   const [sort, setSort] = useState<SortKey>('added')
   const { data, isPending, isError, refetch } = useQuery(libraryQuery(type, sort))
   const navigate = useNavigate()
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-  const sentinelRef = useRef<HTMLDivElement>(null)
 
-  // reset the window when the underlying list changes (sort/library refetch)
-  // -- render-time adjustment, not an effect (react docs: "adjusting state
-  // when a prop changes"), so it takes effect before the stale slice paints
-  const [prevData, setPrevData] = useState(data)
-  if (data !== prevData) {
-    setPrevData(data)
-    setVisibleCount(PAGE_SIZE)
-  }
+  const gridRef = useRef<HTMLDivElement>(null)
+  const columns = useColumnCount(gridRef)
+  const rowCount = data ? Math.ceil(data.length / columns) : 0
 
-  useEffect(() => {
-    const el = sentinelRef.current
-    if (!el) return
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry?.isIntersecting) setVisibleCount((n) => n + PAGE_SIZE)
-      },
-      { rootMargin: '600px' }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
+  const virtualizer = useVirtualizer({
+    count: rowCount,
+    // the scrolling ancestor is .main (AppLayout), not this component's own
+    // element or the window — see the data-scroll-root comment there
+    getScrollElement: () => document.querySelector<HTMLElement>('[data-scroll-root]'),
+    estimateSize: () => ESTIMATED_ROW_PX,
+    overscan: 3
+  })
 
   // decision-paralysis killer: random unwatched movie → details page, which
   // runs a cancellable auto-play countdown (?surprise=1)
@@ -102,24 +112,50 @@ export function LibraryGrid({
       {empty && (
         <div className={styles.status}>{`No ${noun} yet. Add media to your Jellyfin library.`}</div>
       )}
-      <div className={styles.grid}>
-        {data?.slice(0, visibleCount).map((item, i) =>
-          // stagger only the first screenful — animating a full library's
-          // worth of cards at once is just jank, not polish
-          i < 12 ? (
-            <div
-              key={item.Id}
-              className={styles.gridItem}
-              style={{ animationDelay: `${i * 30}ms` }}
-            >
-              <Card item={item} />
-            </div>
-          ) : (
-            <Card key={item.Id} item={item} />
-          )
-        )}
-      </div>
-      {data && visibleCount < data.length && <div ref={sentinelRef} aria-hidden />}
+      {data && data.length > 0 && (
+        <div
+          ref={gridRef}
+          className={styles.grid}
+          style={{ position: 'relative', blockSize: virtualizer.getTotalSize() }}
+        >
+          {virtualizer.getVirtualItems().map((row) => {
+            const start = row.index * columns
+            const rowItems = data.slice(start, start + columns)
+            return (
+              <div
+                key={row.key}
+                ref={virtualizer.measureElement}
+                data-index={row.index}
+                className={styles.gridRow}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  insetInlineStart: 0,
+                  insetInlineEnd: 0,
+                  transform: `translateY(${row.start}px)`,
+                  gridTemplateColumns: `repeat(${columns}, 1fr)`
+                }}
+              >
+                {rowItems.map((item, i) =>
+                  // stagger only the very first row — animating a full
+                  // library's worth of cards at once is just jank, not polish
+                  row.index === 0 ? (
+                    <div
+                      key={item.Id}
+                      className={styles.gridItem}
+                      style={{ animationDelay: `${i * 30}ms` }}
+                    >
+                      <Card item={item} />
+                    </div>
+                  ) : (
+                    <Card key={item.Id} item={item} />
+                  )
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

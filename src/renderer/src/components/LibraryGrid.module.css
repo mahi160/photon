@@ -83,9 +83,17 @@
 }
 
 .grid {
+  /* sizing/positioning only — the virtualizer absolutely positions each
+     .gridRow inside this, JS sets its total block-size */
+}
+
+.gridRow {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
-  gap: 1.75rem 1rem;
+  gap: 1rem;
+  /* row gap folded into padding, not CSS grid's row-gap: each row is its
+     own absolutely-positioned element, so the virtualizer's measured
+     height has to include the gap for its translateY math to stack right */
+  padding-block-end: 1.75rem;
 }
 
 .surpriseBtn {
