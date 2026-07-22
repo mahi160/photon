@@ -58,6 +58,8 @@ pub fn pip_start(
     muted: bool,
     rate: f64,
     paused: bool,
+    sub_url: Option<String>,
+    sub_lang: Option<String>,
 ) -> Result<(), String> {
     let mut slot = state.0.lock().unwrap();
     if slot.is_some() {
@@ -67,8 +69,8 @@ pub fn pip_start(
     let socket_path = std::env::temp_dir().join(format!("photon-pip-{}.sock", std::process::id()));
     let _ = std::fs::remove_file(&socket_path); // stale socket from a crashed previous run
 
-    let child = Command::new(mpv_binary())
-        .arg("--no-border")
+    let mut cmd = Command::new(mpv_binary());
+    cmd.arg("--no-border")
         .arg("--ontop")
         .arg("--on-all-workspaces") // follows across macOS Spaces / virtual desktops
         .arg("--title=Photon — Picture in Picture")
@@ -83,7 +85,19 @@ pub fn pip_start(
         .arg(format!("--volume={}", (volume.clamp(0.0, 1.0) * 100.0).round()))
         .arg(format!("--mute={}", if muted { "yes" } else { "no" }))
         .arg(format!("--speed={rate}"))
-        .arg(format!("--pause={}", if paused { "yes" } else { "no" }))
+        .arg(format!("--pause={}", if paused { "yes" } else { "no" }));
+    // Carries the currently-active *text* subtitle over, if any -- an
+    // embedded (non-text) pick has no URL to hand this fresh process, so it
+    // just plays without subs in that case, same as none being selected.
+    // mpv fetches this itself (own HTTP stack), same as sub-add does for the
+    // in-process engine -- no auth/CORS handling needed here either.
+    if let Some(sub_url) = sub_url {
+        cmd.arg(format!("--sub-file={sub_url}"));
+        if let Some(lang) = sub_lang {
+            cmd.arg(format!("--slang={lang}"));
+        }
+    }
+    let child = cmd
         .arg(url)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
