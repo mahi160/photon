@@ -87,19 +87,24 @@ export function buildDeviceProfile(maxBitrate: number): object {
     // request, not just the subtitle, forcing a full transcode. Confirmed
     // against jellyfin server's StreamBuilder.GetVideoDirectPlayProfile.
     SubtitleProfiles: [
-      // vtt External for text formats (subrip/ass/ssa/mov_text/etc, server
-      // converts on the fly) -- keeps these on the Text Subtitle path so
-      // delay/appearance styling keeps working (only text tracks support
-      // that, see engine.setTextTrack). Declaring any of those *other*
-      // formats here explicitly (tried before, see git history) makes the
-      // server hand that format back raw instead of auto-converting it --
-      // harmless for mpv's own demuxer, but doesn't change direct-play
-      // eligibility either, so there's no upside to it.
-      { Format: 'vtt', Method: 'External' },
+      // srt (not vtt) External for text formats (subrip/ass/ssa/mov_text/
+      // etc, server converts on the fly) -- keeps these on the Text
+      // Subtitle path so delay/appearance styling keeps working (only text
+      // tracks support that, see engine.setTextTrack). vtt was tried first,
+      // but Jellyfin's ASS/SSA->vtt conversion emits a malformed `Region:`
+      // header (real WebVTT spec: `REGION` on its own line, newline-
+      // separated settings, not `Region:` with space-separated key:value
+      // pairs) whenever the source has cue positioning -- confirmed against
+      // a real server response. mpv's webvtt decoder silently drops every
+      // cue in the file once it hits that malformed header (track still
+      // shows up, selectable, just empty). Plain srt has no region/style
+      // block at all, sidestepping this class of bug entirely -- no loss,
+      // since Photon ships one fixed subtitle style regardless (ADR-0007).
+      { Format: 'srt', Method: 'External' },
       // Embed for the image-based formats mpv selects as an embedded track
       // instead (ADR-0008, engine.selectEmbeddedSubtitleTrack) -- this is
       // what tells the server direct play doesn't need to burn these in.
-      // ass/ssa deliberately excluded: those stay on the vtt path above.
+      // ass/ssa deliberately excluded: those stay on the srt path above.
       { Format: 'pgssub', Method: 'Embed' },
       { Format: 'dvdsub', Method: 'Embed' },
       { Format: 'dvbsub', Method: 'Embed' }

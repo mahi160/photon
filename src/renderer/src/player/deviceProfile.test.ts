@@ -54,8 +54,8 @@ describe('buildDeviceProfile subtitle profiles', () => {
     }
   })
 
-  it('keeps text formats on the External vtt path (delay/styling support)', () => {
-    expect(profiles).toContainEqual({ Format: 'vtt', Method: 'External' })
+  it('keeps text formats on the External srt path (delay/styling support)', () => {
+    expect(profiles).toContainEqual({ Format: 'srt', Method: 'External' })
     expect(profiles.some((p) => p.Format === 'ass')).toBe(false)
     expect(profiles.some((p) => p.Format === 'ssa')).toBe(false)
   })

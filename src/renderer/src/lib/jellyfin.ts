@@ -375,6 +375,39 @@ export function directStreamUrl(itemId: string, mediaSourceId: string): string {
   return `${session.server}/Videos/${itemId}/stream?static=true&mediaSourceId=${mediaSourceId}&api_key=${session.token}`
 }
 
+// Text-subtitle delivery URL, built ourselves rather than trusting the
+// server's own MediaStream.DeliveryUrl. That field bakes in whatever
+// startPositionTicks the PlaybackInfo request's StartTimeTicks was (server
+// source: SubtitleController's .../Subtitles/{index}/{startPositionTicks}/
+// Stream.{format} route, fed by StreamInfo.GetSubtitleStreamInfo) -- and
+// without `copyTimestamps=true` (which the server never sets for this field),
+// a nonzero startPositionTicks makes SubtitleEncoder.FilterEvents rebase
+// every cue's start/end time to count from 0, for the transcode case where
+// the *video* stream itself also restarts counting from 0 at that offset.
+// mpv (direct play, ADR-0008) never does that: it seeks the one full,
+// original file to `startSeconds` and keeps that file's real absolute
+// timeline running. Feeding it cues rebased to 0 desyncs every one of
+// them by the resume offset -- for any partially-watched item (Continue
+// Watching is Photon's primary resume surface), every cue ends up already
+// in mpv's past the moment playback starts, so nothing ever renders.
+// Hardcoding startPositionTicks to 0 here sidesteps the rebase entirely
+// (FilterEvents no-ops for both the filter and the rebase at offset 0),
+// giving back this stream's real, untouched absolute timestamps.
+// No startPositionTicks path segment: that segment requires a newer server
+// route (GetSubtitleWithTicks) this client has no version check for --
+// omitting it hits the older, more universally supported GetSubtitle route
+// instead, which defaults startPositionTicks to 0 query-side regardless.
+//
+// .srt, not .vtt: see deviceProfile.ts's SubtitleProfiles doc -- Jellyfin's
+// vtt conversion emits a malformed `Region:` header for source subtitles
+// with cue positioning, which makes mpv's webvtt decoder silently drop
+// every cue in the file. Format here must match the SubtitleProfiles entry
+// that got this stream marked External in the first place.
+export function subtitleStreamUrl(itemId: string, mediaSourceId: string, index: number): string {
+  if (!session) throw new JellyfinError(0, 'Not signed in')
+  return `${session.server}/Videos/${itemId}/${mediaSourceId}/Subtitles/${index}/Stream.srt?api_key=${session.token}`
+}
+
 export function serverUrl(): string {
   if (!session) throw new JellyfinError(0, 'Not signed in')
   return session.server

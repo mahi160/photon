@@ -8,7 +8,7 @@ export interface TextTrackSource {
   index: number // jellyfin stream index
   label: string
   language?: string
-  url: string // VTT delivery url
+  url: string // SRT delivery url
 }
 
 export interface LoadRequest {

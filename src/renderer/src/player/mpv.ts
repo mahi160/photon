@@ -198,19 +198,8 @@ export class MpvEngine implements PlaybackEngine {
   // a paper trail.
   setTextTrack(index: number | null): void {
     this.activeTextIndex = index
-    void invoke('mpv_set_text_track', { index })
-      .then(() => this.logTracks('setTextTrack', index))
-      .catch((e) => console.error('[playback] setTextTrack failed', index, e))
-  }
-
-  // ponytail: debug-only visibility for "added/selected without error, but
-  // nothing shows" -- dumps mpv's own real track-list (id/selected/codec/
-  // title/lang) so a silently-wrong sid or a genuinely trackless load is
-  // obvious from devtools instead of guessed at. Remove once subtitle
-  // selection has proven itself solid for a while.
-  private logTracks(from: string, arg: unknown): void {
-    void invoke('mpv_debug_tracks').then((tracks) =>
-      console.log(`[playback] track-list after ${from}(${JSON.stringify(arg)})`, tracks)
+    void invoke('mpv_set_text_track', { index }).catch((e) =>
+      console.error('[playback] setTextTrack failed', index, e)
     )
   }
 
@@ -225,9 +214,9 @@ export class MpvEngine implements PlaybackEngine {
   }
 
   selectEmbeddedSubtitleTrack(index: number | null): void {
-    void invoke('mpv_select_track', { kind: 'sub', sourceIndex: index })
-      .then(() => this.logTracks('selectEmbeddedSubtitleTrack', index))
-      .catch((e) => console.error('[playback] selectEmbeddedSubtitleTrack failed', index, e))
+    void invoke('mpv_select_track', { kind: 'sub', sourceIndex: index }).catch((e) =>
+      console.error('[playback] selectEmbeddedSubtitleTrack failed', index, e)
+    )
   }
 
   async enterPiP(): Promise<void> {

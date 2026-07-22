@@ -4,6 +4,7 @@ import {
   directStreamUrl,
   jf,
   secondsToTicks,
+  subtitleStreamUrl,
   ticksToSeconds,
   type BaseItem,
   type MediaSource,
@@ -192,17 +193,15 @@ export async function startPlayback(
   } else {
     throw new Error('Playback failed.')
   }
-  // Jellyfin appends its own "?ApiKey=" to DeliveryUrl server-side already
-  // (MediaInfoHelper.SetDeviceSpecificSubtitleInfo/StreamInfo.
-  // GetSubtitleStreamInfo, confirmed against jellyfin server source) --
-  // nothing to add here. `s.server + st.DeliveryUrl` is enough.
+  // Built ourselves via subtitleStreamUrl, not st.DeliveryUrl -- see that
+  // function's doc for why the server-supplied URL is unsafe to use as-is.
   const textTracks: TextTrackSource[] = subtitleStreams
     .filter((st) => st.DeliveryMethod === 'External' && st.DeliveryUrl)
     .map((st) => ({
       index: st.Index,
       label: st.DisplayTitle ?? st.Language ?? `Subtitle ${st.Index}`,
       language: st.Language,
-      url: s.server + st.DeliveryUrl
+      url: subtitleStreamUrl(item.Id, ms.Id, st.Index)
     }))
 
   return {
