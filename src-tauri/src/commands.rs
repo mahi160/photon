@@ -3,6 +3,7 @@
 //! commands live elsewhere (mpv module) / aren't ported yet (ticket #11).
 
 use keyring::Entry;
+use objc2_app_kit::{NSWindow, NSWindowButton};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use tauri::{AppHandle, Manager};
@@ -51,6 +52,25 @@ pub fn app_restore(window: tauri::Window) {
 #[tauri::command]
 pub fn app_set_fullscreen(window: tauri::Window, fullscreen: bool) {
     let _ = window.set_fullscreen(fullscreen);
+}
+
+/// Shows/hides the native traffic-light buttons themselves (not the whole
+/// title bar -- there's no separate title bar to show/hide in Overlay
+/// style, just these three buttons drawn over the content). Used only by
+/// the player (Player.tsx), synced to the same auto-hide `visible` state
+/// already driving PlayerControls' own opacity, so the dots disappear over
+/// the video along with everything else and only reappear on hover -- every
+/// other page leaves them alone (never calls this with `false`).
+#[tauri::command]
+pub fn app_set_traffic_lights_visible(window: tauri::Window, visible: bool) -> Result<(), String> {
+    let ns_window_ptr = window.ns_window().map_err(|e| e.to_string())?;
+    let ns_window: &NSWindow = unsafe { &*(ns_window_ptr as *const NSWindow) };
+    for button_kind in [NSWindowButton::CloseButton, NSWindowButton::MiniaturizeButton, NSWindowButton::ZoomButton] {
+        if let Some(button) = ns_window.standardWindowButton(button_kind) {
+            button.setHidden(!visible);
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]

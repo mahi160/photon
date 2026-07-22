@@ -24,6 +24,7 @@ pub fn run() {
             commands::app_minimize,
             commands::app_restore,
             commands::app_set_fullscreen,
+            commands::app_set_traffic_lights_visible,
             pip::pip_available,
             pip::pip_start,
             pip::pip_stop,

@@ -300,18 +300,25 @@ unsafe extern "C" fn gl_get_proc_address(_ctx: *mut c_void, name: *const c_char)
 
 fn create_io_surface(w: i32, h: i32) -> Result<CFRetained<IOSurfaceRef>, String> {
     let bytes_per_element = 4i32;
+    // No explicit IOSurfaceBytesPerRow: Metal's IOSurface-backed texture
+    // validation requires the stride 16-byte aligned, and `w * 4` (the naive
+    // stride) only happens to be a multiple of 16 when `w` is a multiple of
+    // 4 -- a fullscreen resize can easily land on a width where it isn't
+    // (e.g. 1710: 1710*4 = 6840, not divisible by 16), which crashed with
+    // "Texture Descriptor Validation ... bytesPerRow must be aligned to 16
+    // bytes". Omitting the key lets IOSurfaceCreate pick a correctly-aligned
+    // stride itself; both CGLTexImageIOSurface2D and the Metal texture read
+    // that stride back off the surface, never the value we'd have supplied.
     let keys = [
         CFString::from_str("IOSurfaceWidth"),
         CFString::from_str("IOSurfaceHeight"),
         CFString::from_str("IOSurfaceBytesPerElement"),
-        CFString::from_str("IOSurfaceBytesPerRow"),
         CFString::from_str("IOSurfacePixelFormat"),
     ];
     let values = [
         CFNumber::new_i32(w),
         CFNumber::new_i32(h),
         CFNumber::new_i32(bytes_per_element),
-        CFNumber::new_i32(w * bytes_per_element),
         CFNumber::new_i32(0x42475241), // 'BGRA' FourCC (kCVPixelFormatType_32BGRA)
     ];
     let key_refs: Vec<&CFString> = keys.iter().map(|k| &**k).collect();
