@@ -1,4 +1,4 @@
-use super::engine::{MpvEngine, TrackDebugInfo};
+use super::engine::MpvEngine;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, Runtime, State};
 
@@ -76,13 +76,6 @@ pub fn mpv_set_subtitle_delay(state: State<'_, MpvState>, seconds: f64) -> Resul
 #[tauri::command]
 pub fn mpv_select_track(state: State<'_, MpvState>, kind: String, source_index: Option<i64>) -> Result<(), String> {
     with_engine(&state, |e| e.select_track(&kind, source_index))
-}
-
-/// Debug-only: dumps mpv's real track-list to devtools -- see
-/// `TrackDebugInfo`'s doc (engine.rs).
-#[tauri::command]
-pub fn mpv_debug_tracks(state: State<'_, MpvState>) -> Result<Vec<TrackDebugInfo>, String> {
-    with_engine(&state, |e| e.debug_track_list())
 }
 
 #[tauri::command]
