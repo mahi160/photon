@@ -17,9 +17,28 @@ use tauri::{AppHandle, Emitter};
 #[derive(Default, Clone)]
 pub struct PipState(pub Arc<Mutex<Option<Child>>>);
 
+/// A GUI app launched via Finder/Dock/a `.dmg` install doesn't inherit the
+/// user's login-shell `PATH` -- confirmed report: PiP's "is mpv on PATH"
+/// probe worked in `pnpm dev` (started from a terminal, full `PATH`
+/// inherited) but always failed after installing the built `.dmg` and
+/// launching normally, hiding the PiP button even with `brew install mpv`
+/// already done. `brew`'s own bin dir (`/opt/homebrew` on Apple Silicon,
+/// `/usr/local` on Intel) never reaches a bare `Command::new("mpv")` there.
+/// Checked ahead of the bare name so an already-resolving `PATH` (dev
+/// builds, a differently configured shell) still wins.
+fn mpv_binary() -> PathBuf {
+    for candidate in ["/opt/homebrew/bin/mpv", "/usr/local/bin/mpv", "/opt/local/bin/mpv"] {
+        let p = PathBuf::from(candidate);
+        if p.is_file() {
+            return p;
+        }
+    }
+    PathBuf::from("mpv")
+}
+
 #[tauri::command]
 pub fn pip_available() -> bool {
-    Command::new("mpv")
+    Command::new(mpv_binary())
         .arg("--version")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -48,7 +67,7 @@ pub fn pip_start(
     let socket_path = std::env::temp_dir().join(format!("photon-pip-{}.sock", std::process::id()));
     let _ = std::fs::remove_file(&socket_path); // stale socket from a crashed previous run
 
-    let child = Command::new("mpv")
+    let child = Command::new(mpv_binary())
         .arg("--no-border")
         .arg("--ontop")
         .arg("--on-all-workspaces") // follows across macOS Spaces / virtual desktops
