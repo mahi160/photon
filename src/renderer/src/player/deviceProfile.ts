@@ -90,7 +90,11 @@ export function buildDeviceProfile(maxBitrate: number): object {
       // vtt External for text formats (subrip/ass/ssa/mov_text/etc, server
       // converts on the fly) -- keeps these on the Text Subtitle path so
       // delay/appearance styling keeps working (only text tracks support
-      // that, see engine.setTextTrack).
+      // that, see engine.setTextTrack). Declaring any of those *other*
+      // formats here explicitly (tried before, see git history) makes the
+      // server hand that format back raw instead of auto-converting it --
+      // harmless for mpv's own demuxer, but doesn't change direct-play
+      // eligibility either, so there's no upside to it.
       { Format: 'vtt', Method: 'External' },
       // Embed for the image-based formats mpv selects as an embedded track
       // instead (ADR-0008, engine.selectEmbeddedSubtitleTrack) -- this is

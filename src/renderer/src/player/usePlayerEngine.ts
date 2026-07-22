@@ -98,8 +98,7 @@ export function usePlayerEngine(
         setMuted(m)
       })
       e.on('ended', () => handlersRef.current.onEnded?.(e.currentTime()))
-      e.setVolume(initialRef.current.volume)
-      e.setMuted(initialRef.current.muted)
+      e.applyInitialVolume(initialRef.current.volume, initialRef.current.muted)
       engineRef.current = e
     }
     return engineRef.current

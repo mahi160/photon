@@ -50,9 +50,6 @@ export class MpvEngine implements PlaybackEngine {
   private resizeObserver: ResizeObserver
   private rectListenersAbort = new AbortController()
   private ready: Promise<void>
-  // jellyfin stream index -> mpv's track id ("sid") for the current file,
-  // populated by load() as it adds each external text subtitle
-  private subtitleSids = new Map<number, number>()
   // stashed for enterPiP -- the currently-loaded stream URL and last rate
   // sent to mpv aren't otherwise tracked/observable off this engine
   private url = ''
@@ -119,16 +116,16 @@ export class MpvEngine implements PlaybackEngine {
 
   async load(req: LoadRequest): Promise<void> {
     await this.ready
-    this.subtitleSids.clear()
     this.url = req.url
     await invoke('mpv_load', { url: req.url, startSeconds: req.startSeconds })
     // mpv fetches subtitle URLs itself (its own HTTP stack, no CORS) — unlike
-    // html5.ts there's no need to fetch/blob these through the main process
+    // html5.ts there's no need to fetch/blob these through the main process.
+    // Rust owns the index -> mpv "sid" mapping (and the load-race deferral
+    // for it, see engine.rs's add_subtitle) -- no map to keep in sync here.
     await Promise.all(
       req.textTracks.map(async (t) => {
         try {
-          const sid = await invoke<number>('mpv_add_subtitle', { url: t.url, lang: t.language })
-          this.subtitleSids.set(t.index, sid)
+          await invoke('mpv_add_subtitle', { url: t.url, lang: t.language, index: t.index })
         } catch (e) {
           console.error('[playback] subtitle add failed', t.label, e)
         }
@@ -153,25 +150,34 @@ export class MpvEngine implements PlaybackEngine {
     void invoke('mpv_set_rate', { rate })
   }
 
-  // chained on `ready`, not fire-and-forget: usePlayerEngine applies the
-  // persisted lastVolume/lastMuted at construction, before mpv_attach
-  // resolves — a bare invoke can win the (non-FIFO) MpvState lock race, hit
-  // the still-empty engine slot, and silently drop the initial value for the
-  // whole session. `.then` callbacks fire in registration order, so rapid
-  // slider changes stay ordered.
+  // Fires directly, like play/pause/seek/setRate -- *not* chained on `ready`
+  // here (only the one-time initial apply in `applyInitialVolume` needs
+  // that, see its own doc). Every call after construction reaches an
+  // already-attached engine; adding a needless `.then()` per call was the
+  // "mute doesn't react as fast as the other buttons" report.
   setVolume(volume: number): void {
-    void this.ready.then(() =>
-      invoke('mpv_set_volume', { volume: Math.max(0, Math.min(1, volume)) })
-    )
+    void invoke('mpv_set_volume', { volume: Math.max(0, Math.min(1, volume)) })
   }
 
   setMuted(muted: boolean): void {
-    void this.ready.then(() => invoke('mpv_set_muted', { muted }))
+    void invoke('mpv_set_muted', { muted })
+  }
+
+  // Chained on `ready`, not fire-and-forget: usePlayerEngine applies the
+  // persisted lastVolume/lastMuted right at construction, before mpv_attach
+  // resolves — a bare invoke can win the (non-FIFO) MpvState lock race, hit
+  // the still-empty engine slot, and silently drop the initial value for the
+  // whole session. Only this one-time call needs the wait; every later
+  // setVolume/setMuted (user actions) fires straight through above.
+  applyInitialVolume(volume: number, muted: boolean): void {
+    void this.ready.then(() => {
+      void invoke('mpv_set_volume', { volume: Math.max(0, Math.min(1, volume)) })
+      void invoke('mpv_set_muted', { muted })
+    })
   }
 
   setTextTrack(index: number | null): void {
-    const sid = index === null ? null : (this.subtitleSids.get(index) ?? null)
-    void invoke('mpv_set_text_track', { sid })
+    void invoke('mpv_set_text_track', { index })
   }
 
   setSubtitleDelay(seconds: number): void {
@@ -233,7 +239,6 @@ export class MpvEngine implements PlaybackEngine {
     this.rectListenersAbort.abort()
     for (const un of this.unlisten) un()
     this.unlisten = []
-    this.subtitleSids.clear()
     void invoke('pip_stop') // don't orphan a floating mpv window if the player unmounts mid-PiP
     void invoke('mpv_destroy')
   }

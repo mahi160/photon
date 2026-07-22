@@ -35,6 +35,9 @@ export interface PlaybackEngine {
   setRate(rate: number): void
   setVolume(volume: number): void // 0..1
   setMuted(muted: boolean): void
+  // one-time application of the persisted volume/mute at construction — see
+  // MpvEngine's doc for why this is a separate method from setVolume/setMuted
+  applyInitialVolume(volume: number, muted: boolean): void
   setTextTrack(index: number | null): void // jellyfin stream index, null = off
   setSubtitleDelay(seconds: number): void // text tracks only
   // both take the media's own stream index (Jellyfin's MediaStream.Index) —
