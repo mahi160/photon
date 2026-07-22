@@ -85,7 +85,11 @@ describe('resolveSubtitleSelection', () => {
       { index: 3, label: 'English', language: 'eng', url: '' },
       { index: 5, label: 'German', language: 'ger', url: '' }
     ],
-    mediaSource: {} as { DefaultSubtitleStreamIndex?: number }
+    mediaSource: {} as { DefaultSubtitleStreamIndex?: number },
+    subtitleStreams: [{ Index: 3 }, { Index: 4 }, { Index: 5 }] as Pick<
+      MediaStream,
+      'Index' | 'IsForced'
+    >[]
   }
   const on = { subtitlesEnabled: true }
   const off = { subtitlesEnabled: false }
@@ -141,6 +145,30 @@ describe('resolveSubtitleSelection', () => {
   it('no request, non-text server default → selected via mpv directly, no reload needed', () => {
     const s = { ...sess, mediaSource: { DefaultSubtitleStreamIndex: 4 } }
     expect(resolveSubtitleSelection(s, undefined, on)).toEqual({
+      display: 4,
+      textTrack: null,
+      embeddedTrack: 4
+    })
+  })
+
+  it('subtitles disabled but a forced text track exists → shown anyway', () => {
+    const s = {
+      ...sess,
+      subtitleStreams: [{ Index: 3, IsForced: true }, { Index: 4 }, { Index: 5 }]
+    }
+    expect(resolveSubtitleSelection(s, undefined, off)).toEqual({
+      display: 3,
+      textTrack: 3,
+      embeddedTrack: null
+    })
+  })
+
+  it('subtitles disabled but a forced embedded (non-text) track exists → shown anyway', () => {
+    const s = {
+      ...sess,
+      subtitleStreams: [{ Index: 4, IsForced: true }, { Index: 3 }, { Index: 5 }]
+    }
+    expect(resolveSubtitleSelection(s, undefined, off)).toEqual({
       display: 4,
       textTrack: null,
       embeddedTrack: 4

@@ -1,3 +1,21 @@
+// Minimal subtitle-appearance GUI (Settings > Playback): the few knobs
+// people actually reach for (size/color/background box), not a full
+// per-property styling page -- ADR-0007 still holds. Returned pairs are
+// meant to be spread *before* parseMpvConfig's raw passthrough below, so a
+// matching raw `sub-*` line still wins (same "defaults, then user" order
+// engine.rs already applies its own hardcoded defaults in).
+export function guiSubtitleConfig(settings: {
+  subtitleFontSize: number
+  subtitleColor: string
+  subtitleBackgroundBox: boolean
+}): [string, string][] {
+  return [
+    ['sub-font-size', String(settings.subtitleFontSize)],
+    ['sub-color', settings.subtitleColor],
+    ['sub-back-color', settings.subtitleBackgroundBox ? '#CC000000' : '#00000000']
+  ]
+}
+
 // Raw mpv-config passthrough (Settings > Playback, issue #9): replaces the
 // old per-property subtitle-styling GUI's role without rebuilding one.
 // Photon ships a sane default subtitle appearance (applied in engine.rs);

@@ -189,6 +189,7 @@ export interface MediaStream {
   DisplayTitle?: string
   IsTextSubtitleStream?: boolean
   IsDefault?: boolean // container disposition flag — what the browser plays in direct play
+  IsForced?: boolean // foreign-dialogue-only track (e.g. anime, foreign-language films) — shows regardless of the subtitlesEnabled preference
   DeliveryMethod?: string
   DeliveryUrl?: string
   IsExternal?: boolean

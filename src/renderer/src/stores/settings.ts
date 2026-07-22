@@ -16,6 +16,14 @@ interface SettingsState {
   subtitlesEnabled: boolean
   preferredAudioLanguage: string // ISO 639-2, '' = server default. Kept in sync with the player.
   lastSubtitleDelay: number // seconds, restored on next playback
+  // minimal subtitle-appearance GUI (issue #9 follow-up) -- a few common
+  // knobs, not a full styling page (ADR-0007 still holds: no per-property
+  // GUI). Applied as mpv options at launch, before the raw passthrough
+  // below so a matching raw key still wins. See mpvConfig.ts's
+  // guiSubtitleConfig.
+  subtitleFontSize: number // scaled px at 720p window height, matches --sub-font-size
+  subtitleColor: string // #RRGGBB, matches --sub-color
+  subtitleBackgroundBox: boolean // opaque box behind subtitle text vs. none
   // mpv (issue #9): raw `key=value` lines, applied as extra mpv options at
   // launch on top of Photon's default subtitle appearance. See mpvConfig.ts.
   mpvConfig: string
@@ -38,6 +46,9 @@ const defaults: Omit<SettingsState, 'set' | 'reset'> = {
   subtitlesEnabled: true,
   preferredAudioLanguage: '',
   lastSubtitleDelay: 0,
+  subtitleFontSize: 48,
+  subtitleColor: '#FFFFFF',
+  subtitleBackgroundBox: false,
   mpvConfig: '',
   theme: 'dark'
 }

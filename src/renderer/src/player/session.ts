@@ -137,10 +137,19 @@ const SUBTITLES_OFF: SubtitleSelection = { display: null, textTrack: null, embed
 // are enabled. Every subtitle stream is playable directly now (ADR-0008) —
 // text-deliverable ones via engine.setTextTrack, everything else (PGS/VOBSUB/
 // styled ASS) via mpv's own embedded-track selection.
+//
+// A forced track (IsForced — foreign-dialogue-only, e.g. anime/foreign-
+// language films) is meant to show regardless of subtitlesEnabled: that
+// preference is about *normal* subtitles, not the handful of foreign lines a
+// forced track exists for. Only checked when subtitlesEnabled is off and
+// nothing else was explicitly requested — subtitlesEnabled=true already
+// reaches a real pick (preferred language or the server's own default,
+// which itself accounts for forced tracks) further down.
 export function resolveSubtitleSelection(
   sess: {
     textTracks: TextTrackSource[]
     mediaSource: Pick<MediaSource, 'DefaultSubtitleStreamIndex'>
+    subtitleStreams: Pick<MediaStream, 'Index' | 'IsForced'>[]
   },
   requestedIndex: number | undefined,
   settings: { subtitlesEnabled: boolean; preferredSubtitleLanguage?: string }
@@ -153,7 +162,10 @@ export function resolveSubtitleSelection(
   }
   if (requestedIndex !== undefined)
     return requestedIndex < 0 ? SUBTITLES_OFF : forIndex(requestedIndex)
-  if (!settings.subtitlesEnabled) return SUBTITLES_OFF
+  if (!settings.subtitlesEnabled) {
+    const forced = sess.subtitleStreams.find((s) => s.IsForced)
+    return forced ? forIndex(forced.Index) : SUBTITLES_OFF
+  }
   const preferredText = sess.textTracks.find(
     (t) => !!settings.preferredSubtitleLanguage && t.language === settings.preferredSubtitleLanguage
   )

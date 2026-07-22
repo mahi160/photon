@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { EngineEvents, LoadRequest, PlaybackEngine, TextTrackSource } from './engine'
-import { parseMpvConfig } from './mpvConfig'
+import { guiSubtitleConfig, parseMpvConfig } from './mpvConfig'
 import { useSettings } from '../stores/settings'
 
 type Listeners = { [K in keyof EngineEvents]: Set<EngineEvents[K]> }
@@ -62,7 +62,11 @@ export class MpvEngine implements PlaybackEngine {
   private backend: 'gpu' | 'cpu' | null = null
 
   constructor(private element: HTMLElement) {
-    const extraConfig = parseMpvConfig(useSettings.getState().mpvConfig)
+    // GUI subtitle knobs first, so a matching key in the raw passthrough
+    // below still wins (same order as engine.rs's own hardcoded defaults
+    // vs. this whole extraConfig list) -- see guiSubtitleConfig's doc.
+    const settings = useSettings.getState()
+    const extraConfig = [...guiSubtitleConfig(settings), ...parseMpvConfig(settings.mpvConfig)]
     this.ready = invoke<string>('mpv_attach', { extraConfig }).then((backend) => {
       this.backend = backend === 'gpu' ? 'gpu' : 'cpu'
       return this.syncRect()

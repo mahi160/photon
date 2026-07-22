@@ -1,5 +1,30 @@
 import { describe, expect, it } from 'vitest'
-import { parseMpvConfig } from './mpvConfig'
+import { guiSubtitleConfig, parseMpvConfig } from './mpvConfig'
+
+describe('guiSubtitleConfig', () => {
+  it('maps settings to sub-* mpv options', () => {
+    expect(
+      guiSubtitleConfig({
+        subtitleFontSize: 64,
+        subtitleColor: '#FFFF00',
+        subtitleBackgroundBox: false
+      })
+    ).toEqual([
+      ['sub-font-size', '64'],
+      ['sub-color', '#FFFF00'],
+      ['sub-back-color', '#00000000']
+    ])
+  })
+
+  it('background box on → opaque sub-back-color', () => {
+    const pairs = guiSubtitleConfig({
+      subtitleFontSize: 48,
+      subtitleColor: '#FFFFFF',
+      subtitleBackgroundBox: true
+    })
+    expect(pairs).toContainEqual(['sub-back-color', '#CC000000'])
+  })
+})
 
 describe('parseMpvConfig', () => {
   it('empty string → no pairs', () => {
