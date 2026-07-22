@@ -65,6 +65,7 @@ const MPV_RENDER_PARAM_SW_STRIDE: mpv_render_param_type = 19;
 const MPV_RENDER_PARAM_SW_POINTER: mpv_render_param_type = 20;
 const MPV_RENDER_API_TYPE_SW: &[u8] = b"sw\0";
 use objc::{class, msg_send, sel, sel_impl};
+use std::collections::HashMap;
 use std::ffi::{c_void, CStr, CString};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex};
@@ -95,7 +96,12 @@ struct PendingState {
     loaded: bool, // has MPV_EVENT_FILE_LOADED fired for the *current* load() yet
     start_seconds: f64,
     queued_tracks: Vec<(String, Option<i64>)>, // (kind, source_index) selected before `loaded`
-    queued_text_sid: Option<Option<i64>>,      // set_text_track called before `loaded`; latest wins
+    queued_text_index: Option<Option<i64>>,    // set_text_track called before `loaded`; latest wins
+    // (url, lang, jellyfin index) added before `loaded` -- see add_subtitle's doc
+    queued_subtitle_adds: Vec<(String, Option<String>, i64)>,
+    // jellyfin stream index -> mpv's own "sid", populated as each add_subtitle
+    // actually lands (immediately, or once FILE_LOADED drains the queue above)
+    text_track_ids: HashMap<i64, i64>,
 }
 
 /// The render-loop/rect state (render context, view, colorspace) --
@@ -266,10 +272,37 @@ fn find_track_id(mpv: *mut mpv_handle, kind: &str, source_index: i64) -> Result<
     Err(format!("select_track: no {kind} track with source index {source_index}"))
 }
 
-// Sets/clears the text-subtitle track by mpv's own "sid" (as returned by
-// add_subtitle). Free fn so both the main thread (once loaded) and the
-// observer thread (draining a queued selection on MPV_EVENT_FILE_LOADED) can
-// call it from a raw handle -- same pattern as apply_select_track.
+// Issues the actual `sub-add` command and reads back mpv's assigned "sid".
+// Free fn so both the main thread (add_subtitle, once loaded) and the
+// observer thread (draining a queued add on MPV_EVENT_FILE_LOADED) can call
+// it from a raw handle.
+//
+// ponytail: tried the documented approach first -- `sub-add ... auto` then
+// reading its command_ret/mpv_node result, which the manual says carries
+// the new track's id. Verified (against raw mpv IPC, not just this FFI
+// layer) that this mpv build returns `null` there instead. `sub-add ...
+// select` immediately makes the new track current, so reading the
+// now-current "sid" property right after (mpv_command is synchronous -- it
+// only returns once the command has been processed) reliably gives the
+// right id. Momentarily selecting each track while mapping is harmless:
+// callers always follow up with an explicit `set_text_track` for whichever
+// one the user actually wants.
+fn apply_add_subtitle(mpv: *mut mpv_handle, url: &str, lang: Option<&str>) -> Result<i64, String> {
+    let lang = lang.unwrap_or("");
+    let cstrs: Vec<CString> = ["sub-add", url, "select", "", lang].iter().map(|s| CString::new(*s).unwrap()).collect();
+    let mut ptrs: Vec<*const std::os::raw::c_char> =
+        cstrs.iter().map(|s| s.as_ptr()).chain(std::iter::once(std::ptr::null())).collect();
+    unsafe {
+        check(mpv_command(mpv, ptrs.as_mut_ptr()), "mpv_command")?;
+    }
+    get_property_int(mpv, "sid")
+}
+
+// Sets/clears the text-subtitle track by mpv's own "sid" (resolved from a
+// Jellyfin index by the two callers below). Free fn so both the main thread
+// (once loaded) and the observer thread (draining a queued selection on
+// MPV_EVENT_FILE_LOADED) can call it from a raw handle -- same pattern as
+// apply_select_track.
 fn apply_set_text_track(mpv: *mut mpv_handle, sid: Option<i64>) -> Result<(), String> {
     let name = CString::new("sid").unwrap();
     unsafe {
@@ -566,47 +599,57 @@ impl MpvEngine {
     /// Adds an external text subtitle (server-delivered VTT/SRT URL — mpv
     /// fetches it itself via its own HTTP stack, so unlike the browser this
     /// has no CORS restriction, no subtitle_fetch proxy needed here).
-    /// Returns mpv's assigned track id ("sid") for later reselection via
-    /// `set_text_track`.
+    /// `index` is the caller's own key (Jellyfin's stream index) for later
+    /// reselection via `set_text_track`.
     ///
-    /// ponytail: tried the documented approach first — `sub-add ... auto`
-    /// then reading its command_ret/mpv_node result, which the manual says
-    /// carries the new track's id. Verified (against raw mpv IPC, not just
-    /// this FFI layer) that this mpv build returns `null` there instead.
-    /// `sub-add ... select` immediately makes the new track current, so
-    /// reading the now-current "sid" property right after (mpv_command is
-    /// synchronous — it only returns once the command has been processed)
-    /// reliably gives the right id. Momentarily selecting each track while
-    /// mapping is harmless: `load()`'s caller always follows up with an
-    /// explicit `set_text_track` for whichever one the user actually wants.
-    pub fn add_subtitle(&self, url: &str, lang: Option<&str>) -> Result<i64, String> {
-        let lang = lang.unwrap_or("");
-        self.command(&["sub-add", url, "select", "", lang])?;
-        let name = CString::new("sid").unwrap();
-        let mut sid: i64 = -1;
-        unsafe {
-            check(
-                mpv_get_property(self.mpv, name.as_ptr(), mpv_format_MPV_FORMAT_INT64, &mut sid as *mut _ as *mut c_void),
-                "mpv_get_property (sid)",
-            )?;
+    /// Deferred to MPV_EVENT_FILE_LOADED exactly like `select_track`/
+    /// `set_text_track` below -- confirmed against raw mpv IPC that a
+    /// `sub-add` issued between `loadfile` returning (queued, not yet
+    /// demuxed) and the core actually opening the new file can silently
+    /// fail or get wiped once that open settles: the external track never
+    /// showed up in the post-load track-list at all. Queued when `!loaded`,
+    /// applied by the observer thread once the core is ready, same pattern
+    /// as the other deferred ops -- `text_track_ids` (index -> mpv "sid")
+    /// is populated there or here, whichever actually runs the add.
+    pub fn add_subtitle(&self, url: &str, lang: Option<&str>, index: i64) -> Result<(), String> {
+        let mut pending = self.pending.lock().unwrap();
+        if !pending.loaded {
+            pending.queued_subtitle_adds.push((url.to_string(), lang.map(str::to_string), index));
+            return Ok(());
         }
-        Ok(sid)
+        drop(pending);
+        let sid = apply_add_subtitle(self.mpv, url, lang)?;
+        self.pending.lock().unwrap().text_track_ids.insert(index, sid);
+        Ok(())
     }
 
-    /// `sid`: mpv's track id from `add_subtitle`, or `None` to disable subs.
+    /// `index`: the Jellyfin stream index passed to `add_subtitle`, or
+    /// `None` to disable subs. Resolved against `text_track_ids` (populated
+    /// as each `add_subtitle` actually lands) into mpv's own "sid" --
+    /// callers only ever know the Jellyfin side of that mapping.
     ///
     /// Deferred to MPV_EVENT_FILE_LOADED exactly like `select_track` and
     /// `seek`: mpv runs its automatic default-subtitle selection as *part of*
     /// the async file load, so setting `sid` right after `loadfile` races that
     /// autoselect -- if FILE_LOADED fires after this call, mpv clobbers the
     /// chosen external sub. Queued when `!loaded` and applied by the observer
-    /// thread once the core is ready, after autoselect has run.
-    pub fn set_text_track(&self, sid: Option<i64>) -> Result<(), String> {
+    /// thread once the core is ready, after autoselect *and* any queued
+    /// `add_subtitle` calls have run.
+    pub fn set_text_track(&self, index: Option<i64>) -> Result<(), String> {
         let mut pending = self.pending.lock().unwrap();
         if !pending.loaded {
-            pending.queued_text_sid = Some(sid);
+            pending.queued_text_index = Some(index);
             return Ok(());
         }
+        let sid = match index {
+            None => None,
+            Some(idx) => Some(
+                *pending
+                    .text_track_ids
+                    .get(&idx)
+                    .ok_or_else(|| format!("set_text_track: unknown subtitle index {idx}"))?,
+            ),
+        };
         drop(pending);
         apply_set_text_track(self.mpv, sid)
     }
@@ -872,13 +915,14 @@ fn spawn_observer<R: Runtime>(
                     let _ = app.emit("mpv://tick", tick.clone());
                 }
                 x if x == mpv_event_id_MPV_EVENT_FILE_LOADED => {
-                    let (start, queued_tracks, queued_text_sid) = {
+                    let (start, subtitle_adds, queued_tracks, queued_text_index) = {
                         let mut p = pending.lock().unwrap();
                         p.loaded = true;
                         (
                             std::mem::replace(&mut p.start_seconds, 0.0),
+                            std::mem::take(&mut p.queued_subtitle_adds),
                             std::mem::take(&mut p.queued_tracks),
-                            p.queued_text_sid.take(),
+                            p.queued_text_index.take(),
                         )
                     };
                     if start > 0.0 {
@@ -894,12 +938,23 @@ fn spawn_observer<R: Runtime>(
                             mpv_command(mpv, ptrs.as_mut_ptr());
                         }
                     }
+                    // adds first -- queued_text_index below resolves against
+                    // whatever lands in `text_track_ids` here
+                    for (url, lang, index) in subtitle_adds {
+                        if let Ok(sid) = apply_add_subtitle(mpv, &url, lang.as_deref()) {
+                            pending.lock().unwrap().text_track_ids.insert(index, sid);
+                        }
+                    }
                     for (kind, source_index) in queued_tracks {
                         let _ = apply_select_track(mpv, &kind, source_index);
                     }
                     // after autoselect + any embedded-track selection above,
                     // so a chosen external text sub wins the load-time race
-                    if let Some(sid) = queued_text_sid {
+                    if let Some(index) = queued_text_index {
+                        let sid = match index {
+                            None => None,
+                            Some(idx) => pending.lock().unwrap().text_track_ids.get(&idx).copied(),
+                        };
                         let _ = apply_set_text_track(mpv, sid);
                     }
                 }

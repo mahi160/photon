@@ -52,17 +52,13 @@ pub fn mpv_set_muted(state: State<'_, MpvState>, muted: bool) -> Result<(), Stri
 }
 
 #[tauri::command]
-pub fn mpv_add_subtitle(state: State<'_, MpvState>, url: String, lang: Option<String>) -> Result<i64, String> {
-    let slot = state.0.lock().unwrap();
-    match slot.as_ref() {
-        Some(e) => e.add_subtitle(&url, lang.as_deref()),
-        None => Err("mpv engine not attached".into()),
-    }
+pub fn mpv_add_subtitle(state: State<'_, MpvState>, url: String, lang: Option<String>, index: i64) -> Result<(), String> {
+    with_engine(&state, |e| e.add_subtitle(&url, lang.as_deref(), index))
 }
 
 #[tauri::command]
-pub fn mpv_set_text_track(state: State<'_, MpvState>, sid: Option<i64>) -> Result<(), String> {
-    with_engine(&state, |e| e.set_text_track(sid))
+pub fn mpv_set_text_track(state: State<'_, MpvState>, index: Option<i64>) -> Result<(), String> {
+    with_engine(&state, |e| e.set_text_track(index))
 }
 
 #[tauri::command]
