@@ -13,10 +13,16 @@ name: Release
 # .releaserc.json marks `prod` as a prerelease channel ("pre") -- versions
 # come out as `2.0.0-pre.1`, `2.0.0-pre.2`, ... and the GitHub release is
 # flagged as a pre-release, on top of (not instead of) the draft-until-
-# macOS-succeeds gating above. Reflects where this actually stands: v2 (the
-# Electron -> Tauri replatform) is verified on macOS only, Windows/Linux ship
-# unverified stub render surfaces (see mpv/windows, mpv/linux). Drop the
-# `prerelease` flag once Windows/Linux are for-real verified to start
+# macOS-succeeds gating above. `main` is also listed in `branches` there,
+# unused for actual publishing (this workflow only ever triggers on `prod`)
+# -- semantic-release's own validation requires at least one plain,
+# non-prerelease release branch to *exist* alongside any prerelease branch
+# (confirmed the hard way: a single fully-prerelease branch config fails
+# with ERELEASEBRANCHES, "a minimum of 1 ... release branches are required"),
+# `main` is just there to satisfy that. Reflects where this actually stands:
+# v2 (the Electron -> Tauri replatform) is verified on macOS only, Windows/
+# Linux ship unverified stub render surfaces (see mpv/windows, mpv/linux).
+# Drop the `prerelease` flag once Windows/Linux are for-real verified to start
 # cutting stable releases again.
 on:
   push:
