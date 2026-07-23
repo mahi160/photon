@@ -9,6 +9,15 @@ name: Release
 # neither has been run/observed on real hardware (no Windows/Linux box in
 # this environment), so they must never be able to block the macOS release
 # that already works. See each job's own comment for what's still unverified.
+#
+# .releaserc.json marks `prod` as a prerelease channel ("pre") -- versions
+# come out as `2.0.0-pre.1`, `2.0.0-pre.2`, ... and the GitHub release is
+# flagged as a pre-release, on top of (not instead of) the draft-until-
+# macOS-succeeds gating above. Reflects where this actually stands: v2 (the
+# Electron -> Tauri replatform) is verified on macOS only, Windows/Linux ship
+# unverified stub render surfaces (see mpv/windows, mpv/linux). Drop the
+# `prerelease` flag once Windows/Linux are for-real verified to start
+# cutting stable releases again.
 on:
   push:
     branches: [prod]
@@ -42,6 +51,7 @@ jobs:
           extra_plugins: |
             @semantic-release/changelog
             @semantic-release/git
+            @semantic-release/exec
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
