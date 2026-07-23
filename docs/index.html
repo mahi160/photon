@@ -270,7 +270,9 @@
         </svg>
         Photon
       </div>
-      <p class="tagline">A calm, minimal desktop media player built exclusively for Jellyfin.</p>
+      <p class="tagline">
+        A calm, minimal desktop media player for Jellyfin, built around real mpv playback.
+      </p>
       <p class="not-a">Photon is not a media manager. It is a media player.</p>
 
       <div class="actions">
@@ -284,6 +286,17 @@
         <a class="btn" href="https://github.com/mahi160/photon">View on GitHub</a>
       </div>
 
+      <p class="gatekeeper" style="margin-block-end: 1.5rem; text-align: center">
+        <strong
+          >Every other Jellyfin desktop client plays through the browser's
+          <code>&lt;video&gt;</code> tag, or shells out to a separate mpv window.</strong
+        >
+        Photon embeds mpv directly, in-process, via its render API — compositing straight into
+        Photon's own window, GPU-rendered with automatic CPU fallback. Always direct play: the
+        server never has to transcode just because the client's playback is weak. This is the whole
+        reason Photon exists.
+      </p>
+
       <p class="not-a" style="margin-block-end: 3rem">
         macOS: verified, working — <code>brew install --cask mahi160/photon/photon</code>.
         Windows/Linux builds run but video doesn't render yet (<a
@@ -296,14 +309,14 @@
         <h2>What it does</h2>
         <ul class="features">
           <li>
+            <strong>mpv-quality playback in the same window</strong> — GPU-rendered, CPU fallback,
+            always direct play
+          </li>
+          <li>
             Continue Watching, Recently Added Movies, Recently Added Shows — nothing else on Home
           </li>
           <li>Movies and TV Shows grids, every library merged</li>
           <li>Instant local search plus server-side episode search</li>
-          <li>
-            In-process libmpv playback — GPU-rendered with automatic CPU fallback, always direct
-            play
-          </li>
           <li>Audio and subtitle track switching; delay and styling for text subtitles</li>
           <li>Picture-in-Picture, fullscreen, playback speed</li>
           <li>Keyboard-first controls</li>

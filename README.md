@@ -1,6 +1,19 @@
 # Photon
 
-A calm, minimal desktop media player for Jellyfin.
+A calm, minimal desktop media player for Jellyfin, built around real mpv
+playback — not a browser `<video>` tag with a Jellyfin skin on top.
+
+## mpv, in the same window
+
+Every other Jellyfin desktop client either plays through the browser's
+`<video>` element (limited codec/container support, server transcodes
+anything it can't handle) or shells out to a separate mpv window with its
+own title bar and controls. Photon embeds mpv directly, in-process, via its
+render API — the actual mpv decoder/renderer compositing straight into
+Photon's own window, GPU-rendered with automatic CPU fallback if a machine
+can't do that. **Always direct play** — the server never has to transcode
+just because the client's playback engine is weak. This is the whole reason
+Photon exists; everything else is the UI around it.
 
 Sign in to your server, browse Movies and TV Shows, hit play. No dashboards,
 no library management, no clutter. Photon is not a media manager. It is a
@@ -8,11 +21,11 @@ media player.
 
 ## Features
 
+- **mpv-quality playback in the same window** — GPU-rendered, CPU fallback,
+  always direct play, server decides remux/transcode
 - Continue Watching, Recently Added Movies, Recently Added Shows on Home
 - Movies and TV Shows grids, all libraries merged
 - Instant local search plus server-side episode search
-- In-process libmpv playback — GPU-rendered with automatic CPU fallback,
-  always direct play, server decides remux/transcode
 - Audio and subtitle track switching; delay and styling for text subtitles
 - Picture-in-Picture (hands off to a standalone `mpv`, if one's on `PATH`),
   fullscreen, playback speed
