@@ -1,28 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query'
-import { Check, Heart, Play } from 'reicon-react'
-import { imageUrl, type BaseItem, type UserData } from '../lib/jellyfin'
-import { setFavorite, setPlayed } from '../lib/queries'
-import { queryKeys } from '../lib/queryKeys'
-import { Tip } from './Tip'
+import { Play, Clapperboard } from 'reicon-react'
+import { imageUrl, type BaseItem } from '../lib/jellyfin'
+import { FavoriteButton } from './FavoriteButton'
+import { WatchedButton } from './WatchedButton'
 import styles from './Card.module.css'
 
-// Patch the toggled item's UserData in every cached query instead of
-// invalidating queryKeys.all() — that refetched the entire library (and the
-// staleTime:Infinity search index) on a single heart/check click.
-function patchUserData(qc: QueryClient, itemId: string, patch: Partial<UserData>): void {
-  const patchOne = (it: BaseItem): BaseItem =>
-    it.Id === itemId ? { ...it, UserData: { ...it.UserData, ...patch } } : it
-  qc.setQueriesData({ queryKey: queryKeys.all() }, (data: unknown) => {
-    if (Array.isArray(data)) return data.map(patchOne)
-    if (data && typeof data === 'object' && 'Id' in data) return patchOne(data as BaseItem)
-    return data
-  })
-}
-
 // Card semantics (CONTEXT.md): click card / hover play button = play,
-// click title label = details. Same everywhere.
+// click title label = details. For episodes specifically: title links to
+// the series (what you're browsing), subtitle links to the episode itself.
 export function Card({
   item,
   wide = false
@@ -31,62 +17,38 @@ export function Card({
   wide?: boolean
 }): React.JSX.Element {
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const img = imageUrl(item, wide ? 480 : 360)
   const pct = item.UserData?.PlayedPercentage
-  const played = item.UserData?.Played ?? false
-  const favorite = item.UserData?.IsFavorite ?? false
   // lazy initializer: the sanctioned place to read the wall clock during
   // render — a "new" badge doesn't need per-render freshness
   const [now] = useState(() => Date.now())
   const isNew = !!item.DateCreated && now - Date.parse(item.DateCreated) < 7 * 86_400_000
-
-  const toggleWatched = useMutation({
-    mutationFn: (next: boolean) => setPlayed(item.Id, next),
-    onSuccess: (_data, next) => {
-      patchUserData(queryClient, item.Id, {
-        Played: next,
-        PlayedPercentage: undefined,
-        PlaybackPositionTicks: 0
-      })
-      // membership of these rows actually changes when watched state flips
-      queryClient.invalidateQueries({ queryKey: queryKeys.resume() })
-      queryClient.invalidateQueries({ queryKey: queryKeys.nextUp.all() })
-    }
-  })
-
-  const toggleFavorite = useMutation({
-    mutationFn: (next: boolean) => setFavorite(item.Id, next),
-    onSuccess: (_data, next) => patchUserData(queryClient, item.Id, { IsFavorite: next })
-  })
+  const [loaded, setLoaded] = useState(false)
 
   function play(): void {
     navigate({ to: '/player/$itemId', params: { itemId: item.Id } })
   }
 
-  function toggleWatchedClick(e: React.MouseEvent): void {
-    e.stopPropagation()
-    toggleWatched.mutate(!played)
-  }
-
-  function toggleFavoriteClick(e: React.MouseEvent): void {
-    e.stopPropagation()
-    toggleFavorite.mutate(!favorite)
-  }
-
-  function details(e: React.MouseEvent): void {
+  // episodes: title row links to the *series* (what you're actually
+  // browsing for), subtitle links to the episode itself -- movies/shows
+  // keep the plain title-links-to-itself behavior
+  function openTitle(e: React.MouseEvent): void {
     e.stopPropagation()
     if (item.Type === 'Movie') navigate({ to: '/movies/$itemId', params: { itemId: item.Id } })
-    else if (item.Type === 'Series')
-      navigate({ to: '/shows/$seriesId', params: { seriesId: item.Id } })
-    else if (item.SeriesId)
-      navigate({ to: '/shows/$seriesId', params: { seriesId: item.SeriesId } })
+    else if (item.Type === 'Series' || item.Type === 'Episode')
+      navigate({ to: '/shows/$seriesId', params: { seriesId: (item.SeriesId ?? item.Id)! } })
   }
 
-  const subtitle =
-    item.Type === 'Episode'
-      ? `${item.SeriesName ?? ''} · S${item.ParentIndexNumber ?? '?'}E${item.IndexNumber ?? '?'}`
-      : (item.ProductionYear ?? '')
+  function openEpisode(e: React.MouseEvent): void {
+    e.stopPropagation()
+    navigate({ to: '/episode/$itemId', params: { itemId: item.Id } })
+  }
+
+  const isEpisode = item.Type === 'Episode'
+  const titleLabel = isEpisode ? (item.SeriesName ?? '') : item.Name
+  const subtitle = isEpisode
+    ? `S${item.ParentIndexNumber ?? '?'}:E${item.IndexNumber ?? '?'} - ${item.Name}`
+    : (item.ProductionYear ?? '')
 
   return (
     <div className={`${styles.card} ${wide ? styles.wide : ''}`}>
@@ -96,9 +58,18 @@ export function Card({
         className={`${styles.poster} ${wide ? styles.wide : ''}`}
       >
         {img ? (
-          <img src={img} alt="" loading="lazy" className={styles.image} />
+          <img
+            src={img}
+            alt=""
+            loading="lazy"
+            className={`${styles.image} ${loaded ? styles.imageLoaded : ''}`}
+            onLoad={() => setLoaded(true)}
+          />
         ) : (
-          <div className={styles.placeholder}>{item.Name}</div>
+          <div className={styles.placeholder}>
+            <Clapperboard className={styles.placeholderIcon} />
+            <span className={styles.placeholderText}>{item.Name}</span>
+          </div>
         )}
         <div className={styles.playScrim}>
           <span className={styles.playButton}>
@@ -113,31 +84,31 @@ export function Card({
         {isNew && <span className={styles.newBadge}>NEW</span>}
       </button>
       <div className={styles.meta}>
-        <button onClick={details} className={styles.title} title={item.Name}>
-          {item.Name}
+        <button onClick={openTitle} className={styles.title} title={titleLabel}>
+          {titleLabel}
         </button>
         <div className={styles.quickActions}>
-          <Tip label={favorite ? 'Remove from favorites' : 'Add to favorites'}>
-            <button
-              onClick={toggleFavoriteClick}
-              aria-label={favorite ? 'Remove from favorites' : 'Add to favorites'}
-              className={`${styles.actionBtn} ${favorite ? styles.actionBtnActive : ''}`}
-            >
-              <Heart weight={favorite ? 'Filled' : 'Outline'} />
-            </button>
-          </Tip>
-          <Tip label={played ? 'Mark unwatched' : 'Mark watched'}>
-            <button
-              onClick={toggleWatchedClick}
-              aria-label={played ? 'Mark unwatched' : 'Mark watched'}
-              className={`${styles.actionBtn} ${played ? styles.actionBtnActive : ''}`}
-            >
-              <Check />
-            </button>
-          </Tip>
+          <FavoriteButton
+            item={item}
+            className={styles.actionBtn}
+            activeClassName={styles.actionBtnActive}
+            stopPropagation
+          />
+          <WatchedButton
+            item={item}
+            className={styles.actionBtn}
+            activeClassName={styles.actionBtnActive}
+            stopPropagation
+          />
         </div>
       </div>
-      <div className={styles.subtitle}>{subtitle}</div>
+      {isEpisode ? (
+        <button onClick={openEpisode} className={styles.subtitleLink} title={item.Name}>
+          {subtitle}
+        </button>
+      ) : (
+        <div className={styles.subtitle}>{subtitle}</div>
+      )}
     </div>
   )
 }

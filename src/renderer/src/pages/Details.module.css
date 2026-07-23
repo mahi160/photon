@@ -1,8 +1,41 @@
 /* shared by MovieDetails and ShowDetails */
 
 .page {
+  position: relative;
+
   min-block-size: 100%;
+  /* contains .ambient's negative z-index to this page instead of it
+     leaking behind AppLayout's own chrome */
+  isolation: isolate;
+
   animation: page-in var(--dur-slow) var(--ease-out) backwards;
+}
+
+/* very faint, hugely blurred backdrop bleeding down from the hero -- an
+   ambient wash, not a second copy of the hero image (opacity/mask keep it
+   from ever reading as a real backdrop) */
+.ambient {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: -1;
+
+  overflow: hidden;
+  block-size: 34rem;
+
+  mask-image: linear-gradient(to bottom, black, transparent);
+}
+
+.ambientImg {
+  position: absolute;
+  inset: -10%;
+
+  inline-size: 120%;
+  block-size: 120%;
+  object-fit: cover;
+
+  opacity: 0.35;
+  filter: blur(60px) saturate(1.2);
 }
 
 @keyframes page-in {
@@ -53,6 +86,27 @@
   block-size: 75%;
 
   background: linear-gradient(to bottom, transparent, var(--bg));
+}
+
+/* no backdrop on the server for this item -- a wash + mark beats an empty
+   scrim over a flat surface */
+.heroPlaceholder {
+  position: absolute;
+  inset: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: var(--artwork-fallback-bg);
+}
+
+.heroPlaceholderIcon {
+  inline-size: 3rem;
+  block-size: 3rem;
+
+  color: var(--fg-faint);
+  opacity: 0.6;
 }
 
 .back {
@@ -109,14 +163,108 @@
 }
 
 .posterImg,
-.posterPlaceholder {
+.posterPlaceholder,
+.posterSkeleton {
   aspect-ratio: 2 / 3;
   inline-size: 100%;
   border-radius: var(--radius-m);
 
+  box-shadow: var(--shadow-2);
+}
+
+.posterImg {
   object-fit: cover;
   background: var(--surface-2);
+
+  opacity: 0;
+
+  transition: opacity var(--dur-med) var(--ease);
+}
+
+.imageLoaded {
+  opacity: 1;
+}
+
+.posterPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: var(--artwork-fallback-bg);
+}
+
+.posterPlaceholderIcon {
+  inline-size: 2rem;
+  block-size: 2rem;
+
+  color: var(--fg-faint);
+  opacity: 0.7;
+}
+
+/* EpisodeDetails' hero thumb -- episodes are 16:9, not the movie/show 2:3
+   poster, but needs to fill the same ‘top’ flex slot so .info's top padding
+   still lines up */
+.episodePoster {
+  flex-shrink: 0;
+  inline-size: clamp(14rem, 30vw, 20rem);
+}
+
+.episodePosterImg,
+.episodePosterPlaceholder {
+  aspect-ratio: 16 / 9;
+  inline-size: 100%;
+  border-radius: var(--radius-m);
+
   box-shadow: var(--shadow-2);
+}
+
+.episodePosterImg {
+  object-fit: cover;
+  background: var(--surface-2);
+
+  opacity: 0;
+
+  transition: opacity var(--dur-med) var(--ease);
+}
+
+.episodePosterPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: var(--artwork-fallback-bg);
+}
+
+.episodePosterPlaceholderIcon {
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+
+  color: var(--fg-faint);
+  opacity: 0.7;
+}
+
+.nextEpisodeCard {
+  inline-size: clamp(16rem, 40vw, 20rem);
+}
+
+.epSeriesLink {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.epSeriesLink:hover {
+  color: var(--fg);
+  text-decoration: underline;
+}
+
+.epNumberLine {
+  margin-block-start: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--fg-faint);
 }
 
 .info {
@@ -180,7 +328,6 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
-
   margin-block-start: 0.75rem;
 }
 
@@ -319,8 +466,8 @@
 
 .iconToggleActive,
 .iconToggleActive:hover {
-  color: var(--accent-fg);
   border-color: transparent;
+  color: var(--accent-fg);
   background: var(--accent);
 }
 
@@ -432,7 +579,6 @@
   padding: 0.75rem;
   border-radius: var(--radius-m);
 
-  cursor: pointer;
   text-align: start;
 
   transition: background-color var(--dur-fast) var(--ease);
@@ -442,7 +588,7 @@
   background: var(--surface-1);
 }
 
-.episodeThumb {
+.episodeThumbWrap {
   position: relative;
 
   overflow: hidden;
@@ -453,6 +599,16 @@
   border-radius: var(--radius-s);
 
   background: var(--surface-2);
+}
+
+/* button, not a div: fills .episodeThumbWrap so the visual box is identical
+   to before, but is now a real sibling to .episodeWatchedToggle instead of
+   its parent -- a <button> can't nest a <button> */
+.episodeThumb {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+  cursor: pointer;
 }
 
 .episodeThumb img {
@@ -507,8 +663,8 @@
 }
 
 .episodeWatchedToggleActive {
-  opacity: 1;
   color: var(--accent);
+  opacity: 1;
   background: var(--scrim-soft);
 }
 
@@ -529,9 +685,17 @@
 }
 
 .episodeTitle {
+  display: block;
+  text-align: start;
+
+  font-family: inherit;
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--fg);
+}
+
+.episodeTitle:hover {
+  text-decoration: underline;
 }
 
 .episodeOverview {
@@ -547,8 +711,46 @@
   color: var(--fg-muted);
 }
 
-.loading,
 .errorState {
   padding: 2rem var(--gutter);
   color: var(--fg-faint);
+}
+
+/* ---- loading skeleton ---- */
+@keyframes shimmer {
+  from {
+    background-position: -150% 0;
+  }
+
+  to {
+    background-position: 150% 0;
+  }
+}
+
+.heroSkeleton,
+.posterSkeleton,
+.line {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+.heroSkeleton {
+  block-size: clamp(14rem, 32vh, 20rem);
+}
+
+.line {
+  block-size: 0.9rem;
+  margin-block-end: 0.75rem;
+  border-radius: var(--radius-s);
+}
+
+.lineTitle {
+  block-size: 1.75rem;
+  inline-size: 55%;
+  margin-block-end: 0.5rem;
+}
+
+.lineShort {
+  inline-size: 40%;
 }

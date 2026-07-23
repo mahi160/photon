@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { mediaBadges, trickplayTile, type MediaStream, type TrickplayInfo } from './jellyfin'
+import {
+  mediaBadges,
+  playerSpecialBadges,
+  trickplayTile,
+  type MediaStream,
+  type TrickplayInfo
+} from './jellyfin'
 
 describe('mediaBadges', () => {
   const uhd: MediaStream[] = [
@@ -33,6 +39,63 @@ describe('mediaBadges', () => {
 
   it('no streams → no badges', () => {
     expect(mediaBadges([])).toEqual([])
+  })
+
+  it('NTSC frame rates round to their nominal fps', () => {
+    const ntsc: MediaStream[] = [
+      {
+        Index: 0,
+        Type: 'Video',
+        Codec: 'h264',
+        Width: 1920,
+        RealFrameRate: 23.976,
+        VideoRangeType: 'SDR'
+      }
+    ]
+    expect(mediaBadges(ntsc)).toEqual(['1080p', 'H264', '24fps'])
+  })
+})
+
+describe('playerSpecialBadges', () => {
+  const uhd: MediaStream[] = [
+    { Index: 0, Type: 'Video', Codec: 'hevc', Width: 3840, Height: 2160, VideoRangeType: 'HDR10' },
+    {
+      Index: 1,
+      Type: 'Audio',
+      Codec: 'truehd',
+      IsDefault: true,
+      ChannelLayout: '7.1',
+      Profile: 'Dolby TrueHD + Dolby Atmos'
+    }
+  ]
+
+  it('4K HDR with Atmos: only the notable tags, no codec/channel-layout noise', () => {
+    expect(playerSpecialBadges(uhd)).toEqual(['4K', 'HDR10', 'Atmos'])
+  })
+
+  it('1080p SDR stereo: the ordinary case shows nothing', () => {
+    const hd: MediaStream[] = [
+      { Index: 0, Type: 'Video', Codec: 'h264', Width: 1920, VideoRangeType: 'SDR' },
+      { Index: 1, Type: 'Audio', Codec: 'aac', ChannelLayout: 'stereo' }
+    ]
+    expect(playerSpecialBadges(hd)).toEqual([])
+  })
+
+  it('plain 5.1 without Atmos stays quiet too', () => {
+    const surround: MediaStream[] = [
+      { Index: 0, Type: 'Video', Codec: 'h264', Width: 1920, VideoRangeType: 'SDR' },
+      { Index: 1, Type: 'Audio', Codec: 'ac3', ChannelLayout: '5.1' }
+    ]
+    expect(playerSpecialBadges(surround)).toEqual([])
+  })
+
+  it('Dolby Vision variants collapse to one label', () => {
+    const dv = uhd.map((s) => (s.Type === 'Video' ? { ...s, VideoRangeType: 'DOVIWithHDR10' } : s))
+    expect(playerSpecialBadges(dv)).toContain('Dolby Vision')
+  })
+
+  it('no streams → no badges', () => {
+    expect(playerSpecialBadges([])).toEqual([])
   })
 })
 

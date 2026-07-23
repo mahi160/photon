@@ -1,4 +1,5 @@
 import { imageUrl, type BaseItem } from '../lib/jellyfin'
+import { noFocusOnClick } from '../lib/noFocusOnClick'
 import { useSettings } from '../stores/settings'
 import styles from './PlayerControls.module.css'
 
@@ -36,10 +37,20 @@ export function NextUpCard({
           {String(nextEpisode.IndexNumber ?? 0).padStart(2, '0')} · {nextEpisode.Name}
         </div>
         <div className={styles.nextUpActions}>
-          <button className={styles.nextUpPlay} onClick={onPlay}>
+          <button
+            className={styles.nextUpPlay}
+            onClick={onPlay}
+            onMouseDown={noFocusOnClick}
+            tabIndex={-1}
+          >
             Play now
           </button>
-          <button className={styles.nextUpDismiss} onClick={onDismiss}>
+          <button
+            className={styles.nextUpDismiss}
+            onClick={onDismiss}
+            onMouseDown={noFocusOnClick}
+            tabIndex={-1}
+          >
             Dismiss
           </button>
         </div>

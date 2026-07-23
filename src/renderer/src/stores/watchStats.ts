@@ -2,22 +2,21 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { BaseItem } from '../lib/jellyfin'
 
-// Photon-local watch time, fed by the players' existing progress ticks
-// (10s built-in, 5s mpv) whenever playback is actually running — paused and
-// buffering time never counts. Real minutes sat watching, not content minutes
-// (2× speed for an hour records an hour). No server dependency; stats start
-// at zero on the day this shipped — Jellyfin has no "watched via which app"
-// history to backfill from.
+// Photon-local watch time, fed by the player's progress ticks whenever
+// playback is actually running — paused and buffering time never counts.
+// Real minutes sat watching, not content minutes (2× speed for an hour
+// records an hour). No server dependency; stats start at zero on the day
+// this shipped — Jellyfin has no "watched via which app" history to
+// backfill from.
 export interface DayStats {
   movieSecs: number
   episodeSecs: number
-  mpvSecs: number // subset of the above that mpv played
 }
 
 interface WatchStatsState {
   days: Record<string, DayStats> // key: 'YYYY-MM-DD' local time
   series: Record<string, { name: string; secs: number }> // key: SeriesId
-  record: (item: BaseItem, seconds: number, viaMpv: boolean) => void
+  record: (item: BaseItem, seconds: number) => void
 }
 
 export function dayKey(d = new Date()): string {
@@ -33,17 +32,16 @@ export const useWatchStats = create<WatchStatsState>()(
     (set) => ({
       days: {},
       series: {},
-      record: (item, seconds, viaMpv) =>
+      record: (item, seconds) =>
         set((s) => {
           const key = dayKey()
-          const day = s.days[key] ?? { movieSecs: 0, episodeSecs: 0, mpvSecs: 0 }
+          const day = s.days[key] ?? { movieSecs: 0, episodeSecs: 0 }
           const isMovie = item.Type === 'Movie'
           const days = {
             ...s.days,
             [key]: {
               movieSecs: day.movieSecs + (isMovie ? seconds : 0),
-              episodeSecs: day.episodeSecs + (isMovie ? 0 : seconds),
-              mpvSecs: day.mpvSecs + (viaMpv ? seconds : 0)
+              episodeSecs: day.episodeSecs + (isMovie ? 0 : seconds)
             }
           }
           // ponytail: prune on write — max 400 daily buckets, no timers needed

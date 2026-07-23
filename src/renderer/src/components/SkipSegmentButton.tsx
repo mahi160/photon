@@ -1,4 +1,5 @@
 import type { MediaSegment } from '../lib/jellyfin'
+import { noFocusOnClick } from '../lib/noFocusOnClick'
 import styles from './PlayerControls.module.css'
 
 const labels: Record<MediaSegment['Type'], string> = {
@@ -18,7 +19,12 @@ export function SkipSegmentButton({
   onSkip: () => void
 }): React.JSX.Element {
   return (
-    <button className={styles.skipSegment} onClick={onSkip}>
+    <button
+      className={styles.skipSegment}
+      onClick={onSkip}
+      onMouseDown={noFocusOnClick}
+      tabIndex={-1}
+    >
       {labels[segment.Type]}
     </button>
   )

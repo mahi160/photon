@@ -1,0 +1,51 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Photon",
+  "version": "2.0.0-next",
+  "identifier": "io.github.mahi160.Photon",
+  "build": {
+    "beforeDevCommand": "pnpm exec vite --config vite.tauri.config.ts",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm exec vite build --config vite.tauri.config.ts",
+    "frontendDist": "../dist-tauri"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Photon",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "backgroundColor": "#0e0e10",
+        "transparent": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYyREQwN0I1MDVDQkQ2RkYKUldULzFzc0Z0UWZkWXVaeVlOcS9DYnJPbGJjcWJsUjJQSWNnNEdjNE9yU3V2NUtzaXBaYXN4SmcK",
+      "endpoints": ["https://github.com/mahi160/photon/releases/latest/download/latest.json"]
+    }
+  }
+}

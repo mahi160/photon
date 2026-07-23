@@ -3,8 +3,12 @@ name: Release
 # semantic-release computes the version from conventional commits and tags/
 # releases (as a draft) on every push to prod — normally a PR merge. The
 # platform builds below only run once a release actually happens, and
-# undraft it only after all three succeed (never publish a release with
-# missing binaries).
+# undrafts it only once macOS's build succeeds (never publish a release
+# missing the one platform that's actually verified). build-windows/
+# build-linux are wired up per-request but `continue-on-error: true` --
+# neither has been run/observed on real hardware (no Windows/Linux box in
+# this environment), so they must never be able to block the macOS release
+# that already works. See each job's own comment for what's still unverified.
 on:
   push:
     branches: [prod]
@@ -41,44 +45,171 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build:
-    needs: release
+  # ad-hoc signed (AGENTS.md's Gatekeeper note) via Tauri's own bundler +
+  # updater signing (TAURI_SIGNING_PRIVATE_KEY secrets, not an Apple
+  # Developer cert -- that part is unchanged/still not done, see AGENTS.md).
+  # The one platform actually verified end-to-end -- gates `publish-release`
+  # alone (see its `needs`).
+  build-macos:
+    needs: [release]
     if: needs.release.outputs.published == 'true'
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            builderArgs: --win --x64
-          - os: macos-latest
-            builderArgs: --mac --arm64
-          - os: ubuntu-latest
-            builderArgs: --linux
-    runs-on: ${{ matrix.os }}
-    env:
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      CSC_IDENTITY_AUTO_DISCOVERY: false
+    permissions:
+      contents: write
+    runs-on: macos-latest # arm64 -- native only, no --target cross-build (see comment above)
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.release.outputs.tag }}
-
+      - run: brew install mpv
       - uses: pnpm/action-setup@v4
         with:
           version: 11
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: pnpm
-
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
       - run: pnpm install --frozen-lockfile
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ needs.release.outputs.tag }}
+          releaseDraft: true
 
-      - run: pnpm build
-      - run: pnpm exec electron-builder ${{ matrix.builderArgs }} --publish always
+  # ticket #11: Windows build -- wired up per request, unverified (no
+  # Windows box to run/observe this on). `continue-on-error: true` so a
+  # failure here can never block the macOS release (see publish-release's
+  # `needs`) -- treat this as "something to iterate on", not a
+  # guaranteed-working pipeline yet.
+  #
+  # Same ADR-0004 gap as macOS: this isn't the vendored LGPL libmpv build
+  # either. Bigger problem here: Windows has no pkg-config/vcpkg story for
+  # libmpv at all -- a vcpkg port was proposed and closed unmerged
+  # (microsoft/vcpkg#40587: "libmpv is very hard to build on windows with
+  # msvc or with msys2 gcc"). So: download shinchiro/mpv-winbuild-cmake's
+  # prebuilt nightly dev package (GPL build, ships a MinGW `.dll.a`, not an
+  # MSVC `.lib`), then generate an MSVC-compatible import lib the way mpv's
+  # own docs describe for exactly this (DOCS/compile-windows.md > "Linking
+  # libmpv with MSVC Programs"): `gendef` the dll's exports into a `.def`,
+  # then MSVC's `lib.exe /def:...`. build.rs picks up the result via
+  # MPV_LIB_DIR. The `mpv/windows/` render surface itself is still a stub
+  # (no WGL/D3D11 context yet -- see its own doc), so this produces an
+  # installer, but video won't actually render until that lands.
+  build-windows:
+    needs: [release]
+    if: needs.release.outputs.published == 'true'
+    continue-on-error: true
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+      - name: Download libmpv dev package (shinchiro/mpv-winbuild-cmake nightly, GPL build)
+        shell: pwsh
+        run: |
+          $release = Invoke-RestMethod "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest"
+          $asset = $release.assets | Where-Object { $_.name -like "mpv-dev-x86_64-*.7z" } | Select-Object -First 1
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile mpv-dev.7z
+          7z x mpv-dev.7z -o"mpv-dev" -y
+      - name: Get gendef (mingw-w64-tools, via the runner's pre-installed MSYS2)
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-tools-git
+          release: false
+      - name: gendef libmpv-2.dll -> libmpv-2.def
+        shell: msys2 {0}
+        run: gendef mpv-dev/libmpv-2.dll
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: lib.exe /def -> mpv.lib (MSVC import lib)
+        shell: pwsh
+        run: lib /def:libmpv-2.def /name:libmpv-2.dll /out:mpv-dev/mpv.lib /machine:x64
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+      - run: pnpm install --frozen-lockfile
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          MPV_LIB_DIR: ${{ github.workspace }}\mpv-dev
+        with:
+          tagName: ${{ needs.release.outputs.tag }}
+          releaseDraft: true
+
+  # ticket #11: Linux build -- also unverified (no Linux box tested here
+  # either), but far lower-risk than Windows: Ubuntu ships a real
+  # `libmpv-dev` package with a working .pc file, so build.rs's existing
+  # pkg-config probe (same code path as macOS's brew mpv) just works, no
+  # Linux-specific build.rs branch needed. One job covers *both* X11 and
+  # Wayland -- mpv's render API and WRY's WebKitGTK backend both pick their
+  # windowing backend (GLX/EGL, X11/Wayland) at runtime from the same
+  # binary, same as any GTK app; there's no separate "X11 build" vs
+  # "Wayland build" to wire up. What's still missing: `mpv/linux/`'s
+  # `RenderSurface` is a stub (no GLX/EGL context yet, see its own doc) --
+  # this produces installable deb/rpm/AppImage packages, but video won't
+  # actually render on either windowing system until that lands.
+  build-linux:
+    needs: [release]
+    if: needs.release.outputs.published == 'true'
+    continue-on-error: true
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release.outputs.tag }}
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y libmpv-dev libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev patchelf
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+      - run: pnpm install --frozen-lockfile
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ needs.release.outputs.tag }}
+          releaseDraft: true
 
   publish-release:
-    needs: [release, build]
+    # build-windows/build-linux are `continue-on-error: true` above, so
+    # listing them here only waits for them to finish (success or failure),
+    # it never makes their outcome block this job -- lets whichever one
+    # *does* succeed upload its artifacts (tauri-action's own behavior)
+    # before this undrafts the release, without the still-unverified two
+    # being able to hold the working macOS release back.
+    needs: [release, build-macos, build-windows, build-linux]
+    if: needs.release.outputs.published == 'true'
     runs-on: ubuntu-latest
     steps:
       - env:

@@ -1,0 +1,18 @@
+// ticket #11's Windows build (release.yml's build-windows job): bundles
+// libmpv-2.dll (extracted by that job to ../mpv-dev/ relative to src-tauri/)
+// into the installer via Tauri's resources mechanism. Unverified -- Tauri's
+// own docs flag inconsistent cross-platform behavior for relative-path
+// resource sources (tauri-apps/tauri#15342), and libmpv-2.dll needs to land
+// wherever Windows' DLL search order actually finds it at runtime (normally
+// the same directory as the .exe) for the app to even start. If this turns
+// out wrong once actually run: copy the dll into src-tauri/ directly instead
+// of reaching up with `../`, or fall back to `externalBin` (sidecar) instead
+// of `resources`.
+{
+  $schema: "https://schema.tauri.app/config/2",
+  bundle: {
+    resources: {
+      "../mpv-dev/libmpv-2.dll": "",
+    },
+  },
+}

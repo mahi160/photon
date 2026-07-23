@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { invoke } from '@tauri-apps/api/core'
 import { authenticateByName, configure, type Session } from '../lib/jellyfin'
 
 interface SessionState {
@@ -16,7 +17,7 @@ export const useSession = create<SessionState>((set) => ({
 
   restore: async () => {
     try {
-      const raw = await window.api.sessionGet()
+      const raw = await invoke<string | null>('session_get')
       if (raw) {
         const session = JSON.parse(raw) as Session
         configure(session)
@@ -32,19 +33,19 @@ export const useSession = create<SessionState>((set) => ({
   login: async (server, username, password) => {
     const session = await authenticateByName(server, username, password)
     configure(session)
-    await window.api.sessionSet(JSON.stringify(session))
+    await invoke('session_set', { value: JSON.stringify(session) })
     set({ status: 'signedIn', session })
   },
 
   loginWith: async (session) => {
     configure(session)
-    await window.api.sessionSet(JSON.stringify(session))
+    await invoke('session_set', { value: JSON.stringify(session) })
     set({ status: 'signedIn', session })
   },
 
   logout: async () => {
     configure(null)
-    await window.api.sessionClear()
+    await invoke('session_clear')
     set({ status: 'signedOut', session: null })
   }
 }))

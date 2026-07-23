@@ -27,7 +27,7 @@ export function TrackSelectMenu({
   return (
     <BaseMenu.Root open={open} onOpenChange={onOpenChange}>
       <Tip label={ariaLabel}>
-        <BaseMenu.Trigger className={styles.iconBtn} aria-label={ariaLabel}>
+        <BaseMenu.Trigger className={styles.iconBtn} tabIndex={-1} aria-label={ariaLabel}>
           {label}
         </BaseMenu.Trigger>
       </Tip>
@@ -41,15 +41,18 @@ export function TrackSelectMenu({
                   onSelect(t.Index)
                   onOpenChange(false)
                 }}
+                tabIndex={-1}
                 className={`${styles.menuItem} ${value === t.Index ? styles.menuItemActive : ''}`}
               >
                 {t.DisplayTitle ?? `Track ${t.Index}`}
               </BaseMenu.Item>
             ))}
             {!tracks.length && (
-              <BaseMenu.Item onClick={() => {}} className={styles.menuItem}>
+              // plain text, not a BaseMenu.Item -- nothing to select when the
+              // track list is empty, so it shouldn't look/behave clickable
+              <div className={styles.menuItem} aria-disabled="true">
                 {defaultLabel ?? 'Default'}
-              </BaseMenu.Item>
+              </div>
             )}
           </BaseMenu.Popup>
         </BaseMenu.Positioner>

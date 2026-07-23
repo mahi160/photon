@@ -1,115 +1,41 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { invoke } from '@tauri-apps/api/core'
 import { itemQuery, mediaSegmentsQuery } from '../lib/queries'
 import {
   currentSession,
   jf,
+  playerSpecialBadges,
   secondsToTicks,
   ticksToSeconds,
   type ItemsResult
 } from '../lib/jellyfin'
-import { resolvePlayable, usePlayback } from '../player/usePlayback'
-import { canDirectPlay } from '../player/session'
+import { usePlayback } from '../player/usePlayback'
 import { useSettings } from '../stores/settings'
 import { PlayerControls } from '../components/PlayerControls'
 import { speeds } from '../player/engine'
-import { SubtitleStyleTag } from '../components/SubtitleStyleTag'
 import { useHotkeys } from '../lib/useHotkeys'
 import { useToast } from '../hooks/useToast'
 import { useMediaSession } from '../hooks/useMediaSession'
 import { useAutoHideControls } from '../hooks/useAutoHideControls'
+import { useWakeLock } from '../hooks/useWakeLock'
 import { queryKeys } from '../lib/queryKeys'
-import { MpvPlayer } from './MpvPlayer'
+import { ShortcutsOverlay } from './Shortcuts'
 import styles from './Player.module.css'
-
-// One state machine for player routing: engine is 'web', 'mpv', or null while
-// the 'auto' probe is in flight. mpv falling over (not installed) or a PiP
-// request both collapse to the built-in player — setEngine('web') is the only
-// transition. 'auto' probes the server once: direct play stays in the
-// built-in player, anything that would transcode is handed to mpv (which
-// plays the original file).
-// ponytail: decided at play start only — a mid-session reload that flips to
-// transcoding (e.g. an audio switch) stays in the built-in player.
-export function Player(): React.JSX.Element {
-  const mode = useSettings((s) => s.playerMode)
-  const { itemId } = useParams({ from: '/app/player/$itemId' })
-  const search = useSearch({ from: '/app/player/$itemId' })
-  const navigate = useNavigate()
-  const [engine, setEngine] = useState<'web' | 'mpv' | null>(mode === 'auto' ? null : mode)
-  // handoffs in either direction resume the other player at the last position
-  const [resume, setResume] = useState<number | undefined>(undefined)
-  const handoff = (to: 'web' | 'mpv') => (pos: number) => {
-    setResume(pos)
-    setEngine(to)
-  }
-  const [failed, setFailed] = useState(false)
-  const item = useQuery({ ...itemQuery(itemId), enabled: engine === null })
-  const probedFor = useRef<string | null>(null)
-
-  useEffect(() => {
-    const it = item.data
-    if (engine !== null || !it || probedFor.current === it.Id) return
-    probedFor.current = it.Id
-    const settings = useSettings.getState()
-    // probe and availability check are independent — run them together; never
-    // route to a player that isn't installed (the server can transcode for
-    // the built-in player instead)
-    Promise.all([
-      resolvePlayable(it).then((playable) =>
-        canDirectPlay(playable, {
-          audioStreamIndex: search.audio,
-          subtitleStreamIndex: search.sub,
-          maxBitrate: settings.maxBitrate || undefined
-        })
-      ),
-      window.api.mpvCheck()
-    ])
-      .then(([direct, mpvOk]) => setEngine(!direct && mpvOk ? 'mpv' : 'web'))
-      .catch(() => setFailed(true))
-  }, [engine, item.data, search.audio, search.sub])
-
-  if (engine === 'mpv')
-    return (
-      <MpvPlayer
-        startOverride={resume}
-        onFallback={() => setEngine('web')}
-        onRequestPiP={handoff('web')}
-      />
-    )
-  if (engine === 'web') return <WebPlayer startOverride={resume} onOpenMpv={handoff('mpv')} />
-  return (
-    <div className={styles.stage}>
-      {failed && (
-        <div className={styles.errorLayer}>
-          <p className={styles.errorText}>Playback failed.</p>
-          <button onClick={() => navigate({ to: '/' })} className={styles.errorBack}>
-            Back to Home
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
 
 function segmentNoun(type: string): string {
   return type === 'Outro' ? 'credits' : type === 'Commercial' ? 'ad' : type.toLowerCase()
 }
 
-function WebPlayer({
-  startOverride,
-  onOpenMpv
-}: {
-  startOverride?: number
-  onOpenMpv?: (pos: number) => void
-}): React.JSX.Element {
+export function Player(): React.JSX.Element {
   const { itemId } = useParams({ from: '/app/player/$itemId' })
-  const routeSearch = useSearch({ from: '/app/player/$itemId' })
-  const search =
-    startOverride !== undefined ? { ...routeSearch, start: startOverride } : routeSearch
+  const search = useSearch({ from: '/app/player/$itemId' })
   const navigate = useNavigate()
 
-  const videoRef = useRef<HTMLVideoElement>(null)
+  // mpv composites into a native surface positioned under this placeholder's
+  // on-screen rect (ADR-0005)
+  const videoRef = useRef<HTMLDivElement>(null)
   const item = useQuery(itemQuery(itemId))
   const player = usePlayback(videoRef, item.data, search)
   const { engine, session } = player
@@ -124,40 +50,58 @@ function WebPlayer({
     playItem
   } = player
 
-  // only offer the mpv handoff when mpv is actually installed
-  const [mpvOk, setMpvOk] = useState(false)
-  useEffect(() => {
-    void window.api.mpvCheck().then(setMpvOk)
-  }, [])
-
   // extract toast and auto-hide controls
   const { message: toast, show: showToast } = useToast(1200)
   const { visible, setPinned, poke } = useAutoHideControls(engine.state)
-
-  // real fullscreen state (Esc exits natively; icon must follow), and never
-  // strand the app in fullscreen when leaving the player
-  const [fullscreen, setFullscreen] = useState(false)
+  useWakeLock(engine.state === 'playing')
+  // native traffic-light dots (overlay title bar, tauri.conf.json) hide/show
+  // in lockstep with the rest of the controls -- they're AppKit-drawn, over
+  // the video, so CSS opacity/pointer-events (PlayerControls' own auto-hide)
+  // can't reach them; this is the one native-side echo of that same state.
   useEffect(() => {
-    const onFs = (): void => setFullscreen(!!document.fullscreenElement)
-    document.addEventListener('fullscreenchange', onFs)
+    void invoke('app_set_traffic_lights_visible', { visible })
+  }, [visible])
+  // ...and always restored on the way out -- every other page expects them
+  // on, this must never leak past the player route
+  useEffect(() => {
+    return () => void invoke('app_set_traffic_lights_visible', { visible: true })
+  }, [])
+  // AppLayout owns '?' + the overlay everywhere else, but the player route
+  // is chrome-free (outside AppLayout, see router.tsx) -- without its own
+  // copy there's no way to discover e.g. the chapter-skip shortcut while
+  // actually watching something
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+
+  // Native OS window fullscreen (Tauri's set_fullscreen), not the DOM
+  // Fullscreen API -- WebKit implements document.documentElement's Fullscreen
+  // API by presenting the fullscreen element in a *separate* window/layer
+  // outside the app's own NSWindow, which the mpv NSView (composited as a
+  // sibling under the *original* window's content view, see engine.rs) never
+  // gets carried into: fullscreen showed no video, and the real window
+  // underneath (still receiving actual clicks) could visually desync from
+  // whatever WebKit was presenting, making clicks land wrong. Native window
+  // fullscreen keeps everything in the same NSWindow/content view, so the
+  // mpv surface keeps compositing correctly.
+  const [fullscreen, setFullscreen] = useState(false)
+  const fullscreenRef = useRef(false)
+  useEffect(() => {
+    fullscreenRef.current = fullscreen
+  }, [fullscreen])
+  // never strand the app in fullscreen when leaving the player -- no native
+  // DOM Fullscreen auto-exit to rely on anymore, Esc is handled explicitly
+  // below
+  useEffect(() => {
     return () => {
-      document.removeEventListener('fullscreenchange', onFs)
-      if (document.fullscreenElement) void document.exitFullscreen()
+      if (fullscreenRef.current) void invoke('app_set_fullscreen', { fullscreen: false })
     }
   }, [])
 
-  // PiP floats its own always-on-top window — minimize the app behind it on
-  // enter, bring it back on exit
-  const prevPip = useRef(false)
-  useEffect(() => {
-    if (engine.pip && !prevPip.current) void window.api.minimizeWindow()
-    else if (!engine.pip && prevPip.current) void window.api.restoreWindow()
-    prevPip.current = engine.pip
-  }, [engine.pip])
-
   const toggleFullscreen = useCallback(() => {
-    if (document.fullscreenElement) void document.exitFullscreen()
-    else void document.documentElement.requestFullscreen()
+    setFullscreen((prev) => {
+      const next = !prev
+      void invoke('app_set_fullscreen', { fullscreen: next })
+      return next
+    })
   }, [])
 
   // stable identities: these feed the player's track-select menus, which are
@@ -257,41 +201,56 @@ function WebPlayer({
 
   // keyboard shortcuts (PRD: Navigation); repeat-guarded where holding the
   // key would flap the state instead of progressing it
-  useHotkeys({
-    space: (e) => {
-      if (!e.repeat) engine.togglePlay()
+  useHotkeys(
+    {
+      space: (e) => {
+        if (!e.repeat) engine.togglePlay()
+      },
+      arrowleft: () => {
+        engine.seekBy(-10)
+        poke()
+      },
+      arrowright: () => {
+        engine.seekBy(10)
+        poke()
+      },
+      arrowup: () => bumpVolume(0.05),
+      arrowdown: () => bumpVolume(-0.05),
+      f: (e) => {
+        if (!e.repeat) toggleFullscreen()
+      },
+      escape: (e) => {
+        // exit only -- never enter fullscreen via Escape
+        if (!e.repeat && fullscreen) toggleFullscreen()
+      },
+      p: (e) => {
+        if (!e.repeat) engine.togglePiP()
+      },
+      m: (e) => {
+        if (!e.repeat) toggleMuteWithToast()
+      },
+      s: (e) => {
+        if (e.repeat || !activeSegment) return
+        seek(ticksToSeconds(activeSegment.EndTicks))
+        showToast(`Skipped ${segmentNoun(activeSegment.Type)}`)
+      },
+      'shift+arrowright': () => jumpChapter(1),
+      'shift+arrowleft': () => jumpChapter(-1),
+      'shift+>': () => stepSpeed(1),
+      'shift+<': () => stepSpeed(-1),
+      '[': () => shiftSubtitleDelay(-0.5),
+      ']': () => shiftSubtitleDelay(0.5),
+      a: (e) => {
+        if (!e.repeat) cycleAudio()
+      },
+      c: (e) => {
+        if (!e.repeat) cycleSubtitle()
+      },
+      '?': () => setShortcutsOpen((v) => !v),
+      'shift+?': () => setShortcutsOpen((v) => !v)
     },
-    arrowleft: () => {
-      engine.seekBy(-10)
-      poke()
-    },
-    arrowright: () => {
-      engine.seekBy(10)
-      poke()
-    },
-    arrowup: () => bumpVolume(0.05),
-    arrowdown: () => bumpVolume(-0.05),
-    f: (e) => {
-      if (!e.repeat) toggleFullscreen()
-    },
-    p: (e) => {
-      if (!e.repeat) engine.togglePiP()
-    },
-    m: (e) => {
-      if (!e.repeat) toggleMuteWithToast()
-    },
-    s: (e) => {
-      if (e.repeat || !activeSegment) return
-      seek(ticksToSeconds(activeSegment.EndTicks))
-      showToast(`Skipped ${segmentNoun(activeSegment.Type)}`)
-    },
-    'shift+arrowright': () => jumpChapter(1),
-    'shift+arrowleft': () => jumpChapter(-1),
-    'shift+>': () => stepSpeed(1),
-    'shift+<': () => stepSpeed(-1),
-    '[': () => shiftSubtitleDelay(-0.5),
-    ']': () => shiftSubtitleDelay(0.5)
-  })
+    { ignoreFocusGuard: true }
+  )
 
   // plain functions — useHotkeys reads through a ref, no stable identity needed
   function jumpChapter(dir: 1 | -1): void {
@@ -309,6 +268,26 @@ function WebPlayer({
     showToast(dir === 1 ? 'Next chapter' : 'Previous chapter')
   }
 
+  // keyboard-reachable equivalent of the audio/subtitle menus (which live in
+  // base-ui popovers with tabIndex={-1} — the player's controls are mouse or
+  // hotkey only, see useHotkeys.ts)
+  function cycleAudio(): void {
+    if (!session || session.audioStreams.length < 2) return
+    const current = player.audioIndex ?? session.mediaSource.DefaultAudioStreamIndex
+    const streams = session.audioStreams
+    const i = streams.findIndex((s) => s.Index === current)
+    const next = streams[(i + 1) % streams.length]
+    player.selectAudio(next.Index)
+    showToast(`Audio: ${next.DisplayTitle ?? `Track ${next.Index}`}`)
+  }
+
+  function cycleSubtitle(): void {
+    if (!session || !session.subtitleStreams.length) return
+    const streams = session.subtitleStreams
+    const i = streams.findIndex((s) => s.Index === player.subtitleIndex)
+    selectSubtitle(i + 1 >= streams.length ? null : streams[i + 1].Index)
+  }
+
   function stepSpeed(dir: 1 | -1): void {
     const i = speeds.indexOf(engine.rate)
     const next =
@@ -323,12 +302,14 @@ function WebPlayer({
     () => (nextEp ? () => void playItem(nextEp) : undefined),
     [nextEp, playItem]
   )
-  const openMpvAtCurrentTime = useMemo(
-    () => (onOpenMpv && mpvOk ? () => onOpenMpv(currentTime()) : undefined),
-    [onOpenMpv, mpvOk, currentTime]
-  )
 
   const displayDuration = engine.duration || ticksToSeconds(session?.mediaSource.RunTimeTicks)
+  // only the notable quality/HDR/audio tags (issue #12) -- the full
+  // breakdown (mediaBadges) is a details-pages-only thing now
+  const specialBadges = useMemo(
+    () => playerSpecialBadges(session?.mediaSource.MediaStreams ?? []),
+    [session]
+  )
 
   return (
     <div
@@ -343,12 +324,11 @@ function WebPlayer({
       }}
       onDoubleClick={(e) => {
         const t = e.target as HTMLElement
-        if (t === e.currentTarget || t.tagName === 'VIDEO') toggleFullscreen()
+        if (t === e.currentTarget || t === videoRef.current) toggleFullscreen()
       }}
       style={{ cursor: visible ? 'default' : 'none' }}
     >
-      <SubtitleStyleTag />
-      <video ref={videoRef} className={styles.video} />
+      <div ref={videoRef} className={styles.video} />
       {player.error && (
         <div className={styles.errorLayer}>
           <p className={styles.errorText}>{player.error}</p>
@@ -366,11 +346,18 @@ function WebPlayer({
           </button>
         </div>
       )}
+      {!player.error && !session && (
+        <div className={styles.loadingLayer}>
+          <div className={styles.loadingSpinner} />
+        </div>
+      )}
       {!player.error && session && (
         <PlayerControls
           visible={visible}
           item={session.item}
           playMethod={session.playMethod}
+          specialBadges={specialBadges}
+          cpuFallback={engine.renderBackend() === 'cpu'}
           state={engine.state}
           time={engine.time}
           duration={displayDuration}
@@ -379,6 +366,7 @@ function WebPlayer({
           muted={engine.muted}
           rate={engine.rate}
           pip={engine.pip}
+          pipAvailable={engine.pipAvailable}
           fullscreen={fullscreen}
           audioStreams={session.audioStreams}
           subtitleStreams={session.subtitleStreams}
@@ -405,10 +393,10 @@ function WebPlayer({
           onSubtitleDelay={player.changeDelay}
           onFullscreen={toggleFullscreen}
           onPiP={engine.togglePiP}
-          onOpenMpv={openMpvAtCurrentTime}
         />
       )}
       {toast && <div className={styles.toast}>{toast}</div>}
+      <ShortcutsOverlay open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
   )
 }

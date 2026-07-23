@@ -20,9 +20,20 @@ body {
   margin: 0;
 
   font-family: var(--font-sans);
+
+  /* Signal: every number in the app (runtime, timestamps, ratings, stat
+     rows) reads as data, not prose -- tabular widths so digits line up
+     instead of jittering column to column. */
+  font-variant-numeric: tabular-nums;
   color: var(--fg);
 
-  background: var(--bg);
+  /* no background here (ADR-0005): body/html/#root must stay fully
+     unpainted so the transparent window can show mpv's composited surface
+     through the Player page's video placeholder. Body's background used to
+     cover every pixel of the window regardless of what any descendant
+     (including Player's own already-background-less .stage) did -- every
+     OTHER page supplies its own opaque background instead (AppLayout's
+     .shell, Login's .page). */
 
   -webkit-font-smoothing: antialiased;
 }
@@ -48,9 +59,12 @@ select {
 
 button {
   cursor: pointer;
+
   padding: 0;
   border: none;
+
   text-align: inherit;
+
   background: none;
 }
 
@@ -80,9 +94,10 @@ kbd {
   outline-offset: 2px;
 }
 
-/* Electron bundles a fixed, modern Chromium — no ::-webkit-scrollbar fallback needed.
-   The ::-webkit-scrollbar-thumb rule below isn't a compat fallback, standard
-   scrollbar-color has no radius control, so it's kept for the rounded thumb only. */
+/* Tauri's webviews (WebKitGTK, WKWebView, WebView2) are all WebKit/Blink
+   descended, so ::-webkit-scrollbar-thumb works everywhere Photon ships —
+   this isn't a compat fallback, standard scrollbar-color just has no radius
+   control, so it's kept for the rounded thumb only. */
 * {
   scrollbar-color: var(--border-strong) transparent;
   scrollbar-width: thin;
@@ -100,4 +115,20 @@ kbd {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+
+  /* View Transition pseudo-elements live in the top layer, outside the DOM
+     tree the `*` rule above covers -- route crossfades need their own kill
+     switch */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* route crossfade matches the app's own easing instead of the UA default */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur-med);
+  animation-timing-function: var(--ease-out);
 }

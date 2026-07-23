@@ -12,13 +12,27 @@ function comboOf(e: KeyboardEvent): string {
   return parts.join('+')
 }
 
-export function useHotkeys(map: HotkeyMap): void {
+export interface UseHotkeysOptions {
+  // Every player control is tabIndex={-1} (mouse/hotkey only, never a real
+  // Tab stop) -- the only thing that can still end up :focus-visible on
+  // that route is base-ui's own focus manager grabbing focus onto a
+  // just-opened menu/select popup (it finds nothing tabbable inside once
+  // every item is -1 too, and falls back to the popup container itself).
+  // That's not a genuine focused *control* the way the guard below means --
+  // without skipping it, opening the subtitle menu then pressing Space
+  // selected a track instead of pausing. AppLayout's shortcuts (real
+  // Tab-reachable cards/links) keep the guard.
+  ignoreFocusGuard?: boolean
+}
+
+export function useHotkeys(map: HotkeyMap, options: UseHotkeysOptions = {}): void {
   // listener subscribes once; the ref keeps handlers fresh without
   // resubscribing on every render (the player re-renders on playback ticks)
   const mapRef = useRef(map)
   useEffect(() => {
     mapRef.current = map
   })
+  const ignoreFocusGuard = options.ignoreFocusGuard ?? false
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       const target = e.target as HTMLElement | null
@@ -27,7 +41,7 @@ export function useHotkeys(map: HotkeyMap): void {
       // buttons/sliders don't, so shortcuts keep working right after clicking
       // a player control — preventDefault below also cancels the focused
       // button's own Space activation (the double-toggle bug).
-      if (target?.matches(':focus-visible')) return
+      if (!ignoreFocusGuard && target?.matches(':focus-visible')) return
       // safety net: text entry always wins even when the heuristic doesn't apply
       if (target?.closest('input:not([type="range"]), select, textarea, [contenteditable="true"]'))
         return
@@ -39,5 +53,5 @@ export function useHotkeys(map: HotkeyMap): void {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [ignoreFocusGuard])
 }

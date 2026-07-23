@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Html5Engine } from './html5'
+import { invoke } from '@tauri-apps/api/core'
+import { MpvEngine } from './mpv'
 import type { LoadRequest, PlaybackEngine } from './engine'
 
 // Mirrors engine state into React and funnels every engine write through one
@@ -25,9 +26,11 @@ export interface PlayerEngineApi {
   muted: boolean
   rate: number
   pip: boolean
+  pipAvailable: boolean
   error: string | null
   clearError: () => void
   currentTime: () => number
+  renderBackend: () => 'gpu' | 'cpu' | null
   load: (req: LoadRequest) => Promise<void>
   togglePlay: () => void
   seek: (seconds: number) => void
@@ -38,11 +41,13 @@ export interface PlayerEngineApi {
   changeRate: (rate: number) => void
   setTextTrack: (index: number | null) => void
   setSubtitleDelay: (seconds: number) => void
+  selectAudioTrack: (index: number) => void
+  selectEmbeddedSubtitleTrack: (index: number | null) => void
   togglePiP: () => void
 }
 
 export function usePlayerEngine(
-  videoRef: React.RefObject<HTMLVideoElement | null>,
+  videoRef: React.RefObject<HTMLDivElement | null>,
   initial: EngineInitial,
   handlers: EngineHandlers
 ): PlayerEngineApi {
@@ -61,7 +66,14 @@ export function usePlayerEngine(
   const [muted, setMuted] = useState(initial.muted)
   const [rate, setRate] = useState(initial.rate)
   const [pip, setPip] = useState(false)
+  const [pipAvailable, setPipAvailable] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // system mpv is genuinely optional (unlike in-process playback) -- PiP
+  // just hides itself when there's nothing to spawn
+  useEffect(() => {
+    void invoke<boolean>('pip_available').then(setPipAvailable)
+  }, [])
   const rateRef = useRef(initial.rate)
   // mirrors so adjustVolume/toggleMute keep stable identities (they feed
   // memoized controls) and can report the value they just set
@@ -70,7 +82,7 @@ export function usePlayerEngine(
 
   const ensureEngine = useCallback((): PlaybackEngine | null => {
     if (!engineRef.current && videoRef.current) {
-      const e = new Html5Engine(videoRef.current)
+      const e = new MpvEngine(videoRef.current)
       e.on('time', (t) => {
         setTime(t)
         setDuration(e.duration())
@@ -88,8 +100,7 @@ export function usePlayerEngine(
         setMuted(m)
       })
       e.on('ended', () => handlersRef.current.onEnded?.(e.currentTime()))
-      e.setVolume(initialRef.current.volume)
-      e.setMuted(initialRef.current.muted)
+      e.applyInitialVolume(initialRef.current.volume, initialRef.current.muted)
       engineRef.current = e
     }
     return engineRef.current
@@ -117,9 +128,11 @@ export function usePlayerEngine(
   )
 
   const currentTime = useCallback(() => engineRef.current?.currentTime() ?? 0, [])
+  const renderBackend = useCallback(() => engineRef.current?.renderBackend() ?? null, [])
 
-  // decide off the element, not mirrored state — during 'buffering' the mirror
-  // can't tell playing-but-stalled from paused, and pause would be unreachable
+  // decide off the engine's freshest pause mirror (last tick), not the React
+  // `state` value — during 'buffering' `state` can't tell playing-but-stalled
+  // from paused, so toggling off it would make pause unreachable mid-buffer
   const togglePlay = useCallback(() => {
     const e = engineRef.current
     if (!e) return
@@ -178,12 +191,18 @@ export function usePlayerEngine(
   const setSubtitleDelay = useCallback((seconds: number) => {
     engineRef.current?.setSubtitleDelay(seconds)
   }, [])
+  const selectAudioTrack = useCallback((index: number) => {
+    engineRef.current?.selectAudioTrack(index)
+  }, [])
+  const selectEmbeddedSubtitleTrack = useCallback((index: number | null) => {
+    engineRef.current?.selectEmbeddedSubtitleTrack(index)
+  }, [])
 
   const togglePiP = useCallback(() => {
     const e = engineRef.current
-    if (!e) return
+    if (!e || !pipAvailable) return
     void (pip ? e.exitPiP() : e.enterPiP())
-  }, [pip])
+  }, [pip, pipAvailable])
 
   return {
     state,
@@ -194,9 +213,11 @@ export function usePlayerEngine(
     muted,
     rate,
     pip,
+    pipAvailable,
     error,
     clearError: useCallback(() => setError(null), []),
     currentTime,
+    renderBackend,
     load,
     togglePlay,
     seek,
@@ -207,6 +228,8 @@ export function usePlayerEngine(
     changeRate,
     setTextTrack,
     setSubtitleDelay,
+    selectAudioTrack,
+    selectEmbeddedSubtitleTrack,
     togglePiP
   }
 }

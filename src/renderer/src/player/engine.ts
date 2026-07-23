@@ -8,12 +8,11 @@ export interface TextTrackSource {
   index: number // jellyfin stream index
   label: string
   language?: string
-  url: string // VTT delivery url
+  url: string // SRT delivery url
 }
 
 export interface LoadRequest {
   url: string
-  hls: boolean
   startSeconds: number
   textTracks: TextTrackSource[]
 }
@@ -35,10 +34,23 @@ export interface PlaybackEngine {
   setRate(rate: number): void
   setVolume(volume: number): void // 0..1
   setMuted(muted: boolean): void
+  // one-time application of the persisted volume/mute at construction — see
+  // MpvEngine's doc for why this is a separate method from setVolume/setMuted
+  applyInitialVolume(volume: number, muted: boolean): void
   setTextTrack(index: number | null): void // jellyfin stream index, null = off
   setSubtitleDelay(seconds: number): void // text tracks only
+  // both take the media's own stream index (Jellyfin's MediaStream.Index) —
+  // always direct play (ADR-0008), so every track is already embedded in the
+  // file mpv itself demuxes, no server round-trip needed to switch either
+  selectAudioTrack(index: number): void // no "off" case — always a track
+  selectEmbeddedSubtitleTrack(index: number | null): void // non-text (PGS/VOBSUB/styled ASS); null = off
   enterPiP(): Promise<void>
   exitPiP(): Promise<void>
+  // Which render backend attach() actually landed on (ADR-0009, macOS only
+  // today) -- `null` until attach resolves, or on an engine with no such
+  // concept. Drives the player overlay's CPU-fallback badge only; never
+  // gates behavior.
+  renderBackend(): 'gpu' | 'cpu' | null
   currentTime(): number
   duration(): number
   paused(): boolean

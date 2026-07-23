@@ -1,6 +1,7 @@
 import { CaretLeft, Pause, Play } from 'reicon-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { type BaseItem, type MediaSegment, type MediaStream } from '../lib/jellyfin'
+import { noFocusOnClick } from '../lib/noFocusOnClick'
 import { Tip } from './Tip'
 import { TimelinePreview } from './TimelinePreview'
 import { ControlsBar } from './ControlsBar'
@@ -12,6 +13,10 @@ export interface Props {
   visible: boolean
   item: BaseItem
   playMethod: 'DirectPlay' | 'Transcode'
+  specialBadges: string[]
+  // ADR-0009 -- true only when playback fell back to the CPU render path;
+  // GPU rendering (the normal case) shows nothing (issue #12)
+  cpuFallback: boolean
   state: 'playing' | 'paused' | 'buffering'
   time: number
   duration: number
@@ -20,6 +25,7 @@ export interface Props {
   muted: boolean
   rate: number
   pip: boolean
+  pipAvailable: boolean
   fullscreen: boolean
   audioStreams: MediaStream[]
   subtitleStreams: MediaStream[]
@@ -44,17 +50,18 @@ export interface Props {
   onSubtitleDelay: (s: number) => void
   onFullscreen: () => void
   onPiP: () => void
-  onOpenMpv?: () => void
 }
 
 export function PlayerControls(p: Props): React.JSX.Element {
   const [menu, setMenu] = useState<'audio' | 'subs' | 'speed' | 'sync' | null>(null)
   // stable identity — ControlsBar's menu group is memoized against ticking time
-  const onToggleMenu = useCallback(
-    (m: 'audio' | 'subs' | 'speed' | 'sync', open: boolean) => setMenu(open ? m : null),
-    []
-  )
-  const [hover, setHover] = useState(false)
+  const onToggleMenu = useCallback((m: 'audio' | 'subs' | 'speed' | 'sync', open: boolean) => {
+    setMenu(open ? m : null)
+    // don't let a closed menu's trigger retain focus -- useHotkeys treats a
+    // focused control as "let the browser handle this key" instead of
+    // running our shortcuts (:focus-visible guard, see useHotkeys.ts)
+    if (!open) (document.activeElement as HTMLElement | null)?.blur()
+  }, [])
   const [now, setNow] = useState(() => Date.now())
   const [dismissedFor, setDismissedFor] = useState<string | null>(null)
   const [pulse, setPulse] = useState<{ kind: 'playing' | 'paused'; id: number } | null>(null)
@@ -79,11 +86,17 @@ export function PlayerControls(p: Props): React.JSX.Element {
     }
   }, [p.state])
 
-  // pin controls on hover or open menu
+  // pin controls open while a menu/popover is open -- hovering the dock
+  // *without* one open no longer pins indefinitely (see
+  // useAutoHideControls.ts): a motionless cursor resting over the controls
+  // used to keep them up forever, which is the "overlay never goes away"
+  // report -- any real mouse movement still re-pokes the same idle timer
+  // via .stage's own onMouseMove, menu open/close is the only other case
+  // that needs to override it.
   const { onPinChange } = p
   useEffect(() => {
-    onPinChange(hover || menu !== null)
-  }, [hover, menu, onPinChange])
+    onPinChange(menu !== null)
+  }, [menu, onPinChange])
 
   const remaining = p.duration - p.time
   const showNextUp =
@@ -110,14 +123,21 @@ export function PlayerControls(p: Props): React.JSX.Element {
           </div>
         )}
 
-        <div
-          className={styles.topScrim}
-          onPointerEnter={() => setHover(true)}
-          onPointerLeave={() => setHover(false)}
-        >
+        {/* overlay title bar (tauri.conf.json): traffic lights float over
+            this scrim instead of reserving their own strip -- marking it a
+            drag region gives the window a way to be moved from here; the
+            Back button/badges (real clickable elements) are excluded
+            automatically (see drag.js), no separate handling needed */}
+        <div className={styles.topScrim} data-tauri-drag-region>
           <div className={styles.topBar}>
             <Tip label="Back">
-              <button className={styles.iconBtn} onClick={p.onBack} aria-label="Back">
+              <button
+                className={styles.iconBtn}
+                onClick={p.onBack}
+                onMouseDown={noFocusOnClick}
+                tabIndex={-1}
+                aria-label="Back"
+              >
                 <CaretLeft className={styles.icon} />
               </button>
             </Tip>
@@ -134,20 +154,25 @@ export function PlayerControls(p: Props): React.JSX.Element {
             </div>
             {p.state === 'buffering' && <div className={styles.spinner} />}
             <div className={styles.topRight}>
-              <span
-                className={styles.methodBadge}
-                title={
-                  p.playMethod === 'DirectPlay'
-                    ? 'Playing the original file'
-                    : 'Converted by the server'
-                }
-              >
+              {p.specialBadges.map((b) => (
+                <span key={b} className={styles.methodBadge}>
+                  {b}
+                </span>
+              ))}
+              {p.playMethod !== 'DirectPlay' && (
+                <span className={styles.methodBadge} title="Converted by the server">
+                  <span className={styles.methodDot} data-method="transcode" />
+                  transcode
+                </span>
+              )}
+              {p.cpuFallback && (
                 <span
-                  className={styles.methodDot}
-                  data-method={p.playMethod === 'DirectPlay' ? 'direct' : 'transcode'}
-                />
-                {p.playMethod === 'DirectPlay' ? 'direct' : 'transcode'}
-              </span>
+                  className={styles.methodBadge}
+                  title="GPU rendering unavailable on this machine -- playing back via the slower CPU path"
+                >
+                  CPU
+                </span>
+              )}
               <span className={styles.clock}>
                 {new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
               </span>
@@ -155,12 +180,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
           </div>
         </div>
 
-        <div
-          className={styles.dock}
-          onPointerEnter={() => setHover(true)}
-          onPointerLeave={() => setHover(false)}
-          onWheel={(e) => p.onVolumeStep(e.deltaY < 0 ? 0.05 : -0.05)}
-        >
+        <div className={styles.dock} onWheel={(e) => p.onVolumeStep(e.deltaY < 0 ? 0.05 : -0.05)}>
           <div className={styles.dockInner}>
             <TimelinePreview
               item={p.item}
@@ -177,6 +197,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
               volume={p.volume}
               muted={p.muted}
               pip={p.pip}
+              pipAvailable={p.pipAvailable}
               fullscreen={p.fullscreen}
               audioStreams={p.audioStreams}
               audioIndex={p.audioIndex}
@@ -198,7 +219,6 @@ export function PlayerControls(p: Props): React.JSX.Element {
               onSubtitleDelay={p.onSubtitleDelay}
               onFullscreen={p.onFullscreen}
               onPiP={p.onPiP}
-              onOpenMpv={p.onOpenMpv}
             />
           </div>
         </div>

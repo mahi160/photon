@@ -33,7 +33,6 @@ export function StatsSettings(): React.JSX.Element {
   const total = sum(all)
   const movieTotal = all.reduce((t, d) => t + d.movieSecs, 0)
   const episodeTotal = all.reduce((t, d) => t + d.episodeSecs, 0)
-  const mpvTotal = all.reduce((t, d) => t + d.mpvSecs, 0)
   const topShows = Object.values(series)
     .sort((a, b) => b.secs - a.secs)
     .slice(0, 3)
@@ -47,73 +46,76 @@ export function StatsSettings(): React.JSX.Element {
 
   if (total === 0)
     return (
-      <p className={styles.statsEmpty}>
-        Nothing yet — stats count watch time in Photon from here on. Go watch something.
-      </p>
+      <>
+        <h1 className={styles.pageTitle}>Stats</h1>
+        <p className={styles.statsEmpty}>
+          Nothing yet — stats count watch time in Photon from here on. Go watch something.
+        </p>
+      </>
     )
 
   return (
-    <div className={styles.stats}>
-      <div className={styles.statCards}>
-        <div className={styles.statCard}>
-          <span className={styles.statValue}>{fmtDur(total)}</span>
-          <span className={styles.statLabel}>all time</span>
-        </div>
-        <div className={styles.statCard}>
-          <span className={styles.statValue}>{fmtDur(sum(lastNDays(days, 7, now)))}</span>
-          <span className={styles.statLabel}>last 7 days</span>
-        </div>
-        <div className={styles.statCard}>
-          <span className={styles.statValue}>{fmtDur(sum(lastNDays(days, 30, now)))}</span>
-          <span className={styles.statLabel}>last 30 days</span>
-        </div>
-      </div>
-
-      <div className={styles.statBars} aria-label="Watch time per day, last 30 days">
-        {bars.map((b, i) => (
-          <span
-            key={i}
-            className={styles.statBar}
-            style={{ blockSize: `${Math.max(4, (b / barMax) * 100)}%` }}
-            data-empty={b === 0 || undefined}
-          />
-        ))}
-      </div>
-
-      <div className={styles.statRows}>
-        <div className={styles.statRow}>
-          <span>Movies</span>
-          <span className={styles.statRowValue}>{fmtDur(movieTotal)}</span>
-        </div>
-        <div className={styles.statRow}>
-          <span>Episodes</span>
-          <span className={styles.statRowValue}>{fmtDur(episodeTotal)}</span>
-        </div>
-        {mpvTotal > 0 && (
-          <div className={styles.statRow}>
-            <span>Played by mpv</span>
-            <span className={styles.statRowValue}>{fmtDur(mpvTotal)}</span>
+    <>
+      <h1 className={styles.pageTitle}>Stats</h1>
+      <div className={styles.stats}>
+        <div className={styles.statCards}>
+          <div className={styles.statCard}>
+            <span className={styles.statValue}>{fmtDur(total)}</span>
+            <span className={styles.statLabel}>all time</span>
           </div>
-        )}
-      </div>
+          <div className={styles.statCard}>
+            <span className={styles.statValue}>{fmtDur(sum(lastNDays(days, 7, now)))}</span>
+            <span className={styles.statLabel}>last 7 days</span>
+          </div>
+          <div className={styles.statCard}>
+            <span className={styles.statValue}>{fmtDur(sum(lastNDays(days, 30, now)))}</span>
+            <span className={styles.statLabel}>last 30 days</span>
+          </div>
+        </div>
 
-      {topShows.length > 0 && (
-        <div className={styles.statRows}>
-          {topShows.map((s, i) => (
-            <div key={s.name} className={styles.statRow}>
-              <span>
-                <span className={styles.statRank}>#{i + 1}</span> {s.name}
-              </span>
-              <span className={styles.statRowValue}>{fmtDur(s.secs)}</span>
-            </div>
+        <div className={styles.statBars} aria-label="Watch time per day, last 30 days">
+          {bars.map((b, i) => (
+            <span
+              key={i}
+              className={styles.statBar}
+              style={{ blockSize: `${Math.max(4, (b / barMax) * 100)}%` }}
+              data-empty={b === 0 || undefined}
+            />
           ))}
         </div>
-      )}
 
-      <p className={styles.statsNote}>
-        Counted locally, only while actually playing in Photon. History before this feature shipped
-        isn’t available.
-      </p>
-    </div>
+        <div className={styles.statRows}>
+          <div className={styles.statRow}>
+            <span>Movies</span>
+            <span className={styles.statRowValue}>{fmtDur(movieTotal)}</span>
+          </div>
+          <div className={styles.statRow}>
+            <span>Episodes</span>
+            <span className={styles.statRowValue}>{fmtDur(episodeTotal)}</span>
+          </div>
+        </div>
+
+        {topShows.length > 0 && (
+          <div>
+            <h2 className={styles.sectionTitle}>Top shows</h2>
+            <div className={styles.statRows}>
+              {topShows.map((s, i) => (
+                <div key={s.name} className={styles.statRow}>
+                  <span>
+                    <span className={styles.statRank}>#{i + 1}</span> {s.name}
+                  </span>
+                  <span className={styles.statRowValue}>{fmtDur(s.secs)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <p className={styles.statsNote}>
+          Counted locally, only while actually playing in Photon. History before this feature
+          shipped isn’t available.
+        </p>
+      </div>
+    </>
   )
 }
