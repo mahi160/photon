@@ -70,7 +70,13 @@
         overflow: hidden;
         block-size: 1px;
         margin-block-end: -1px;
-        background: linear-gradient(90deg, transparent, var(--accent), var(--accent-2), transparent);
+        background: linear-gradient(
+          90deg,
+          transparent,
+          var(--accent),
+          var(--accent-2),
+          transparent
+        );
       }
 
       main {
@@ -268,20 +274,37 @@
       <p class="not-a">Photon is not a media manager. It is a media player.</p>
 
       <div class="actions">
-        <a class="btn btn-primary" id="download-link" href="https://github.com/mahi160/photon/releases/latest">
+        <a
+          class="btn btn-primary"
+          id="download-link"
+          href="https://github.com/mahi160/photon/releases"
+        >
           Download<span id="download-version"></span>
         </a>
         <a class="btn" href="https://github.com/mahi160/photon">View on GitHub</a>
       </div>
 
+      <p class="not-a" style="margin-block-end: 3rem">
+        macOS: verified, working — <code>brew install --cask mahi160/photon/photon</code>.
+        Windows/Linux builds run but video doesn't render yet (<a
+          href="https://github.com/mahi160/photon/issues/27"
+          >#27</a
+        >). Releases are flagged pre-release on GitHub until that's fixed.
+      </p>
+
       <section>
         <h2>What it does</h2>
         <ul class="features">
-          <li>Continue Watching, Recently Added Movies, Recently Added Shows — nothing else on Home</li>
+          <li>
+            Continue Watching, Recently Added Movies, Recently Added Shows — nothing else on Home
+          </li>
           <li>Movies and TV Shows grids, every library merged</li>
           <li>Instant local search plus server-side episode search</li>
-          <li>Direct play via HTML5/HLS, or hand off to a local mpv process</li>
-          <li>Audio and subtitle track switching, subtitle delay and styling</li>
+          <li>
+            In-process libmpv playback — GPU-rendered with automatic CPU fallback, always direct
+            play
+          </li>
+          <li>Audio and subtitle track switching; delay and styling for text subtitles</li>
           <li>Picture-in-Picture, fullscreen, playback speed</li>
           <li>Keyboard-first controls</li>
           <li>Watch progress synced back to Jellyfin</li>
@@ -327,23 +350,28 @@
       </section>
 
       <section>
-        <h2>mpv (optional)</h2>
+        <h2>Picture-in-Picture</h2>
         <p class="gatekeeper">
-          The built-in player (HTML5/HLS) needs no setup. For guaranteed direct play with zero
-          server transcoding, install <a href="https://mpv.io">mpv</a> and switch to it in
-          Settings → Playback → Player. Photon does not bundle mpv — install it separately:
-          <code>brew install mpv        # macOS
-choco install mpv        # Windows
-sudo apt install mpv     # Debian/Ubuntu</code>
+          PiP hands playback off to a standalone <a href="https://mpv.io">mpv</a> window instead of
+          shrinking Photon's own — genuinely optional: no system <code>mpv</code> on
+          <code>PATH</code> just means no PiP button, core playback (in-process, bundled) is
+          unaffected either way.
+          <code
+            >brew install mpv # macOS choco install mpv # Windows sudo apt install mpv #
+            Debian/Ubuntu</code
+          >
         </p>
       </section>
 
       <section>
         <h2>macOS Gatekeeper</h2>
         <p class="gatekeeper">
-          Photon's macOS build is ad-hoc signed, not notarized (that requires a paid Apple
-          Developer account). Gatekeeper blocks any downloaded app in that state — a false
-          positive, not a corrupt download. Run this once after moving Photon to Applications:
+          Photon's macOS build is ad-hoc signed, not notarized (that requires a paid Apple Developer
+          account). Gatekeeper blocks any downloaded app in that state — a false positive, not a
+          corrupt download.
+          <code>brew install --cask mahi160/photon/photon</code> handles this automatically;
+          installing the <code>.dmg</code> by hand needs this once, after moving Photon to
+          Applications:
           <code>xattr -cr /Applications/Photon.app</code>
         </p>
       </section>
@@ -351,25 +379,49 @@ sudo apt install mpv     # Debian/Ubuntu</code>
       <section>
         <h2>Screenshots</h2>
         <ul class="shots">
-          <li><img src="screenshots/home.jpg" alt="Home screen: Continue Watching, Next Up, Recently Added Movies" loading="lazy" /></li>
-          <li><img src="screenshots/player.jpg" alt="Player controls during direct playback" loading="lazy" /></li>
-          <li><img src="screenshots/pip.jpg" alt="Picture-in-Picture playing through mpv" loading="lazy" /></li>
+          <li>
+            <img
+              src="screenshots/home.jpg"
+              alt="Home screen: Continue Watching, Next Up, Recently Added Movies"
+              loading="lazy"
+            />
+          </li>
+          <li>
+            <img
+              src="screenshots/player.jpg"
+              alt="Player controls during direct playback"
+              loading="lazy"
+            />
+          </li>
+          <li>
+            <img
+              src="screenshots/pip.jpg"
+              alt="Picture-in-Picture playing through mpv"
+              loading="lazy"
+            />
+          </li>
           <li><img src="screenshots/login.jpg" alt="Sign in screen" loading="lazy" /></li>
         </ul>
       </section>
 
-      <footer>MIT License · <a href="https://github.com/mahi160/photon">github.com/mahi160/photon</a></footer>
+      <footer>
+        MIT License · <a href="https://github.com/mahi160/photon">github.com/mahi160/photon</a>
+      </footer>
     </main>
 
     <script>
-      // progressive enhancement: shows the real latest tag on the download
-      // button; the href above already points at /releases/latest so the
-      // link works even if this fetch fails or is offline
-      fetch('https://api.github.com/repos/mahi160/photon/releases/latest')
+      // progressive enhancement: shows the real most-recent tag on the download
+      // button; the href above already points at /releases so the link works
+      // even if this fetch fails or is offline. Deliberately /releases (most
+      // recent, including pre-releases) rather than /releases/latest (which
+      // skips pre-releases entirely) -- right now that would silently point
+      // at the old pre-Tauri v1.x line instead of the current v2 pre-release.
+      fetch('https://api.github.com/repos/mahi160/photon/releases')
         .then((r) => (r.ok ? r.json() : null))
-        .then((release) => {
-          if (release?.tag_name) {
-            document.getElementById('download-version').textContent = ' ' + release.tag_name
+        .then((releases) => {
+          const tag = releases?.[0]?.tag_name
+          if (tag) {
+            document.getElementById('download-version').textContent = ' ' + tag
           }
         })
         .catch(() => {})
