@@ -1,3 +1,10 @@
+# [2.0.0-pre.3](https://github.com/mahi160/photon/compare/v2.0.0-pre.2...v2.0.0-pre.3) (2026-07-23)
+
+
+### Bug Fixes
+
+* **player:** don't leave playback paused when PiP fails to start ([#33](https://github.com/mahi160/photon/issues/33)) ([767b5ed](https://github.com/mahi160/photon/commit/767b5ed4e7e38d7902cb11da240ca8ce85ef639b))
+
 # [2.0.0-pre.2](https://github.com/mahi160/photon/compare/v2.0.0-pre.1...v2.0.0-pre.2) (2026-07-23)
 
 
