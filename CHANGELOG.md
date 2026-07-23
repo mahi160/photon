@@ -1,3 +1,11 @@
+# [2.0.0-pre.2](https://github.com/mahi160/photon/compare/v2.0.0-pre.1...v2.0.0-pre.2) (2026-07-23)
+
+
+### Bug Fixes
+
+* **release:** rotate updater signing keypair, matching private key set as GH secret ([#25](https://github.com/mahi160/photon/issues/25)) ([ddc8347](https://github.com/mahi160/photon/commit/ddc8347099210c0cc2535cb3048cdbb04383e9d2))
+* **release:** windows bundler skips MSI for non-numeric prerelease versions ([#24](https://github.com/mahi160/photon/issues/24)) ([763d443](https://github.com/mahi160/photon/commit/763d4431002da2c9bae2ea53989efd362a9e5b74))
+
 # [2.0.0-pre.1](https://github.com/mahi160/photon/compare/v1.6.0...v2.0.0-pre.1) (2026-07-23)
 
 

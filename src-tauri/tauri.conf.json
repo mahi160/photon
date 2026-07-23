@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Photon",
-  "version": "2.0.0-pre.1",
+  "version": "2.0.0-pre.2",
   "identifier": "io.github.mahi160.Photon",
   "build": {
     "beforeDevCommand": "pnpm exec vite --config vite.tauri.config.ts",
@@ -45,7 +45,9 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdBRjhDMTBBNzJENjUxRjIKUldUeVVkWnlDc0g0ZWxzOHlSM2RmUkM5QTlacXo4WGgvdW5WYm9oLzErK3RlT0FQQVZpNmFzUkwK",
-      "endpoints": ["https://github.com/mahi160/photon/releases/latest/download/latest.json"]
+      "endpoints": [
+        "https://github.com/mahi160/photon/releases/latest/download/latest.json"
+      ]
     }
   }
 }
