@@ -7,19 +7,15 @@ import { RouterProvider } from '@tanstack/react-router'
 import { router } from './router'
 import { useSession } from './stores/session'
 import { useSettings } from './stores/settings'
-import { resolveTheme } from './lib/theme'
 import { setClientVersion } from './lib/jellyfin'
 import { invoke } from '@tauri-apps/api/core'
 
 function applyAppearance(): void {
-  const s = useSettings.getState()
-  document.documentElement.dataset.theme = resolveTheme(s.theme)
+  document.documentElement.dataset.theme = useSettings.getState().theme
 }
 
 applyAppearance()
 useSettings.subscribe(applyAppearance)
-// follow OS theme changes while in 'system' mode
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance)
 
 const queryClient = new QueryClient({
   defaultOptions: {

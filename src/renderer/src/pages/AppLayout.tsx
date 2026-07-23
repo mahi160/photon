@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { Gear, Search, Moon, Sun } from 'reicon-react'
+import { Gear, Search, Palette } from 'reicon-react'
 import { useHotkeys } from '../lib/useHotkeys'
 import { useSettings } from '../stores/settings'
-import { resolvedDark } from '../lib/theme'
+import { nextTheme, themeLabel } from '../lib/theme'
 import { ShortcutsOverlay } from './Shortcuts'
 import { Tip } from '../components/Tip'
 import { PhotonMark } from '../components/PhotonMark'
@@ -12,20 +12,16 @@ import styles from './AppLayout.module.css'
 function ThemeToggle(): React.JSX.Element {
   const theme = useSettings((s) => s.theme)
   const set = useSettings((s) => s.set)
-  const dark = resolvedDark(theme)
-  // theme === 'system' has no fixed next state to name -- clicking still
-  // works (it commits to the resolved opposite) but the tooltip says so,
-  // since it silently drops the OS-follow preference set in Settings
-  const label = `${dark ? 'Light' : 'Dark'} theme${theme === 'system' ? ' (overrides System)' : ''}`
+  const next = nextTheme(theme)
 
   return (
-    <Tip label={label}>
+    <Tip label={`Theme: ${themeLabel(theme)} (next: ${themeLabel(next)})`}>
       <button
         className={styles.iconBtn}
-        aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
-        onClick={() => set({ theme: dark ? 'light' : 'dark' })}
+        aria-label={`Switch theme, currently ${themeLabel(theme)}`}
+        onClick={() => set({ theme: next })}
       >
-        {dark ? <Sun className={styles.themeIcon} /> : <Moon className={styles.themeIcon} />}
+        <Palette className={styles.themeIcon} />
       </button>
     </Tip>
   )

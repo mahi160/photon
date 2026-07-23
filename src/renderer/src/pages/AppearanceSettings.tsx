@@ -1,12 +1,7 @@
 import { useSettings } from '../stores/settings'
+import { themes } from '../lib/theme'
 import { SettingsSection, SettingsRow } from './SettingsSection'
 import styles from './Settings.module.css'
-
-const themeOptions: { key: 'dark' | 'light' | 'system'; label: string }[] = [
-  { key: 'dark', label: 'Dark' },
-  { key: 'light', label: 'Light' },
-  { key: 'system', label: 'System' }
-]
 
 export function AppearanceSettings(): React.JSX.Element {
   const theme = useSettings((s) => s.theme)
@@ -16,13 +11,13 @@ export function AppearanceSettings(): React.JSX.Element {
     <SettingsSection title="Appearance">
       <SettingsRow label="Theme">
         <div className={styles.slabRow}>
-          {themeOptions.map((o) => (
+          {themes.map((t) => (
             <button
-              key={o.key}
-              className={`${styles.slab} ${theme === o.key ? styles.slabActive : ''}`}
-              onClick={() => set({ theme: o.key })}
+              key={t.key}
+              className={`${styles.slab} ${theme === t.key ? styles.slabActive : ''}`}
+              onClick={() => set({ theme: t.key })}
             >
-              {o.label}
+              {t.label}
             </button>
           ))}
         </div>
