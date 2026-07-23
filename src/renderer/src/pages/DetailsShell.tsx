@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { useRouter } from '@tanstack/react-router'
-import { CaretLeft } from 'reicon-react'
+import { CaretLeft, Clapperboard } from 'reicon-react'
 import type { BaseItem } from '../lib/jellyfin'
 import { Ratings } from '../components/Ratings'
 import { FavoriteButton } from '../components/FavoriteButton'
@@ -11,7 +12,24 @@ import styles from './Details.module.css'
 // season/episode list), so only the identical wrapping is pulled out here.
 
 export function DetailsLoading(): React.JSX.Element {
-  return <div className={styles.loading}>Loading…</div>
+  return (
+    <div className={styles.page}>
+      <div className={styles.heroSkeleton} />
+      <div className={styles.content}>
+        <div className={styles.top}>
+          <div className={styles.poster}>
+            <div className={styles.posterSkeleton} />
+          </div>
+          <div className={styles.info}>
+            <div className={`${styles.line} ${styles.lineTitle}`} />
+            <div className={`${styles.line} ${styles.lineShort}`} />
+            <div className={styles.line} />
+            <div className={styles.line} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export function DetailsError({ onRetry }: { onRetry: () => void }): React.JSX.Element {
@@ -41,11 +59,27 @@ export function DetailsHero({
   backdrop: string | null | undefined
 }): React.JSX.Element {
   return (
-    <div className={styles.hero}>
-      {backdrop && <img src={backdrop} alt="" fetchPriority="high" className={styles.heroImg} />}
-      <div className={styles.heroScrim} />
-      <BackButton />
-    </div>
+    <>
+      {/* ambient wash: the same backdrop, hugely blurred, bleeding down past
+         the hero's own clipped bounds into .content -- needs .page as its
+         positioned ancestor (not .hero, which clips it), see .page/.ambient */}
+      {backdrop && (
+        <div className={styles.ambient} aria-hidden="true">
+          <img src={backdrop} alt="" className={styles.ambientImg} />
+        </div>
+      )}
+      <div className={styles.hero}>
+        {backdrop ? (
+          <img src={backdrop} alt="" fetchPriority="high" className={styles.heroImg} />
+        ) : (
+          <div className={styles.heroPlaceholder}>
+            <Clapperboard className={styles.heroPlaceholderIcon} />
+          </div>
+        )}
+        <div className={styles.heroScrim} />
+        <BackButton />
+      </div>
+    </>
   )
 }
 
@@ -54,12 +88,20 @@ export function DetailsPoster({
 }: {
   poster: string | null | undefined
 }): React.JSX.Element {
+  const [loaded, setLoaded] = useState(false)
   return (
     <div className={styles.poster}>
       {poster ? (
-        <img src={poster} alt="" className={styles.posterImg} />
+        <img
+          src={poster}
+          alt=""
+          className={`${styles.posterImg} ${loaded ? styles.imageLoaded : ''}`}
+          onLoad={() => setLoaded(true)}
+        />
       ) : (
-        <div className={styles.posterPlaceholder} />
+        <div className={styles.posterPlaceholder}>
+          <Clapperboard className={styles.posterPlaceholderIcon} />
+        </div>
       )}
     </div>
   )

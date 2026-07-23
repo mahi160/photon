@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { Play } from 'reicon-react'
+import { Play, Clapperboard } from 'reicon-react'
 import { useQuery } from '@tanstack/react-query'
 import { episodesQuery, itemQuery, seasonsQuery } from '../lib/queries'
 import { backdropUrl, imageUrl, mediaBadges, ticksToSeconds } from '../lib/jellyfin'
@@ -26,6 +26,7 @@ export function EpisodeDetails(): React.JSX.Element {
   const { data: item, isPending, isError, refetch } = useQuery(itemQuery(itemId))
   const [audio, setAudio] = useState<number | undefined>()
   const [sub, setSub] = useState<number | undefined>()
+  const [thumbLoaded, setThumbLoaded] = useState(false)
 
   // next episode: same season's next index, or next season's first --
   // conditional queries (react-query's own `enabled` pattern, not a
@@ -101,9 +102,16 @@ export function EpisodeDetails(): React.JSX.Element {
         <div className={styles.top}>
           <div className={styles.episodePoster}>
             {thumb ? (
-              <img src={thumb} alt="" className={styles.episodePosterImg} />
+              <img
+                src={thumb}
+                alt=""
+                className={`${styles.episodePosterImg} ${thumbLoaded ? styles.imageLoaded : ''}`}
+                onLoad={() => setThumbLoaded(true)}
+              />
             ) : (
-              <div className={styles.episodePosterPlaceholder} />
+              <div className={styles.episodePosterPlaceholder}>
+                <Clapperboard className={styles.episodePosterPlaceholderIcon} />
+              </div>
             )}
           </div>
           <div className={styles.info}>
