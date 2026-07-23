@@ -12,6 +12,7 @@ mod software;
 use super::engine::RenderWaker;
 use libmpv_sys::mpv_handle;
 use objc2_app_kit::NSView;
+use raw_window_handle::RawWindowHandle;
 use std::sync::Arc;
 
 /// The three operations the shared engine code needs from whichever backend
@@ -50,15 +51,28 @@ impl Backend {
     }
 }
 
-/// The one entry point the shared engine calls. Tries the GPU surface
-/// first, falling back to the CPU path on any setup failure -- entirely
-/// inside this module; the caller only learns which backend it got, never
-/// *why* a fallback happened beyond the diagnostic line below.
+/// The one entry point the shared engine calls. `engine.rs` (platform-
+/// agnostic) hands over a bare `RawWindowHandle` -- unwrapping it into a
+/// real `NSView` is this module's own job, same as everything else
+/// AppKit-specific. Tries the GPU surface first, falling back to the CPU
+/// path on any setup failure; the caller only learns which backend it got,
+/// never *why* a fallback happened beyond the diagnostic line below.
 pub(crate) fn attach(
     mpv: *mut mpv_handle,
-    content_view: &NSView,
+    handle: RawWindowHandle,
     waker: &Arc<RenderWaker>,
 ) -> Result<(Box<dyn RenderSurface>, Backend), String> {
+    let RawWindowHandle::AppKit(appkit) = handle else {
+        return Err("expected an AppKit window handle on macOS".into());
+    };
+    // # Safety: `ns_view` is a non-owning pointer to the window's content
+    // view (raw-window-handle's own documented contract for this variant);
+    // the window itself keeps ownership for as long as `attach`'s caller
+    // (`MpvEngine::attach`) holds it. Neither this cast nor the backends'
+    // own `NSView::alloc` check main-thread affinity -- preserved as-is
+    // rather than adding a new runtime check as a drive-by (ADR-0009).
+    let content_view: &NSView = unsafe { &*(appkit.ns_view.as_ptr() as *const NSView) };
+
     let (result, backend) = try_or_fallback(
         || gpu::GpuSurface::new(mpv, content_view, waker).map(|s| Box::new(s) as Box<dyn RenderSurface>),
         || software::SoftwareSurface::new(mpv, content_view, waker).map(|s| Box::new(s) as Box<dyn RenderSurface>),

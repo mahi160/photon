@@ -14,7 +14,7 @@
 
 use super::mac::{self, Backend, RenderSurface};
 use libmpv_sys::*;
-use objc2_app_kit::NSWindow;
+use raw_window_handle::HasWindowHandle;
 use std::collections::HashMap;
 use std::ffi::{c_void, CStr, CString};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -447,16 +447,11 @@ impl MpvEngine {
         window: &WebviewWindow<R>,
         extra_config: &[(String, String)],
     ) -> Result<Self, String> {
-        // # Safety: `ns_window()` hands back a raw, non-owning `NSWindow*`
-        // (the window itself keeps ownership). Neither this cast nor the
-        // `mpv/mac/` backends' own `NSView::alloc` check main-thread
-        // affinity -- `attach`'s whole call chain (from the `mpv_attach`
-        // Tauri command down) never did on cocoa/objc 0.2.x either;
-        // preserved as-is rather than adding a new runtime check as a
-        // drive-by part of the objc2 migration (ADR-0009).
-        let ns_window_ptr = window.ns_window().map_err(|e| e.to_string())?;
-        let ns_window: &NSWindow = unsafe { &*(ns_window_ptr as *const NSWindow) };
-        let content_view = ns_window.contentView().ok_or("no content view")?;
+        // Platform-agnostic handle -- this file (unlike `mpv/mac/`) never
+        // imports an AppKit/Win32/X11 type directly; whichever platform
+        // backend `mac::attach` (or a future windows::attach/linux::attach)
+        // is compiled in does its own raw-handle unwrapping internally.
+        let raw_handle = window.window_handle().map_err(|e| e.to_string())?.as_raw();
 
         unsafe {
             let mpv = mpv_create();
@@ -520,7 +515,7 @@ impl MpvEngine {
             // params differ), the GPU-vs-CPU fallback decision, and
             // registering `on_render_update` against whichever it picked --
             // see `mac::attach`'s doc.
-            let (surface, backend) = mac::attach(mpv, &content_view, &waker)?;
+            let (surface, backend) = mac::attach(mpv, raw_handle, &waker)?;
             let surface = Arc::new(Mutex::new(surface));
 
             observe(mpv, 1, "time-pos", mpv_format_MPV_FORMAT_DOUBLE);

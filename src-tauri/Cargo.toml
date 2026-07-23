@@ -25,6 +25,12 @@ serde_json = "1"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 libmpv-sys = "3"
 libc = "0.2"
+# same version tauri itself uses (Window/WebviewWindow implement its
+# HasWindowHandle) -- lets engine.rs (platform-agnostic) hand a bare
+# RawWindowHandle down to mac::attach instead of importing objc2_app_kit
+# directly, so it stays a genuinely cross-platform seam for a future
+# windows::attach/linux::attach
+raw-window-handle = "0.6"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 # objc2 crate family (ADR-0009) -- replaces cocoa/objc 0.2.x everywhere in
