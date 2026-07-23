@@ -51,7 +51,7 @@ const defaults: Omit<SettingsState, 'set' | 'reset'> = {
   subtitleColor: '#FFFFFF',
   subtitleBackgroundBox: false,
   mpvConfig: '',
-  theme: 'gruvbox'
+  theme: 'jellyfin'
 }
 
 export const useSettings = create<SettingsState>()(
