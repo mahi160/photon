@@ -44,7 +44,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYyREQwN0I1MDVDQkQ2RkYKUldULzFzc0Z0UWZkWXVaeVlOcS9DYnJPbGJjcWJsUjJQSWNnNEdjNE9yU3V2NUtzaXBaYXN4SmcK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdBRjhDMTBBNzJENjUxRjIKUldUeVVkWnlDc0g0ZWxzOHlSM2RmUkM5QTlacXo4WGgvdW5WYm9oLzErK3RlT0FQQVZpNmFzUkwK",
       "endpoints": ["https://github.com/mahi160/photon/releases/latest/download/latest.json"]
     }
   }
