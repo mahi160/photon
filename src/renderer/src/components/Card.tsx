@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Play } from 'reicon-react'
+import { Play, Clapperboard } from 'reicon-react'
 import { imageUrl, type BaseItem } from '../lib/jellyfin'
 import { FavoriteButton } from './FavoriteButton'
 import { WatchedButton } from './WatchedButton'
@@ -23,6 +23,7 @@ export function Card({
   // render — a "new" badge doesn't need per-render freshness
   const [now] = useState(() => Date.now())
   const isNew = !!item.DateCreated && now - Date.parse(item.DateCreated) < 7 * 86_400_000
+  const [loaded, setLoaded] = useState(false)
 
   function play(): void {
     navigate({ to: '/player/$itemId', params: { itemId: item.Id } })
@@ -57,9 +58,18 @@ export function Card({
         className={`${styles.poster} ${wide ? styles.wide : ''}`}
       >
         {img ? (
-          <img src={img} alt="" loading="lazy" className={styles.image} />
+          <img
+            src={img}
+            alt=""
+            loading="lazy"
+            className={`${styles.image} ${loaded ? styles.imageLoaded : ''}`}
+            onLoad={() => setLoaded(true)}
+          />
         ) : (
-          <div className={styles.placeholder}>{item.Name}</div>
+          <div className={styles.placeholder}>
+            <Clapperboard className={styles.placeholderIcon} />
+            <span className={styles.placeholderText}>{item.Name}</span>
+          </div>
         )}
         <div className={styles.playScrim}>
           <span className={styles.playButton}>
