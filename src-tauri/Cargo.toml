@@ -1,6 +1,6 @@
 [package]
 name = "photon"
-version = "1.5.1"
+version = "2.0.0-next"
 description = "A calm, minimal desktop media player built exclusively for Jellyfin"
 authors = ["Salauddin Omar Sifat"]
 edition = "2021"
