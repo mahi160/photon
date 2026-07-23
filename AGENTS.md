@@ -96,15 +96,21 @@ Release.
 
 Platform builds/publishing (ticket #11): `release.yml` builds and publishes
 a macOS artifact (Tauri bundler, ad-hoc signed, updater-signed) once a
-release is cut, then undrafts it. Windows/Linux builds aren't wired up yet
-— blocked on ADR-0004's vendored libmpv (real per-platform libmpv dev
-headers/libs in CI, not just local `brew install mpv`).
+release is cut, then undrafts it. Windows/Linux builds are wired up too
+(`build-windows`/`build-linux`, `continue-on-error: true` so they can never
+block the macOS release) but produce unverified installers — no real
+Windows/Linux `mpv` render surface exists yet (`mpv/windows`, `mpv/linux`
+are stubs; see issue #27), and none of the three platforms use ADR-0004's
+vendored LGPL libmpv build yet (macOS links Homebrew's GPL build, same as
+local dev; Windows/Linux similarly link a full GPL build in CI).
 
 ## macOS Gatekeeper note
 
 Photon's macOS build is ad-hoc signed, not notarized (requires paid Apple
 Developer account). Gatekeeper blocks any downloaded app in that state — false
-positive, not a corrupt download. One-time fix after moving to Applications:
+positive, not a corrupt download. `brew install --cask mahi160/photon/photon`
+(see `mahi160/homebrew-photon`) handles this automatically; installing the
+`.dmg` by hand needs a one-time fix after moving to Applications:
 
 ```bash
 xattr -cr /Applications/Photon.app
@@ -114,9 +120,8 @@ The in-app auto-updater (Tauri's updater plugin, ticket #11) doesn't change
 this — it verifies its own update-package signature (a separate Tauri-signing
 keypair, unrelated to Apple code signing) but installs the same ad-hoc-signed
 `.app`, so a fresh install after auto-updating can still need the same
-`xattr -cr` fix. CI only builds/publishes macOS today; Windows/Linux release
-builds remain blocked on ADR-0004's vendored libmpv (real dev headers/libs
-for those platforms/architectures aren't set up in CI yet).
+`xattr -cr` fix (or reinstalling via the Homebrew cask, once one exists for
+the installed version).
 
 ## Agent skills
 

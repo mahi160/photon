@@ -1,76 +1,89 @@
 # Photon
 
-A calm, minimal desktop media player for Jellyfin.
+A calm, minimal desktop media player for Jellyfin, powered by real mpv
+playback.
+
+## If mpv can play it, Photon plays it
+
+Photon embeds mpv directly, in-process, via its render API — the actual mpv
+decoder/renderer compositing straight into Photon's own window, GPU-rendered
+with automatic CPU fallback if a machine can't do that. **Always direct
+play** — the server never has to transcode. This is the whole reason Photon
+exists; everything else is the UI around it.
 
 Sign in to your server, browse Movies and TV Shows, hit play. No dashboards,
-no library management, no clutter.
+no library management, no clutter. Photon is not a media manager. It is a
+media player.
 
 ## Features
 
+- **mpv-quality playback in the same window** — GPU-rendered, CPU fallback,
+  always direct play, server decides remux/transcode
 - Continue Watching, Recently Added Movies, Recently Added Shows on Home
 - Movies and TV Shows grids, all libraries merged
 - Instant local search plus server-side episode search
-- Direct play via HTML5/HLS or a local `mpv` process, server transcodes when needed
-- Audio and subtitle track switching, subtitle delay and styling
-- Picture-in-Picture, fullscreen, playback speed
+- Audio and subtitle track switching; delay and styling for text subtitles
+- Picture-in-Picture (hands off to a standalone `mpv`, if one's on `PATH`),
+  fullscreen, playback speed
 - Keyboard-first controls
 - Watch progress synced back to Jellyfin
 
 ## Install
 
-Download a build from [Releases](https://github.com/mahi160/photon/releases).
+**macOS** (verified, working):
 
-macOS builds are ad-hoc signed, not notarized, so Gatekeeper will flag them
-after download. Fix once:
+```bash
+brew install --cask mahi160/photon/photon
+```
+
+or download the `.dmg` from [Releases](https://github.com/mahi160/photon/releases)
+— ad-hoc signed, not notarized, so Gatekeeper needs a one-time fix (the cask
+does this automatically):
 
 ```bash
 xattr -cr /Applications/Photon.app
 ```
 
-### mpv (optional)
+**Windows / Linux** (installers build and run, but video playback doesn't
+render yet — [#27](https://github.com/mahi160/photon/issues/27) tracks the
+remaining work): `.exe`/`.deb`/`.rpm`/`.AppImage` builds are on
+[Releases](https://github.com/mahi160/photon/releases) for anyone who wants
+to help finish that.
 
-Photon's built-in player (HTML5/HLS) needs no setup. For guaranteed direct
-play with zero server transcoding, install [mpv](https://mpv.io) and switch
-to it in Settings → Playback → Player ("Built-in · mpv when transcoding" or
-"Always mpv"). mpv plays in its own window; Picture-in-Picture always falls
-back to the built-in player. Photon does not bundle mpv — install it separately:
-
-```bash
-# macOS
-brew install mpv
-
-# Windows — installs mpv.exe on PATH (mpv.net is a different app, won't work)
-choco install mpv
-# or: scoop install mpv
-
-# Linux
-sudo apt install mpv      # Debian/Ubuntu
-sudo pacman -S mpv        # Arch
-```
+Current releases are flagged **pre-release** on GitHub until Windows/Linux
+playback is verified.
 
 ## Keyboard shortcuts
 
-| Key      | Action             |
-| -------- | ------------------ |
-| Space    | Play / pause       |
-| ← / →    | Seek ±10s          |
-| ↑ / ↓    | Volume             |
-| F        | Fullscreen         |
-| P        | Picture-in-Picture |
-| M        | Mute               |
-| Esc      | Exit fullscreen    |
-| Ctrl/⌘+F | Search             |
+| Key       | Action                  |
+| --------- | ----------------------- |
+| Space     | Play / pause            |
+| ← / →     | Seek ±10s               |
+| ↑ / ↓     | Volume                  |
+| Shift+←/→ | Previous / next chapter |
+| S         | Skip intro / segment    |
+| A         | Cycle audio track       |
+| C         | Cycle subtitle track    |
+| < / >     | Playback speed          |
+| [ / ]     | Subtitle delay          |
+| F         | Fullscreen              |
+| P         | Picture-in-Picture      |
+| M         | Mute                    |
+| Esc       | Exit fullscreen         |
+| Ctrl/⌘+F  | Search                  |
 
 ## Development
 
 ```bash
 pnpm install
-pnpm dev        # run in development
-pnpm build      # typecheck + build
+pnpm dev        # run in development (Tauri)
+pnpm build      # typecheck + build + bundle
 pnpm lint       # eslint
 npx vitest run  # tests
-pnpm build:mac  # package (also build:win, build:linux)
 ```
+
+Requires Rust + a system `mpv` install (dev builds link it via pkg-config —
+`brew install mpv` on macOS, `apt install libmpv-dev` on Linux).
 
 Contributor and architecture notes live in [AGENTS.md](AGENTS.md).
 

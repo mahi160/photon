@@ -226,23 +226,37 @@ export class MpvEngine implements PlaybackEngine {
   async enterPiP(): Promise<void> {
     if (!this.url) return
     const wasPaused = this.last.paused
-    this.pause() // avoid double audio while the spawned mpv also plays this stream
     // hands the active *text* subtitle (if any) over via --sub-file -- the
     // spawned mpv fetches it itself, same as sub-add does for the in-process
     // engine, no auth/CORS concerns either. An embedded (non-text) pick has
     // no URL to give it; PiP just plays without subs in that case, same as
     // if none were selected at all.
     const activeText = this.textTracks.find((t) => t.index === this.activeTextIndex)
-    await invoke('pip_start', {
-      url: this.url,
-      startSeconds: this.last.time,
-      volume: this.last.volume,
-      muted: this.last.muted,
-      rate: this.rate,
-      paused: wasPaused,
-      subUrl: activeText?.url,
-      subLang: activeText?.language
-    })
+    // Pausing only *after* `pip_start` actually resolves -- previously this
+    // paused unconditionally before the await, with the call site never
+    // awaiting/catching this method's own promise (`void e.enterPiP()`).
+    // A failed spawn (mpv missing/crashed, despite `pip_available`'s own
+    // check) left the main engine paused with no PiP window ever having
+    // appeared, no error surfaced, and no way back except pressing play
+    // manually -- exactly the "stuck on a paused frame" symptom. Now a
+    // failure never touches playback at all.
+    try {
+      await invoke('pip_start', {
+        url: this.url,
+        startSeconds: this.last.time,
+        volume: this.last.volume,
+        muted: this.last.muted,
+        rate: this.rate,
+        paused: wasPaused,
+        subUrl: activeText?.url,
+        subLang: activeText?.language
+      })
+    } catch (e) {
+      console.error('[playback] enterPiP failed, staying in the main window', e)
+      this.emit('error', 'Picture-in-Picture failed to start.')
+      return
+    }
+    this.pause() // avoid double audio while the spawned mpv also plays this stream
     this.emit('pip', true)
   }
 
