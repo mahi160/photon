@@ -20,6 +20,11 @@ body {
   margin: 0;
 
   font-family: var(--font-sans);
+
+  /* Signal: every number in the app (runtime, timestamps, ratings, stat
+     rows) reads as data, not prose -- tabular widths so digits line up
+     instead of jittering column to column. */
+  font-variant-numeric: tabular-nums;
   color: var(--fg);
 
   /* no background here (ADR-0005): body/html/#root must stay fully

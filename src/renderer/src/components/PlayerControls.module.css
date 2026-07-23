@@ -361,6 +361,13 @@
   border-radius: var(--radius-full);
 
   appearance: none;
+
+  /* signature: the timeline is a beam of light -- the trace ahead of the
+     playhead is ruled like an instrument readout (a fixed tick pitch, not
+     real chapter data -- see .chapterTick for those), and the beam erases
+     it as playback catches up. Layer order (top to bottom): played beam,
+     buffered, tick ruler, base track -- ticks only show where neither beam
+     nor buffered has painted over them yet. */
   background:
     var(--beam) 0 0 / var(--pct, 0%) 100% no-repeat,
     linear-gradient(
@@ -368,6 +375,11 @@
         color-mix(in oklch, white 22%, transparent)
       )
       0 0 / var(--buf, 0%) 100% no-repeat,
+    repeating-linear-gradient(
+      to right,
+      color-mix(in oklch, white 30%, transparent) 0 1px,
+      transparent 1px 7px
+    ),
     color-mix(in oklch, white 13%, transparent);
 
   transition: block-size var(--dur-fast) var(--ease);
@@ -387,7 +399,7 @@
   background: white;
   box-shadow:
     0 0 0 3px color-mix(in oklch, var(--accent) 40%, transparent),
-    0 0 14px 2px color-mix(in oklch, var(--accent) 75%, transparent);
+    0 0 8px 1px color-mix(in oklch, var(--accent) 75%, transparent);
 
   transition: transform var(--dur-fast) var(--ease);
 }

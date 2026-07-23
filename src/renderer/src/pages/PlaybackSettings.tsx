@@ -1,6 +1,7 @@
+import { CaretRight } from 'reicon-react'
 import { useSettings } from '../stores/settings'
 import { ToggleSwitch } from '../components/ToggleSwitch'
-import { SettingsSection, SettingsRow } from './SettingsSection'
+import { SettingsRow } from './SettingsSection'
 import styles from './Settings.module.css'
 
 const bitrates = [
@@ -42,103 +43,125 @@ export function PlaybackSettings(): React.JSX.Element {
   const set = useSettings((s) => s.set)
 
   return (
-    <SettingsSection title="Playback">
-      <SettingsRow label="Preferred quality" hint="Maximum streaming bitrate">
-        <select
-          className={styles.select}
-          value={maxBitrate}
-          onChange={(e) => set({ maxBitrate: Number(e.target.value) })}
-          aria-label="Preferred quality"
-        >
-          {bitrates.map((b) => (
-            <option key={b.value} value={b.value}>
-              {b.label}
-            </option>
-          ))}
-        </select>
-      </SettingsRow>
-      <SettingsRow label="Autoplay next episode">
-        <ToggleSwitch
-          label="Autoplay next episode"
-          checked={autoplayNext}
-          onChange={(v) => set({ autoplayNext: v })}
-        />
-      </SettingsRow>
-      <SettingsRow
-        label="Skip intros automatically"
-        hint="Also recaps and previews, when the server has detected them. Credits always show."
-      >
-        <ToggleSwitch
-          label="Skip intros automatically"
-          checked={autoSkipSegments}
-          onChange={(v) => set({ autoSkipSegments: v })}
-        />
-      </SettingsRow>
-      <SettingsRow
-        label="“Surprise me” picks unwatched only"
-        hint="Off: the random pick can include movies you’ve already seen"
-      >
-        <ToggleSwitch
-          label="Surprise me picks unwatched only"
-          checked={surpriseUnwatchedOnly}
-          onChange={(v) => set({ surpriseUnwatchedOnly: v })}
-        />
-      </SettingsRow>
-      <SettingsRow label="Remember playback speed">
-        <ToggleSwitch
-          label="Remember playback speed"
-          checked={rememberSpeed}
-          onChange={(v) => set({ rememberSpeed: v })}
-        />
-      </SettingsRow>
-      <SettingsRow label="Subtitle size" hint="Takes effect on next playback">
-        <select
-          className={styles.select}
-          value={subtitleFontSize}
-          onChange={(e) => set({ subtitleFontSize: Number(e.target.value) })}
-          aria-label="Subtitle size"
-        >
-          {subtitleSizes.map((sz) => (
-            <option key={sz.value} value={sz.value}>
-              {sz.label}
-            </option>
-          ))}
-        </select>
-      </SettingsRow>
-      <SettingsRow label="Subtitle color" hint="Takes effect on next playback">
-        <select
-          className={styles.select}
-          value={subtitleColor}
-          onChange={(e) => set({ subtitleColor: e.target.value })}
-          aria-label="Subtitle color"
-        >
-          {subtitleColors.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-      </SettingsRow>
-      <SettingsRow label="Subtitle background box" hint="Takes effect on next playback">
-        <ToggleSwitch
-          label="Subtitle background box"
-          checked={subtitleBackgroundBox}
-          onChange={(v) => set({ subtitleBackgroundBox: v })}
-        />
-      </SettingsRow>
-      <SettingsRow
-        label="mpv config"
-        hint="Advanced: raw key=value mpv options, applied on top of everything above. Takes effect on next playback."
-      >
-        <textarea
-          className={`${styles.select} ${styles.mpvConfigInput}`}
-          value={mpvConfig}
-          onChange={(e) => set({ mpvConfig: e.target.value })}
-          placeholder={'sub-font-size=64\nsub-color=#00FF00'}
-          spellCheck={false}
-          aria-label="mpv config"
-        />
-      </SettingsRow>
-    </SettingsSection>
+    <>
+      <h1 className={styles.pageTitle}>Playback</h1>
+
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>General playback</h2>
+        <div className={styles.rows}>
+          <SettingsRow label="Preferred quality" hint="Maximum streaming bitrate">
+            <select
+              className={styles.select}
+              value={maxBitrate}
+              onChange={(e) => set({ maxBitrate: Number(e.target.value) })}
+              aria-label="Preferred quality"
+            >
+              {bitrates.map((b) => (
+                <option key={b.value} value={b.value}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
+          </SettingsRow>
+          <SettingsRow label="Autoplay next episode">
+            <ToggleSwitch
+              label="Autoplay next episode"
+              checked={autoplayNext}
+              onChange={(v) => set({ autoplayNext: v })}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="Skip intros automatically"
+            hint="Also recaps and previews, when the server has detected them. Credits always show."
+          >
+            <ToggleSwitch
+              label="Skip intros automatically"
+              checked={autoSkipSegments}
+              onChange={(v) => set({ autoSkipSegments: v })}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label="“Surprise me” picks unwatched only"
+            hint="Off: the random pick can include movies you’ve already seen"
+          >
+            <ToggleSwitch
+              label="Surprise me picks unwatched only"
+              checked={surpriseUnwatchedOnly}
+              onChange={(v) => set({ surpriseUnwatchedOnly: v })}
+            />
+          </SettingsRow>
+          <SettingsRow label="Remember playback speed">
+            <ToggleSwitch
+              label="Remember playback speed"
+              checked={rememberSpeed}
+              onChange={(v) => set({ rememberSpeed: v })}
+            />
+          </SettingsRow>
+        </div>
+      </div>
+
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>Subtitles</h2>
+        <div className={styles.rows}>
+          <SettingsRow label="Subtitle size" hint="Takes effect on next playback">
+            <select
+              className={styles.select}
+              value={subtitleFontSize}
+              onChange={(e) => set({ subtitleFontSize: Number(e.target.value) })}
+              aria-label="Subtitle size"
+            >
+              {subtitleSizes.map((sz) => (
+                <option key={sz.value} value={sz.value}>
+                  {sz.label}
+                </option>
+              ))}
+            </select>
+          </SettingsRow>
+          <SettingsRow label="Subtitle color" hint="Takes effect on next playback">
+            <select
+              className={styles.select}
+              value={subtitleColor}
+              onChange={(e) => set({ subtitleColor: e.target.value })}
+              aria-label="Subtitle color"
+            >
+              {subtitleColors.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </SettingsRow>
+          <SettingsRow label="Subtitle background box" hint="Takes effect on next playback">
+            <ToggleSwitch
+              label="Subtitle background box"
+              checked={subtitleBackgroundBox}
+              onChange={(v) => set({ subtitleBackgroundBox: v })}
+            />
+          </SettingsRow>
+        </div>
+      </div>
+
+      <details className={styles.advanced}>
+        <summary className={styles.advancedSummary}>
+          <CaretRight className={styles.advancedChevron} />
+          Advanced playback
+        </summary>
+        <div className={styles.advancedBody}>
+          <SettingsRow
+            label="mpv config"
+            hint="Advanced: raw key=value mpv options, applied on top of everything above. Takes effect on next playback."
+          >
+            <textarea
+              className={`${styles.select} ${styles.mpvConfigInput}`}
+              value={mpvConfig}
+              onChange={(e) => set({ mpvConfig: e.target.value })}
+              placeholder={'sub-font-size=64\nsub-color=#00FF00'}
+              spellCheck={false}
+              aria-label="mpv config"
+            />
+          </SettingsRow>
+        </div>
+      </details>
+    </>
   )
 }

@@ -1,8 +1,8 @@
-import { useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
 import { Gear, Search, Palette } from 'reicon-react'
 import { useHotkeys } from '../lib/useHotkeys'
 import { useSettings } from '../stores/settings'
+import { useUi } from '../stores/ui'
 import { nextTheme, themeLabel } from '../lib/theme'
 import { ShortcutsOverlay } from './Shortcuts'
 import { Tip } from '../components/Tip'
@@ -41,13 +41,14 @@ const navItems: NavItem[] = [
 
 export function AppLayout(): React.JSX.Element {
   const navigate = useNavigate()
-  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const shortcutsOpen = useUi((s) => s.shortcutsOpen)
+  const setShortcutsOpen = useUi((s) => s.setShortcutsOpen)
 
   useHotkeys({
     'mod+f': () => navigate({ to: '/search' }),
     '/': () => navigate({ to: '/search' }),
-    '?': () => setShortcutsOpen((v) => !v),
-    'shift+?': () => setShortcutsOpen((v) => !v)
+    '?': () => setShortcutsOpen(!shortcutsOpen),
+    'shift+?': () => setShortcutsOpen(!shortcutsOpen)
   })
 
   return (

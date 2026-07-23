@@ -8,10 +8,13 @@ import { router } from './router'
 import { useSession } from './stores/session'
 import { useSettings } from './stores/settings'
 import { setClientVersion } from './lib/jellyfin'
+import { applyCustomColors } from './lib/theme'
 import { invoke } from '@tauri-apps/api/core'
 
 function applyAppearance(): void {
-  document.documentElement.dataset.theme = useSettings.getState().theme
+  const settings = useSettings.getState()
+  document.documentElement.dataset.theme = settings.theme
+  applyCustomColors(settings.customColors)
 }
 
 applyAppearance()

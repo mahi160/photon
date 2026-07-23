@@ -25,6 +25,7 @@
    Theme Metadata
    ========================================================================== */
 
+[data-theme='gruvbox'],
 [data-theme='obsidian'],
 [data-theme='midnight'],
 [data-theme='forest'] {
@@ -40,7 +41,22 @@
 }
 
 /* ==========================================================================
-   Obsidian (Default)
+   Gruvbox Material (Default) -- dark, medium contrast, material palette
+   https://github.com/sainnhe/gruvbox-material
+   ========================================================================== */
+
+[data-theme='gruvbox'] {
+  --bg: #282828;
+  --fg: #d4be98;
+  --fg-muted: #a89984;
+  --accent: #e78a4e;
+  --accent-2: #89b482;
+  --accent-3: #a9b665;
+  --accent-4: #d8a657;
+}
+
+/* ==========================================================================
+   Obsidian
    ========================================================================== */
 
 [data-theme='obsidian'] {
@@ -118,9 +134,11 @@
   /* Photon's signature beam */
 
   --beam: linear-gradient(90deg, var(--accent), var(--accent-2));
+
+  /* signal, not bloom: a tight trace, not a soft glow */
   --beam-glow:
-    0 0 10px color-mix(in oklch, var(--accent) 50%, transparent),
-    0 0 24px color-mix(in oklch, var(--accent) 22%, transparent);
+    0 0 4px color-mix(in oklch, var(--accent) 65%, transparent),
+    0 0 12px color-mix(in oklch, var(--accent) 25%, transparent);
 
   /* Missing artwork */
 

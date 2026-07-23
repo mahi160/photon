@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Theme } from '../lib/theme'
+import type { SettingsSectionKey } from '../lib/settingsSections'
 
 interface SettingsState {
   // playback
@@ -30,6 +31,8 @@ interface SettingsState {
   mpvConfig: string
   // general
   theme: Theme
+  customColors: Record<string, string> // CSS var name -> hex, overrides the active theme (see lib/theme.ts)
+  settingsSection: SettingsSectionKey // last-viewed Settings sidebar section, restored on reopen
   set: (partial: Partial<Omit<SettingsState, 'set'>>) => void
   reset: () => void
 }
@@ -51,15 +54,19 @@ const defaults: Omit<SettingsState, 'set' | 'reset'> = {
   subtitleColor: '#FFFFFF',
   subtitleBackgroundBox: false,
   mpvConfig: '',
-  theme: 'obsidian'
+  theme: 'gruvbox',
+  customColors: {},
+  settingsSection: 'general'
 }
 
 export const useSettings = create<SettingsState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...defaults,
       set: (partial) => set(partial),
-      reset: () => set(defaults)
+      // reset restores preferences, not where you are in the Settings UI --
+      // resetting from Server > Danger Zone shouldn't also bounce you to General
+      reset: () => set({ ...defaults, settingsSection: get().settingsSection })
     }),
     { name: 'photon.settings' }
   )
