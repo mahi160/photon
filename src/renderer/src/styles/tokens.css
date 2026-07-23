@@ -1,7 +1,6 @@
-/* Design tokens. Each color scheme supplies 6 primitives
-   (bg, fg, fg-muted, accent, accent-2, accent-3, accent-4) — every surface,
-   border, glow and soft fill is derived from those with color-mix so
-   swapping or adding a scheme is a six-line edit. */
+/* ==========================================================================
+   Photon Design Tokens
+   ========================================================================== */
 
 :root {
   --font-sans: 'Schibsted Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
@@ -16,80 +15,89 @@
   --dur-fast: 140ms;
   --dur-med: 260ms;
   --dur-slow: 500ms;
-
-  /* one small z scale — nothing else in the app sets z-index above these */
   --z-nav: 10;
   --z-overlay: 20;
   --z-toast: 30;
-
-  /* overlay title bar (tauri.conf.json): the traffic lights get their own
-     strip, content sits below them rather than beside/centered on them --
-     no measuring, no per-platform inset math, just a fixed clearance
-     generous enough to clear a compact *or* tall title bar on any macOS
-     version. AppLayout's header and the player's top bar both start below
-     this. */
   --titlebar-clearance: 2rem;
 }
 
-/* accent colors are always chosen light (dark themes) or dark (light
-   themes) by each scheme below, so on-accent text only needs two values */
-[data-theme='gruvbox'],
-[data-theme='jellyfin'],
-[data-theme='aurora'] {
-  --accent-fg: #131318;
+/* ==========================================================================
+   Theme Metadata
+   ========================================================================== */
+
+[data-theme='obsidian'],
+[data-theme='midnight'],
+[data-theme='forest'] {
+  --accent-fg: #121316;
 
   color-scheme: dark;
 }
 
 [data-theme='rosepine'] {
-  --accent-fg: #fdfaf5;
+  --accent-fg: #faf4ed;
 
   color-scheme: light;
 }
 
-/* Gruvbox Material (medium contrast) — dark theme, the default */
-[data-theme='gruvbox'] {
-  --bg: #32302f;
-  --fg: #d4be98;
-  --fg-muted: #a89984;
-  --accent: #e78a4e;
-  --accent-2: #d3869b;
-  --accent-3: #89b482;
-  --accent-4: #d8a657;
+/* ==========================================================================
+   Obsidian (Default)
+   ========================================================================== */
+
+[data-theme='obsidian'] {
+  --bg: #101114;
+  --fg: #f3f2ee;
+  --fg-muted: #9ea3ad;
+  --accent: #7c9dff;
+  --accent-2: #9b8cff;
+  --accent-3: #7cae93;
+  --accent-4: #d6b97d;
 }
 
-/* Jellyfin official brand colors — jellyfin.org, dark theme */
-[data-theme='jellyfin'] {
-  --bg: #101010;
-  --fg: #e5e5e5;
-  --fg-muted: #9a9a9e;
-  --accent: #00a4dc;
-  --accent-2: #aa5cc3;
-  --accent-3: #52b54b;
-  --accent-4: #f2b01e;
+/* ==========================================================================
+   Midnight
+   ========================================================================== */
+
+[data-theme='midnight'] {
+  --bg: #0f141c;
+  --fg: #edf2fb;
+  --fg-muted: #98a6ba;
+  --accent: #4e8cff;
+  --accent-2: #57c8ff;
+  --accent-3: #6cb68d;
+  --accent-4: #d1b46b;
 }
 
-/* Aurora — a modern, saturated neon-on-near-black scheme */
-[data-theme='aurora'] {
-  --bg: #0b0b12;
-  --fg: #eef0ff;
-  --fg-muted: #9a9bb8;
-  --accent: #7c5cff;
-  --accent-2: #ff5c8a;
-  --accent-3: #35e0c8;
-  --accent-4: #ffd166;
+/* ==========================================================================
+   Forest
+   ========================================================================== */
+
+[data-theme='forest'] {
+  --bg: #121614;
+  --fg: #edf3ef;
+  --fg-muted: #9ca9a3;
+  --accent: #66ba8d;
+  --accent-2: #7dcab3;
+  --accent-3: #90b27a;
+  --accent-4: #d7b46d;
 }
 
-/* Rosé Pine Dawn — rosepinetheme.com/palette — light theme */
+/* ==========================================================================
+   Rosé Pine Dawn
+   ========================================================================== */
+
 [data-theme='rosepine'] {
   --bg: #faf4ed;
   --fg: #575279;
   --fg-muted: #797593;
-  --accent: #b4637a;
-  --accent-2: #907aa9;
-  --accent-3: #56949f;
+  --accent: #907cff;
+  --accent-2: #56949f;
+  --accent-3: #b4637a;
   --accent-4: #ea9d34;
 }
+
+/* ==========================================================================
+   Derived Tokens
+   ========================================================================== */
 
 :root {
   --surface-1: color-mix(in oklch, var(--fg) 6%, var(--bg));
@@ -99,33 +107,34 @@
   --border: color-mix(in oklch, var(--border-strong) 60%, transparent);
   --fg-faint: color-mix(in oklch, var(--fg-muted) 65%, var(--bg));
   --accent-border: color-mix(in oklch, var(--accent) 45%, transparent);
-  --accent-hover: color-mix(in oklch, var(--accent) 85%, black);
+  --accent-hover: color-mix(in oklch, var(--accent) 88%, black);
   --scrim: color-mix(in oklch, black 60%, transparent);
   --scrim-soft: color-mix(in oklch, black 35%, transparent);
   --shadow-1: 0 1px 2px color-mix(in oklch, black 30%, transparent);
   --shadow-2:
-    0 8px 24px -8px color-mix(in oklch, black 55%, transparent),
-    0 1px 1px color-mix(in oklch, black 20%, transparent);
+    0 10px 30px -10px color-mix(in oklch, black 55%, transparent),
+    0 2px 4px color-mix(in oklch, black 15%, transparent);
 
-  /* the beam — Photon's signature light line. Used in exactly three places:
-     active nav underline, card progress, player timeline. */
+  /* Photon's signature beam */
+
   --beam: linear-gradient(90deg, var(--accent), var(--accent-2));
-  --beam-glow: 0 0 10px color-mix(in oklch, var(--accent) 55%, transparent);
+  --beam-glow:
+    0 0 10px color-mix(in oklch, var(--accent) 50%, transparent),
+    0 0 24px color-mix(in oklch, var(--accent) 22%, transparent);
 
-  /* no-artwork default: a faint accent-tinted wash instead of a flat gray
-     box, used by Card/DetailsHero/DetailsPoster whenever the server has no
-     poster or backdrop for an item */
+  /* Missing artwork */
+
   --artwork-fallback-bg: linear-gradient(
     145deg,
-    color-mix(in oklch, var(--accent) 16%, var(--surface-2)),
-    color-mix(in oklch, var(--accent-2) 12%, var(--surface-2))
+    color-mix(in oklch, var(--accent) 12%, var(--surface-2)),
+    color-mix(in oklch, var(--accent-2) 10%, var(--surface-2))
   );
 
-  /* the video canvas is always black, in either theme, so the player's own
-     chrome stays dark glass regardless of --bg/--surface */
-  --player-glass: color-mix(in oklch, black 58%, var(--accent-2) 5%);
-  --player-glass-strong: color-mix(in oklch, black 72%, var(--accent-2) 7%);
-  --player-fg: #e8dcc3;
-  --player-fg-muted: color-mix(in oklch, #e8dcc3 60%, transparent);
-  --player-border: color-mix(in oklch, white 12%, transparent);
+  /* Player */
+
+  --player-glass: color-mix(in oklch, black 58%, var(--accent) 4%);
+  --player-glass-strong: color-mix(in oklch, black 72%, var(--accent) 6%);
+  --player-fg: #efe8da;
+  --player-fg-muted: color-mix(in oklch, #efe8da 60%, transparent);
+  --player-border: color-mix(in oklch, white 10%, transparent);
 }

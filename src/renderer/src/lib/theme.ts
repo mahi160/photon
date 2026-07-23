@@ -1,10 +1,10 @@
-export type Theme = 'gruvbox' | 'rosepine' | 'jellyfin' | 'aurora'
+export type Theme = 'obsidian' | 'midnight' | 'forest' | 'rosepine'
 
 // order here is the picker order and the header toggle's cycle order.
 export const themes: { key: Theme; label: string; dark: boolean }[] = [
-  { key: 'gruvbox', label: 'Gruvbox', dark: true },
-  { key: 'jellyfin', label: 'Jellyfin', dark: true },
-  { key: 'aurora', label: 'Aurora', dark: true },
+  { key: 'obsidian', label: 'Obsidian', dark: true },
+  { key: 'midnight', label: 'Midnight', dark: true },
+  { key: 'forest', label: 'Forest', dark: true },
   { key: 'rosepine', label: 'Rosé Pine', dark: false }
 ]
 
