@@ -1,0 +1,182 @@
+.layer {
+  position: absolute;
+  z-index: var(--z-overlay);
+  inset: 0;
+
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+
+  padding: 3rem;
+
+  /* same vignette technique as .errorLayer (Player.module.css) -- glow
+     pulled toward the corner the card (and the real spawned mpv window
+     behind it) actually sit in, instead of a flat scrim */
+  background:
+    radial-gradient(
+      38rem 38rem at 100% 100%,
+      color-mix(in oklch, var(--accent) 6%, transparent),
+      transparent 70%
+    ),
+    color-mix(in oklch, black 74%, transparent);
+}
+
+.card {
+  position: relative;
+
+  display: flex;
+  gap: 1.1rem;
+  align-items: center;
+
+  inline-size: max-content;
+  max-inline-size: min(27rem, 100%);
+  padding: 1.1rem 1.3rem 1.1rem 1.5rem;
+  border: 1px solid var(--player-border);
+  border-radius: var(--radius-m);
+
+  background: var(--player-glass-strong);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-2);
+
+  animation: pip-in var(--dur-slow) var(--ease-out);
+}
+
+@keyframes pip-in {
+  from {
+    transform: translateY(0.6rem);
+    opacity: 0;
+  }
+}
+
+/* signature: the same beam of light the timeline/nav/login screen all
+   carry (tokens.css) -- here it's a thin lit spine on the card itself,
+   the one accessory this quiet layer keeps */
+.rule {
+  position: absolute;
+  inset-block: 0.9rem;
+  inset-inline-start: 0;
+
+  inline-size: 2px;
+  border-radius: var(--radius-full);
+
+  background: var(--beam);
+  box-shadow: var(--beam-glow);
+}
+
+.poster {
+  flex-shrink: 0;
+
+  aspect-ratio: 2 / 3;
+  inline-size: 5.5rem;
+  border-radius: var(--radius-s);
+
+  object-fit: cover;
+  box-shadow: var(--shadow-1);
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-inline-size: 0;
+}
+
+.eyebrow {
+  display: flex;
+  gap: 0.35rem;
+  align-items: center;
+
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.eyebrowIcon {
+  inline-size: 0.8rem;
+  block-size: 0.8rem;
+}
+
+.title {
+  overflow: hidden;
+
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: white;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subtitle {
+  font-size: 0.8125rem;
+  color: var(--player-fg-muted);
+}
+
+.progressRow {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  margin-block-start: 0.3rem;
+}
+
+/* same technique as PlayerControls.module.css .timeline -- played beam
+   painted over a plain track, sized by --pct */
+.progressTrack {
+  flex: 1;
+  block-size: 0.2rem;
+  border-radius: var(--radius-full);
+  background:
+    var(--beam) 0 0 / var(--pct, 0%) 100% no-repeat,
+    color-mix(in oklch, white 13%, transparent);
+}
+
+.time {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--player-fg-muted);
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-block-start: 0.6rem;
+}
+
+.endPip,
+.back {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.endPip {
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--radius-full);
+
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--accent-fg);
+
+  background: var(--accent);
+
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.endPip:hover {
+  background: var(--accent-hover);
+}
+
+.back {
+  padding: 0.4rem 0.9rem;
+  border-radius: var(--radius-full);
+
+  font-size: 0.8125rem;
+  color: var(--player-fg-muted);
+
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.back:hover {
+  background: color-mix(in oklch, white 10%, transparent);
+}

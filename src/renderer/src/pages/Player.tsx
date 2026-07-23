@@ -22,6 +22,7 @@ import { useAutoHideControls } from '../hooks/useAutoHideControls'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { queryKeys } from '../lib/queryKeys'
 import { ShortcutsOverlay } from './Shortcuts'
+import { PipOverlay } from '../components/PipOverlay'
 import styles from './Player.module.css'
 
 function segmentNoun(type: string): string {
@@ -351,7 +352,16 @@ export function Player(): React.JSX.Element {
           <div className={styles.loadingSpinner} />
         </div>
       )}
-      {!player.error && session && (
+      {!player.error && session && engine.pip && (
+        <PipOverlay
+          item={session.item}
+          time={engine.time}
+          duration={displayDuration}
+          onBack={() => navigate({ to: '/' })}
+          onEndPiP={engine.togglePiP}
+        />
+      )}
+      {!player.error && session && !engine.pip && (
         <PlayerControls
           visible={visible}
           item={session.item}
