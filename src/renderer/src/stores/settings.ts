@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import type { Theme } from '../lib/theme'
 
 interface SettingsState {
   // playback
@@ -28,7 +29,7 @@ interface SettingsState {
   // launch on top of Photon's default subtitle appearance. See mpvConfig.ts.
   mpvConfig: string
   // general
-  theme: 'dark' | 'light' | 'system'
+  theme: Theme
   set: (partial: Partial<Omit<SettingsState, 'set'>>) => void
   reset: () => void
 }
@@ -50,7 +51,7 @@ const defaults: Omit<SettingsState, 'set' | 'reset'> = {
   subtitleColor: '#FFFFFF',
   subtitleBackgroundBox: false,
   mpvConfig: '',
-  theme: 'dark'
+  theme: 'gruvbox'
 }
 
 export const useSettings = create<SettingsState>()(

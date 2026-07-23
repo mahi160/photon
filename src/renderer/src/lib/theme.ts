@@ -1,11 +1,22 @@
-export type ThemePref = 'dark' | 'light' | 'system'
+export type Theme = 'gruvbox' | 'rosepine' | 'jellyfin' | 'aurora'
 
-export function resolveTheme(theme: ThemePref): 'dark' | 'light' {
-  if (theme === 'system')
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  return theme
+// order here is the picker order and the header toggle's cycle order.
+export const themes: { key: Theme; label: string; dark: boolean }[] = [
+  { key: 'gruvbox', label: 'Gruvbox', dark: true },
+  { key: 'jellyfin', label: 'Jellyfin', dark: true },
+  { key: 'aurora', label: 'Aurora', dark: true },
+  { key: 'rosepine', label: 'Rosé Pine', dark: false }
+]
+
+export function themeLabel(theme: Theme): string {
+  return themes.find((t) => t.key === theme)?.label ?? theme
 }
 
-export function resolvedDark(theme: ThemePref): boolean {
-  return resolveTheme(theme) === 'dark'
+export function isDark(theme: Theme): boolean {
+  return themes.find((t) => t.key === theme)?.dark ?? true
+}
+
+export function nextTheme(theme: Theme): Theme {
+  const i = themes.findIndex((t) => t.key === theme)
+  return themes[(i + 1) % themes.length].key
 }

@@ -33,20 +33,22 @@
 
 /* accent colors are always chosen light (dark themes) or dark (light
    themes) by each scheme below, so on-accent text only needs two values */
-[data-theme='dark'] {
+[data-theme='gruvbox'],
+[data-theme='jellyfin'],
+[data-theme='aurora'] {
   --accent-fg: #131318;
 
   color-scheme: dark;
 }
 
-[data-theme='light'] {
+[data-theme='rosepine'] {
   --accent-fg: #fdfaf5;
 
   color-scheme: light;
 }
 
-/* Gruvbox Material (medium contrast) — dark theme */
-[data-theme='dark'] {
+/* Gruvbox Material (medium contrast) — dark theme, the default */
+[data-theme='gruvbox'] {
   --bg: #32302f;
   --fg: #d4be98;
   --fg-muted: #a89984;
@@ -56,8 +58,30 @@
   --accent-4: #d8a657;
 }
 
+/* Jellyfin official brand colors — jellyfin.org, dark theme */
+[data-theme='jellyfin'] {
+  --bg: #101010;
+  --fg: #e5e5e5;
+  --fg-muted: #9a9a9e;
+  --accent: #00a4dc;
+  --accent-2: #aa5cc3;
+  --accent-3: #52b54b;
+  --accent-4: #f2b01e;
+}
+
+/* Aurora — a modern, saturated neon-on-near-black scheme */
+[data-theme='aurora'] {
+  --bg: #0b0b12;
+  --fg: #eef0ff;
+  --fg-muted: #9a9bb8;
+  --accent: #7c5cff;
+  --accent-2: #ff5c8a;
+  --accent-3: #35e0c8;
+  --accent-4: #ffd166;
+}
+
 /* Rosé Pine Dawn — rosepinetheme.com/palette — light theme */
-[data-theme='light'] {
+[data-theme='rosepine'] {
   --bg: #faf4ed;
   --fg: #575279;
   --fg-muted: #797593;
