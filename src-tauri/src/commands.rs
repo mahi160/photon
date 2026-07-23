@@ -3,6 +3,7 @@
 //! (mpv module) / aren't ported yet (ticket #11).
 
 use keyring::Entry;
+#[cfg(target_os = "macos")]
 use objc2_app_kit::{NSWindow, NSWindowButton};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -48,6 +49,13 @@ pub fn app_set_fullscreen(window: tauri::Window, fullscreen: bool) {
 /// already driving PlayerControls' own opacity, so the dots disappear over
 /// the video along with everything else and only reappear on hover -- every
 /// other page leaves them alone (never calls this with `false`).
+///
+/// macOS-only concept (`titleBarStyle: "Overlay"` in tauri.conf.json is
+/// itself macOS-only) -- Windows/Linux have no equivalent native buttons to
+/// hide, so this is a no-op there rather than an error: the frontend calls
+/// it unconditionally, and "nothing to hide" is the correct behavior, not a
+/// missing feature.
+#[cfg(target_os = "macos")]
 #[tauri::command]
 pub fn app_set_traffic_lights_visible(window: tauri::Window, visible: bool) -> Result<(), String> {
     let ns_window_ptr = window.ns_window().map_err(|e| e.to_string())?;
@@ -57,6 +65,12 @@ pub fn app_set_traffic_lights_visible(window: tauri::Window, visible: bool) -> R
             button.setHidden(!visible);
         }
     }
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+pub fn app_set_traffic_lights_visible(_window: tauri::Window, _visible: bool) -> Result<(), String> {
     Ok(())
 }
 

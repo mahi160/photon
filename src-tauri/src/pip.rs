@@ -4,15 +4,49 @@
 //! must never be an optional, probed dependency), PiP genuinely is optional
 //! here -- `pip_available` gates the whole feature in the UI, and "no system
 //! mpv" just means no PiP button, not degraded core playback.
+//!
+//! `--input-ipc-server` is a Unix domain socket path on macOS/Linux, a named
+//! pipe path on Windows (`connect_ipc`/`ipc_path` below) -- mpv itself
+//! accepts the same flag either way, only the transport differs. Windows
+//! side is unverified (no Windows box to test against, see AGENTS.md/CI
+//! comments elsewhere) but low-risk relative to the render-surface work:
+//! plain blocking named-pipe I/O, not GPU/compositing.
 
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
+#[cfg(unix)]
 use std::os::unix::net::UnixStream;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
+
+/// Where mpv's `--input-ipc-server` listens -- a real path to a socket file
+/// on Unix, a Win32 named-pipe name (not a filesystem path, though
+/// `std::fs`/`OpenOptions` accept it the same way) on Windows.
+#[cfg(unix)]
+fn ipc_path() -> PathBuf {
+    std::env::temp_dir().join(format!("photon-pip-{}.sock", std::process::id()))
+}
+
+#[cfg(windows)]
+fn ipc_path() -> PathBuf {
+    PathBuf::from(format!(r"\\.\pipe\photon-pip-{}", std::process::id()))
+}
+
+/// Connects to whichever transport `ipc_path` returned. `UnixStream`/`File`
+/// both implement `Read + Write + try_clone` with the same semantics, so
+/// `spawn_poller` below never branches on platform beyond this one call.
+#[cfg(unix)]
+fn connect_ipc(path: &Path) -> Option<UnixStream> {
+    UnixStream::connect(path).ok()
+}
+
+#[cfg(windows)]
+fn connect_ipc(path: &Path) -> Option<std::fs::File> {
+    std::fs::OpenOptions::new().read(true).write(true).open(path).ok()
+}
 
 #[derive(Default, Clone)]
 pub struct PipState(pub Arc<Mutex<Option<Child>>>);
@@ -66,8 +100,8 @@ pub fn pip_start(
         return Ok(()); // already open -- idempotent
     }
 
-    let socket_path = std::env::temp_dir().join(format!("photon-pip-{}.sock", std::process::id()));
-    let _ = std::fs::remove_file(&socket_path); // stale socket from a crashed previous run
+    let socket_path = ipc_path();
+    let _ = std::fs::remove_file(&socket_path); // stale socket from a crashed previous run (no-op on Windows: no on-disk file to remove)
 
     let mut cmd = Command::new(mpv_binary());
     cmd.arg("--no-border")
@@ -139,7 +173,7 @@ fn spawn_poller(app: AppHandle, state: Arc<Mutex<Option<Child>>>, socket_path: P
         // briefly instead of racing it.
         let mut connected = None;
         for _ in 0..50 {
-            if let Ok(s) = UnixStream::connect(&socket_path) {
+            if let Some(s) = connect_ipc(&socket_path) {
                 connected = Some(s);
                 break;
             }
@@ -147,7 +181,7 @@ fn spawn_poller(app: AppHandle, state: Arc<Mutex<Option<Child>>>, socket_path: P
         }
 
         if let Some(stream) = connected {
-            let mut reader = BufReader::new(stream.try_clone().expect("clone unix stream"));
+            let mut reader = BufReader::new(stream.try_clone().expect("clone ipc stream"));
             let mut writer = stream;
             let request = format!("{}\n", json!({ "command": ["get_property", "time-pos"] }));
             'poll: loop {
