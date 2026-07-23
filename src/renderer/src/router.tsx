@@ -137,7 +137,10 @@ export const router = createRouter({
   defaultPreload: 'intent',
   defaultErrorComponent: RouteError,
   defaultNotFoundComponent: RouteNotFound,
-  history: createHashHistory()
+  history: createHashHistory(),
+  // native View Transitions crossfade between routes -- no-ops itself on
+  // webviews without document.startViewTransition (older WebKitGTK)
+  defaultViewTransition: true
 })
 
 declare module '@tanstack/react-router' {
