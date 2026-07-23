@@ -5,7 +5,10 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { libraryQuery, type SortKey } from '../lib/queries'
 import { useSettings } from '../stores/settings'
 import { Card } from './Card'
+import { CardSkeleton } from './CardSkeleton'
 import styles from './LibraryGrid.module.css'
+
+const SKELETON_COUNT = 14
 
 const sorts: { key: SortKey; label: string }[] = [
   { key: 'added', label: 'Added' },
@@ -103,7 +106,13 @@ export function LibraryGrid({
           ))}
         </div>
       </div>
-      {isPending && <div className={styles.status}>Loading…</div>}
+      {isPending && (
+        <div className={styles.skeletonGrid}>
+          {Array.from({ length: SKELETON_COUNT }, (_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
+      )}
       {isError && (
         <div className={styles.status}>
           Cannot reach server.{' '}

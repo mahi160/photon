@@ -87,6 +87,15 @@
      .gridRow inside this, JS sets its total block-size */
 }
 
+/* loading only — unvirtualized, so it must mirror the real grid's own
+   sizing (a plain minmax/auto-fill, not the virtualizer's per-row column
+   count, which needs a measured container it doesn't have yet) */
+.skeletonGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(10.5rem, 1fr));
+  gap: 1.75rem 1rem;
+}
+
 .gridRow {
   display: grid;
   gap: 1rem;
