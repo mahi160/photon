@@ -112,6 +112,15 @@
   --beam: linear-gradient(90deg, var(--accent), var(--accent-2));
   --beam-glow: 0 0 10px color-mix(in oklch, var(--accent) 55%, transparent);
 
+  /* no-artwork default: a faint accent-tinted wash instead of a flat gray
+     box, used by Card/DetailsHero/DetailsPoster whenever the server has no
+     poster or backdrop for an item */
+  --artwork-fallback-bg: linear-gradient(
+    145deg,
+    color-mix(in oklch, var(--accent) 16%, var(--surface-2)),
+    color-mix(in oklch, var(--accent-2) 12%, var(--surface-2))
+  );
+
   /* the video canvas is always black, in either theme, so the player's own
      chrome stays dark glass regardless of --bg/--surface */
   --player-glass: color-mix(in oklch, black 58%, var(--accent-2) 5%);

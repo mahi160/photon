@@ -110,4 +110,20 @@ kbd {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
+
+  /* View Transition pseudo-elements live in the top layer, outside the DOM
+     tree the `*` rule above covers -- route crossfades need their own kill
+     switch */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* route crossfade matches the app's own easing instead of the UA default */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur-med);
+  animation-timing-function: var(--ease-out);
 }
