@@ -1,9 +1,11 @@
 //! In-process libmpv render-API engine (ADR-0003/0005/0009), platform-
 //! agnostic half: mpv lifecycle, command dispatch, the pending-operations
 //! queue, and tick/property observation. Every actual Cocoa/OpenGL/Metal
-//! call lives behind `RenderSurface` (`mpv/mac/`, ADR-0009) — this file
-//! never learns which backend (`SoftwareSurface`/`GpuSurface`) is active,
-//! or that a GPU→CPU fallback happened.
+//! call lives behind `RenderSurface` (`mpv/surface.rs`, ADR-0009; the actual
+//! platform module -- `mac`/`windows`/`linux` -- is selected at compile time
+//! via the `backend` alias in `mpv/mod.rs`) — this file never learns which
+//! backend (`SoftwareSurface`/`GpuSurface`, or a future Windows/Linux one) is
+//! active, or that a GPU→CPU fallback happened.
 //!
 //! Render loop (`spawn_render_loop` in commands.rs) is woken by mpv's own
 //! `mpv_render_context_set_update_callback` (see `RenderWaker` below) as soon
@@ -12,7 +14,8 @@
 //! ready", not "the display's about to refresh") — that's a further, real
 //! per-platform upgrade, not done here.
 
-use super::mac::{self, Backend, RenderSurface};
+use super::backend;
+use super::surface::{Backend, RenderSurface};
 use libmpv_sys::*;
 use raw_window_handle::HasWindowHandle;
 use std::collections::HashMap;
@@ -200,7 +203,7 @@ pub struct MpvEngine {
     waker: Arc<RenderWaker>,
     stop: Arc<AtomicBool>,
     observer: Option<JoinHandle<()>>,
-    // which backend `mac::attach` actually landed on -- surfaced to the
+    // which backend `backend::attach` actually landed on -- surfaced to the
     // frontend (`mpv_attach`'s return value) for the player overlay's
     // CPU-fallback badge (issue #12); never used to branch behavior here.
     backend: Backend,
@@ -447,10 +450,10 @@ impl MpvEngine {
         window: &WebviewWindow<R>,
         extra_config: &[(String, String)],
     ) -> Result<Self, String> {
-        // Platform-agnostic handle -- this file (unlike `mpv/mac/`) never
-        // imports an AppKit/Win32/X11 type directly; whichever platform
-        // backend `mac::attach` (or a future windows::attach/linux::attach)
-        // is compiled in does its own raw-handle unwrapping internally.
+        // Platform-agnostic handle -- this file (unlike `mpv/mac|windows|
+        // linux/`) never imports an AppKit/Win32/X11 type directly; whichever
+        // platform module is compiled in as `backend` does its own
+        // raw-handle unwrapping internally.
         let raw_handle = window.window_handle().map_err(|e| e.to_string())?.as_raw();
 
         unsafe {
@@ -514,8 +517,8 @@ impl MpvEngine {
             // Owns picking + creating the actual render context (SW vs GL
             // params differ), the GPU-vs-CPU fallback decision, and
             // registering `on_render_update` against whichever it picked --
-            // see `mac::attach`'s doc.
-            let (surface, backend) = mac::attach(mpv, raw_handle, &waker)?;
+            // see `backend::attach`'s doc.
+            let (surface, backend) = backend::attach(mpv, raw_handle, &waker)?;
             let surface = Arc::new(Mutex::new(surface));
 
             observe(mpv, 1, "time-pos", mpv_format_MPV_FORMAT_DOUBLE);
