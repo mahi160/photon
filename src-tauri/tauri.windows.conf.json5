@@ -8,9 +8,19 @@
 // out wrong once actually run: copy the dll into src-tauri/ directly instead
 // of reaching up with `../`, or fall back to `externalBin` (sidecar) instead
 // of `resources`.
+//
+// `targets: ["nsis"]` -- confirmed the hard way (first real `tauri build`
+// run on windows-latest): WiX/MSI requires a purely numeric pre-release
+// identifier ("optional pre-release identifier in app version must be
+// numeric-only ... for msi target"), which `2.0.0-pre.1` (this repo's
+// prerelease channel, see .releaserc.json/release.yml) isn't. NSIS has no
+// such restriction. Drop this override (back to the root config's
+// `targets: "all"`) once releases go back to stable, non-prerelease
+// versions.
 {
   $schema: "https://schema.tauri.app/config/2",
   bundle: {
+    targets: ["nsis"],
     resources: {
       "../mpv-dev/libmpv-2.dll": "",
     },
