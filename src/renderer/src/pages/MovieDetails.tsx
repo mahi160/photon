@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams, useRouter, useSearch } from '@tanstack/react-router'
-import { CaretLeft, Check, Heart, Play } from 'reicon-react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { itemQuery, setFavorite, setPlayed } from '../lib/queries'
-import { queryKeys } from '../lib/queryKeys'
+import { useNavigate, useParams, useSearch } from '@tanstack/react-router'
+import { Play } from 'reicon-react'
+import { useQuery } from '@tanstack/react-query'
+import { itemQuery } from '../lib/queries'
 import { backdropUrl, imageUrl, mediaBadges, ticksToSeconds } from '../lib/jellyfin'
-import { Tip } from '../components/Tip'
-import { Ratings } from '../components/Ratings'
+import { WatchedButton } from '../components/WatchedButton'
+import {
+  DetailsError,
+  DetailsHero,
+  DetailsLoading,
+  DetailsMeta,
+  DetailsPoster,
+  DetailsTitleRow
+} from './DetailsShell'
 import styles from './Details.module.css'
 
 function fmtRuntime(ticks?: number): string {
@@ -14,21 +20,10 @@ function fmtRuntime(ticks?: number): string {
   return min ? `${Math.floor(min / 60)}h ${min % 60}m` : ''
 }
 
-function BackButton(): React.JSX.Element {
-  const router = useRouter()
-  return (
-    <button onClick={() => router.history.back()} className={styles.back}>
-      <CaretLeft />
-      Back
-    </button>
-  )
-}
-
 export function MovieDetails(): React.JSX.Element {
   const { itemId } = useParams({ from: '/app/shell/movies/$itemId' })
   const { surprise } = useSearch({ from: '/app/shell/movies/$itemId' })
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const { data: item, isPending, isError, refetch } = useQuery(itemQuery(itemId))
   const [audio, setAudio] = useState<number | undefined>()
   const [sub, setSub] = useState<number | undefined>()
@@ -50,26 +45,8 @@ export function MovieDetails(): React.JSX.Element {
     return () => clearTimeout(t)
   }, [countdown, item, navigate])
 
-  const toggleWatched = useMutation({
-    mutationFn: (next: boolean) => setPlayed(itemId, next),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.all() })
-  })
-
-  const toggleFavorite = useMutation({
-    mutationFn: (next: boolean) => setFavorite(itemId, next),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.all() })
-  })
-
-  if (isPending) return <div className={styles.loading}>Loading…</div>
-  if (isError || !item)
-    return (
-      <div className={styles.errorState}>
-        Cannot reach server.{' '}
-        <button onClick={() => refetch()} className={styles.playPrimary}>
-          Retry
-        </button>
-      </div>
-    )
+  if (isPending) return <DetailsLoading />
+  if (isError || !item) return <DetailsError onRetry={() => refetch()} />
 
   const poster = imageUrl(item, 480)
   const backdrop = backdropUrl(item, 1280)
@@ -99,42 +76,13 @@ export function MovieDetails(): React.JSX.Element {
 
   return (
     <div className={styles.page}>
-      <div className={styles.hero}>
-        {backdrop && <img src={backdrop} alt="" fetchPriority="high" className={styles.heroImg} />}
-        <div className={styles.heroScrim} />
-        <BackButton />
-      </div>
+      <DetailsHero backdrop={backdrop} />
       <div className={styles.content}>
         <div className={styles.top}>
-          <div className={styles.poster}>
-            {poster ? (
-              <img src={poster} alt="" className={styles.posterImg} />
-            ) : (
-              <div className={styles.posterPlaceholder} />
-            )}
-          </div>
+          <DetailsPoster poster={poster} />
           <div className={styles.info}>
-            <div className={styles.titleRow}>
-              <h1 className={styles.title}>{item.Name}</h1>
-              <Tip label={item.UserData?.IsFavorite ? 'Remove from favorites' : 'Add to favorites'}>
-                <button
-                  onClick={() => toggleFavorite.mutate(!item.UserData?.IsFavorite)}
-                  aria-label={
-                    item.UserData?.IsFavorite ? 'Remove from favorites' : 'Add to favorites'
-                  }
-                  aria-pressed={!!item.UserData?.IsFavorite}
-                  className={`${styles.favoriteBtn} ${item.UserData?.IsFavorite ? styles.favoriteBtnActive : ''}`}
-                >
-                  <Heart weight={item.UserData?.IsFavorite ? 'Filled' : 'Outline'} />
-                </button>
-              </Tip>
-            </div>
-            <div className={styles.meta}>
-              {meta.map((m) => (
-                <span key={String(m)}>{m}</span>
-              ))}
-              <Ratings item={item} />
-            </div>
+            <DetailsTitleRow item={item} />
+            <DetailsMeta item={item} meta={meta} />
             {badges.length > 0 && (
               <div className={styles.badges}>
                 {badges.map((b) => (
@@ -169,16 +117,11 @@ export function MovieDetails(): React.JSX.Element {
                 {position <= 60 && <Play weight="Filled" />}
                 {position > 60 ? 'Play from start' : 'Play'}
               </button>
-              <Tip label={item.UserData?.Played ? 'Mark unwatched' : 'Mark watched'}>
-                <button
-                  onClick={() => toggleWatched.mutate(!item.UserData?.Played)}
-                  aria-label={item.UserData?.Played ? 'Mark unwatched' : 'Mark watched'}
-                  aria-pressed={!!item.UserData?.Played}
-                  className={`${styles.iconToggle} ${item.UserData?.Played ? styles.iconToggleActive : ''}`}
-                >
-                  <Check />
-                </button>
-              </Tip>
+              <WatchedButton
+                item={item}
+                className={styles.iconToggle}
+                activeClassName={styles.iconToggleActive}
+              />
             </div>
             {(audioStreams.length > 1 || subtitleStreams.length > 0) && (
               <div className={styles.tracks}>

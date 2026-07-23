@@ -2,7 +2,11 @@
   position: relative;
   overflow: hidden;
   block-size: 100%;
-  background: black;
+
+  /* no background here (ADR-0005): this box must stay fully unpainted so
+     the transparent window can show mpv's composited surface through it.
+     mpv paints its own black letterboxing; NSWindow's #0e0e10 background
+     covers the brief window before the surface attaches/positions. */
 }
 
 .video {
@@ -98,227 +102,29 @@
   color: color-mix(in oklch, white 75%, transparent);
 }
 
-/* ---- mpv status page ---- */
-.mpvBackdrop {
+/* shown while the session resolves / mpv attaches (ADR-0005: .stage stays
+   unpainted so this is the only thing visible over the black window) */
+.loadingLayer {
   position: absolute;
   inset: 0;
-  scale: 1.1; /* hide blur edge bleed */
-
-  inline-size: 100%;
-  block-size: 100%;
-
-  opacity: 0.45;
-  object-fit: cover;
-  filter: blur(28px);
-}
-
-.mpvScrim {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    60rem 40rem at 50% 45%,
-    color-mix(in oklch, black 40%, transparent),
-    color-mix(in oklch, black 82%, transparent)
-  );
-}
-
-.mpvLayer {
-  position: relative;
 
   display: flex;
-  flex-direction: column;
-  gap: 2rem;
   align-items: center;
-  justify-content: center;
-
-  block-size: 100%;
-  padding: var(--gutter);
-
-  animation: mpv-in var(--dur-slow) var(--ease-out) backwards;
-}
-
-@keyframes mpv-in {
-  from {
-    transform: translateY(0.75rem);
-    opacity: 0;
-  }
-}
-
-.mpvCard {
-  display: flex;
-  gap: 1.75rem;
-  align-items: center;
-  max-inline-size: 34rem;
-}
-
-.mpvPoster {
-  flex-shrink: 0;
-
-  aspect-ratio: 2 / 3;
-  inline-size: clamp(7rem, 14vw, 10rem);
-  border-radius: var(--radius-m);
-
-  object-fit: cover;
-  box-shadow: var(--shadow-2);
-}
-
-.mpvInfo {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  align-items: flex-start;
-
-  min-inline-size: 0;
-}
-
-.mpvBadge {
-  display: inline-flex;
-  gap: 0.4rem;
-  align-items: center;
-
-  padding: 0.25rem 0.65rem;
-  border: 1px solid var(--player-border);
-  border-radius: var(--radius-full);
-
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  color: var(--player-fg-muted);
-  letter-spacing: 0.08em;
-
-  background: var(--player-glass);
-}
-
-.mpvDot {
-  inline-size: 0.4rem;
-  block-size: 0.4rem;
-  border-radius: var(--radius-full);
-
-  background: var(--accent-3);
-  box-shadow: 0 0 6px color-mix(in oklch, var(--accent-3) 70%, transparent);
-}
-
-.mpvTitle {
-  font-size: clamp(1.35rem, 2.5vw, 1.75rem);
-  color: white;
-}
-
-.mpvSub {
-  overflow: hidden;
-
-  max-inline-size: 100%;
-
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: color-mix(in oklch, white 55%, transparent);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mpvProgress {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-
-  inline-size: 100%;
-  margin-block-start: 0.75rem;
-}
-
-.mpvProgressTrack {
-  overflow: hidden;
-  block-size: 0.25rem;
-  border-radius: var(--radius-full);
-  background: color-mix(in oklch, white 13%, transparent);
-}
-
-.mpvProgressFill {
-  block-size: 100%;
-  border-radius: var(--radius-full);
-
-  background: var(--beam);
-  box-shadow: var(--beam-glow);
-
-  transition: inline-size 1s linear;
-}
-
-.mpvTime {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: color-mix(in oklch, white 70%, transparent);
-}
-
-.mpvTimeSep {
-  color: color-mix(in oklch, white 35%, transparent);
-}
-
-.mpvGroups {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.5rem;
   justify-content: center;
 }
 
-.mpvGroup {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.mpvGroupLabel {
-  margin-inline-end: 0.25rem;
-
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
-  color: color-mix(in oklch, white 40%, transparent);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.mpvStarting {
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
-  color: var(--player-fg-muted);
-  animation: mpv-pulse 1.4s var(--ease) infinite;
-}
-
-@keyframes mpv-pulse {
-  0%,
-  100% {
-    opacity: 0.4;
-  }
-
-  50% {
-    opacity: 0.9;
-  }
-}
-
-.mpvFooter {
-  display: flex;
-  gap: 1.5rem;
-}
-
-.mpvBtn {
-  padding-block: 0.45rem;
-  padding-inline: 0.85rem;
-  border: 1px solid color-mix(in oklch, white 20%, transparent);
+.loadingSpinner {
+  inline-size: 2rem;
+  block-size: 2rem;
+  border: 3px solid color-mix(in oklch, white 20%, transparent);
+  border-block-start-color: var(--accent);
   border-radius: var(--radius-full);
 
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: color-mix(in oklch, white 70%, transparent);
-
-  background: color-mix(in oklch, white 8%, transparent);
-
-  transition:
-    background-color var(--dur-fast) var(--ease),
-    color var(--dur-fast) var(--ease);
+  animation: loading-spin 0.8s linear infinite;
 }
 
-.mpvBtn:hover {
-  background: color-mix(in oklch, white 15%, transparent);
-}
-
-.mpvBtnActive {
-  border-color: var(--accent);
-  color: var(--accent-fg);
-  background: var(--accent);
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

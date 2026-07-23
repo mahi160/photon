@@ -1,9 +1,9 @@
-import { useState } from 'react'
 import { Link, Outlet, useNavigate } from '@tanstack/react-router'
-import { Gear, Search, Moon, Sun } from 'reicon-react'
+import { Gear, Search, Palette } from 'reicon-react'
 import { useHotkeys } from '../lib/useHotkeys'
 import { useSettings } from '../stores/settings'
-import { resolvedDark } from '../lib/theme'
+import { useUi } from '../stores/ui'
+import { nextTheme, themeLabel } from '../lib/theme'
 import { ShortcutsOverlay } from './Shortcuts'
 import { Tip } from '../components/Tip'
 import { PhotonMark } from '../components/PhotonMark'
@@ -12,16 +12,16 @@ import styles from './AppLayout.module.css'
 function ThemeToggle(): React.JSX.Element {
   const theme = useSettings((s) => s.theme)
   const set = useSettings((s) => s.set)
-  const dark = resolvedDark(theme)
+  const next = nextTheme(theme)
 
   return (
-    <Tip label={dark ? 'Light theme' : 'Dark theme'}>
+    <Tip label={`Theme: ${themeLabel(theme)} (next: ${themeLabel(next)})`}>
       <button
         className={styles.iconBtn}
-        aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
-        onClick={() => set({ theme: dark ? 'light' : 'dark' })}
+        aria-label={`Switch theme, currently ${themeLabel(theme)}`}
+        onClick={() => set({ theme: next })}
       >
-        {dark ? <Sun className={styles.themeIcon} /> : <Moon className={styles.themeIcon} />}
+        <Palette className={styles.themeIcon} />
       </button>
     </Tip>
   )
@@ -41,18 +41,23 @@ const navItems: NavItem[] = [
 
 export function AppLayout(): React.JSX.Element {
   const navigate = useNavigate()
-  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const shortcutsOpen = useUi((s) => s.shortcutsOpen)
+  const setShortcutsOpen = useUi((s) => s.setShortcutsOpen)
 
   useHotkeys({
     'mod+f': () => navigate({ to: '/search' }),
     '/': () => navigate({ to: '/search' }),
-    '?': () => setShortcutsOpen((v) => !v),
-    'shift+?': () => setShortcutsOpen((v) => !v)
+    '?': () => setShortcutsOpen(!shortcutsOpen),
+    'shift+?': () => setShortcutsOpen(!shortcutsOpen)
   })
 
   return (
     <div className={styles.shell}>
-      <header className={styles.header}>
+      {/* overlay title bar (tauri.conf.json): traffic lights float over this
+          bar instead of reserving their own strip -- this makes the empty
+          space in it (not the nav links/buttons themselves, see drag.js)
+          the window's drag handle */}
+      <header className={styles.header} data-tauri-drag-region>
         <Link to="/" className={styles.brand}>
           <PhotonMark /> Photon
         </Link>
@@ -81,7 +86,10 @@ export function AppLayout(): React.JSX.Element {
           </Link>
         </Tip>
       </header>
-      <main className={styles.main}>
+      {/* data-scroll-root: LibraryGrid's virtualizer needs a handle on the
+          actual scrolling ancestor (this, not the window -- .main is the
+          overflow-y:auto element, see AppLayout.module.css) */}
+      <main className={styles.main} data-scroll-root>
         <Outlet />
       </main>
       <ShortcutsOverlay open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />

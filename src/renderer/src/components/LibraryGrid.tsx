@@ -1,16 +1,49 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { libraryQuery, type SortKey } from '../lib/queries'
 import { useSettings } from '../stores/settings'
 import { Card } from './Card'
+import { CardSkeleton } from './CardSkeleton'
 import styles from './LibraryGrid.module.css'
+
+const SKELETON_COUNT = 14
 
 const sorts: { key: SortKey; label: string }[] = [
   { key: 'added', label: 'Added' },
   { key: 'name', label: 'Name' },
   { key: 'release', label: 'Release' }
 ]
+
+// must match .grid's `minmax(10.5rem, 1fr)` / `gap: 1.75rem 1rem` — the
+// virtualizer chunks items into rows itself (no built-in grid mode), so the
+// row math here has to mirror the CSS grid it's replacing
+const MIN_CARD_PX = 168 // 10.5rem
+const COLUMN_GAP_PX = 16 // 1rem
+// Card.module.css's own `contain-intrinsic-size` guess for a card's height
+const ESTIMATED_ROW_PX = 280
+
+// how many columns actually fit at the current container width — same
+// arithmetic `repeat(auto-fill, minmax(...))` does, recomputed on resize.
+// State-backed callback ref, not a plain useRef: the grid div only mounts
+// once `data` has loaded (it's behind a conditional), so a plain useRef's
+// effect (deps never change) would fire once against a still-null .current
+// and never observe anything, leaving columns stuck at the initial 1.
+function useColumnCount(): [number, (el: HTMLElement | null) => void] {
+  const [el, setEl] = useState<HTMLElement | null>(null)
+  const [columns, setColumns] = useState(1)
+  useEffect(() => {
+    if (!el) return
+    const observer = new ResizeObserver(([entry]) => {
+      const width = entry.contentRect.width
+      setColumns(Math.max(1, Math.floor((width + COLUMN_GAP_PX) / (MIN_CARD_PX + COLUMN_GAP_PX))))
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [el])
+  return [columns, setEl]
+}
 
 export function LibraryGrid({
   type,
@@ -22,6 +55,18 @@ export function LibraryGrid({
   const [sort, setSort] = useState<SortKey>('added')
   const { data, isPending, isError, refetch } = useQuery(libraryQuery(type, sort))
   const navigate = useNavigate()
+
+  const [columns, gridRef] = useColumnCount()
+  const rowCount = data ? Math.ceil(data.length / columns) : 0
+
+  const virtualizer = useVirtualizer({
+    count: rowCount,
+    // the scrolling ancestor is .main (AppLayout), not this component's own
+    // element or the window — see the data-scroll-root comment there
+    getScrollElement: () => document.querySelector<HTMLElement>('[data-scroll-root]'),
+    estimateSize: () => ESTIMATED_ROW_PX,
+    overscan: 3
+  })
 
   // decision-paralysis killer: random unwatched movie → details page, which
   // runs a cancellable auto-play countdown (?surprise=1)
@@ -61,7 +106,13 @@ export function LibraryGrid({
           ))}
         </div>
       </div>
-      {isPending && <div className={styles.status}>Loading…</div>}
+      {isPending && (
+        <div className={styles.skeletonGrid}>
+          {Array.from({ length: SKELETON_COUNT }, (_, i) => (
+            <CardSkeleton key={i} />
+          ))}
+        </div>
+      )}
       {isError && (
         <div className={styles.status}>
           Cannot reach server.{' '}
@@ -73,23 +124,50 @@ export function LibraryGrid({
       {empty && (
         <div className={styles.status}>{`No ${noun} yet. Add media to your Jellyfin library.`}</div>
       )}
-      <div className={styles.grid}>
-        {data?.map((item, i) =>
-          // stagger only the first screenful — animating a full library's
-          // worth of cards at once is just jank, not polish
-          i < 12 ? (
-            <div
-              key={item.Id}
-              className={styles.gridItem}
-              style={{ animationDelay: `${i * 30}ms` }}
-            >
-              <Card item={item} />
-            </div>
-          ) : (
-            <Card key={item.Id} item={item} />
-          )
-        )}
-      </div>
+      {data && data.length > 0 && (
+        <div
+          ref={gridRef}
+          className={styles.grid}
+          style={{ position: 'relative', blockSize: virtualizer.getTotalSize() }}
+        >
+          {virtualizer.getVirtualItems().map((row) => {
+            const start = row.index * columns
+            const rowItems = data.slice(start, start + columns)
+            return (
+              <div
+                key={row.key}
+                ref={virtualizer.measureElement}
+                data-index={row.index}
+                className={styles.gridRow}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  insetInlineStart: 0,
+                  insetInlineEnd: 0,
+                  transform: `translateY(${row.start}px)`,
+                  gridTemplateColumns: `repeat(${columns}, 1fr)`
+                }}
+              >
+                {rowItems.map((item, i) =>
+                  // stagger only the very first row — animating a full
+                  // library's worth of cards at once is just jank, not polish
+                  row.index === 0 ? (
+                    <div
+                      key={item.Id}
+                      className={styles.gridItem}
+                      style={{ animationDelay: `${i * 30}ms` }}
+                    >
+                      <Card item={item} />
+                    </div>
+                  ) : (
+                    <Card key={item.Id} item={item} />
+                  )
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

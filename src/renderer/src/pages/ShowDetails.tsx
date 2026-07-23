@@ -1,68 +1,59 @@
 import { useState } from 'react'
-import { useNavigate, useParams, useRouter } from '@tanstack/react-router'
-import { CaretLeft, Check, Heart, Play } from 'reicon-react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import {
-  episodesQuery,
-  itemQuery,
-  nextUpQuery,
-  seasonsQuery,
-  setFavorite,
-  setPlayed
-} from '../lib/queries'
-import { queryKeys } from '../lib/queryKeys'
+import { useNavigate, useParams } from '@tanstack/react-router'
+import { Play } from 'reicon-react'
+import { useQuery } from '@tanstack/react-query'
+import { episodesQuery, itemQuery, nextUpQuery, seasonsQuery } from '../lib/queries'
 import { backdropUrl, imageUrl, ticksToSeconds, type BaseItem } from '../lib/jellyfin'
-import { Tip } from '../components/Tip'
-import { Ratings } from '../components/Ratings'
+import { WatchedButton } from '../components/WatchedButton'
+import {
+  DetailsError,
+  DetailsHero,
+  DetailsLoading,
+  DetailsMeta,
+  DetailsPoster,
+  DetailsTitleRow
+} from './DetailsShell'
 import styles from './Details.module.css'
 
 function EpisodeRow({ ep, onPlay }: { ep: BaseItem; onPlay: () => void }): React.JSX.Element {
-  const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const pct = ep.UserData?.PlayedPercentage
-  const played = ep.UserData?.Played ?? false
   const img = imageUrl(ep, 320)
 
-  const toggleWatched = useMutation({
-    mutationFn: (next: boolean) => setPlayed(ep.Id, next),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.all() })
-  })
-
+  // two sibling buttons, not nested (Card convention, AGENTS.md): thumb
+  // plays, title opens details. WatchedButton sits beside the thumb button
+  // (not inside it) for the same reason -- a <button> can't nest a <button>.
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onPlay}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onPlay()
-        }
-      }}
-      className={styles.episodeRow}
-    >
-      <div className={styles.episodeThumb}>
-        {img && <img src={img} alt="" loading="lazy" />}
-        {pct !== undefined && pct > 0 && pct < 100 && (
-          <div className={styles.episodeProgress}>
-            <div className={styles.episodeProgressFill} style={{ inlineSize: `${pct}%` }} />
-          </div>
-        )}
-        <Tip label={played ? 'Mark unwatched' : 'Mark watched'}>
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              toggleWatched.mutate(!played)
-            }}
-            aria-label={played ? 'Mark unwatched' : 'Mark watched'}
-            className={`${styles.episodeWatchedToggle} ${played ? styles.episodeWatchedToggleActive : ''}`}
-          >
-            <Check />
-          </button>
-        </Tip>
+    <div className={styles.episodeRow}>
+      <div className={styles.episodeThumbWrap}>
+        <button
+          type="button"
+          onClick={onPlay}
+          aria-label={`Play ${ep.Name}`}
+          className={styles.episodeThumb}
+        >
+          {img && <img src={img} alt="" loading="lazy" />}
+          {pct !== undefined && pct > 0 && pct < 100 && (
+            <div className={styles.episodeProgress}>
+              <div className={styles.episodeProgressFill} style={{ inlineSize: `${pct}%` }} />
+            </div>
+          )}
+        </button>
+        <WatchedButton
+          item={ep}
+          className={styles.episodeWatchedToggle}
+          activeClassName={styles.episodeWatchedToggleActive}
+        />
       </div>
       <div className={styles.episodeNum}>{ep.IndexNumber ?? ''}</div>
       <div className={styles.episodeInfo}>
-        <div className={styles.episodeTitle}>{ep.Name}</div>
+        <button
+          type="button"
+          className={styles.episodeTitle}
+          onClick={() => navigate({ to: '/episode/$itemId', params: { itemId: ep.Id } })}
+        >
+          {ep.Name}
+        </button>
         <p className={styles.episodeOverview}>{ep.Overview}</p>
       </div>
     </div>
@@ -72,17 +63,10 @@ function EpisodeRow({ ep, onPlay }: { ep: BaseItem; onPlay: () => void }): React
 export function ShowDetails(): React.JSX.Element {
   const { seriesId } = useParams({ from: '/app/shell/shows/$seriesId' })
   const navigate = useNavigate()
-  const router = useRouter()
-  const queryClient = useQueryClient()
   const series = useQuery(itemQuery(seriesId))
   const seasons = useQuery(seasonsQuery(seriesId))
   const nextUp = useQuery(nextUpQuery(seriesId))
   const [seasonId, setSeasonId] = useState<string | null>(null)
-
-  const toggleFavorite = useMutation({
-    mutationFn: (next: boolean) => setFavorite(seriesId, next),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.all() })
-  })
 
   const activeSeason = seasonId ?? seasons.data?.[0]?.Id ?? null
   const episodes = useQuery({
@@ -90,16 +74,8 @@ export function ShowDetails(): React.JSX.Element {
     enabled: !!activeSeason
   })
 
-  if (series.isPending) return <div className={styles.loading}>Loading…</div>
-  if (series.isError || !series.data)
-    return (
-      <div className={styles.errorState}>
-        Cannot reach server.{' '}
-        <button onClick={() => series.refetch()} className={styles.playPrimary}>
-          Retry
-        </button>
-      </div>
-    )
+  if (series.isPending) return <DetailsLoading />
+  if (series.isError || !series.data) return <DetailsError onRetry={() => series.refetch()} />
 
   const item = series.data
   const poster = imageUrl(item, 480)
@@ -123,45 +99,13 @@ export function ShowDetails(): React.JSX.Element {
 
   return (
     <div className={styles.page}>
-      <div className={styles.hero}>
-        {backdrop && <img src={backdrop} alt="" fetchPriority="high" className={styles.heroImg} />}
-        <div className={styles.heroScrim} />
-        <button onClick={() => router.history.back()} className={styles.back}>
-          <CaretLeft />
-          Back
-        </button>
-      </div>
+      <DetailsHero backdrop={backdrop} />
       <div className={styles.content}>
         <div className={styles.top}>
-          <div className={styles.poster}>
-            {poster ? (
-              <img src={poster} alt="" className={styles.posterImg} />
-            ) : (
-              <div className={styles.posterPlaceholder} />
-            )}
-          </div>
+          <DetailsPoster poster={poster} />
           <div className={styles.info}>
-            <div className={styles.titleRow}>
-              <h1 className={styles.title}>{item.Name}</h1>
-              <Tip label={item.UserData?.IsFavorite ? 'Remove from favorites' : 'Add to favorites'}>
-                <button
-                  onClick={() => toggleFavorite.mutate(!item.UserData?.IsFavorite)}
-                  aria-label={
-                    item.UserData?.IsFavorite ? 'Remove from favorites' : 'Add to favorites'
-                  }
-                  aria-pressed={!!item.UserData?.IsFavorite}
-                  className={`${styles.favoriteBtn} ${item.UserData?.IsFavorite ? styles.favoriteBtnActive : ''}`}
-                >
-                  <Heart weight={item.UserData?.IsFavorite ? 'Filled' : 'Outline'} />
-                </button>
-              </Tip>
-            </div>
-            <div className={styles.meta}>
-              {meta.map((m) => (
-                <span key={String(m)}>{m}</span>
-              ))}
-              <Ratings item={item} />
-            </div>
+            <DetailsTitleRow item={item} />
+            <DetailsMeta item={item} meta={meta} />
             <p className={styles.overview}>{item.Overview}</p>
             {next && (
               <div className={styles.actions}>

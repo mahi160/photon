@@ -58,8 +58,8 @@
 }
 
 .actionBtnActive {
-  opacity: 1;
   color: var(--accent);
+  opacity: 1;
 }
 
 .poster {
@@ -94,7 +94,16 @@
   inline-size: 100%;
   block-size: 100%;
   object-fit: cover;
-  transition: transform var(--dur-med) var(--ease);
+
+  opacity: 0;
+
+  transition:
+    opacity var(--dur-med) var(--ease),
+    transform var(--dur-med) var(--ease);
+}
+
+.imageLoaded {
+  opacity: 1;
 }
 
 .poster:hover .image,
@@ -104,16 +113,38 @@
 
 .placeholder {
   display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
   align-items: center;
   justify-content: center;
 
   inline-size: 100%;
   block-size: 100%;
-  padding: 0.5rem;
+  padding: 0.75rem;
+
+  text-align: center;
+
+  background: var(--artwork-fallback-bg);
+}
+
+.placeholderIcon {
+  flex-shrink: 0;
+
+  inline-size: 1.75rem;
+  block-size: 1.75rem;
+
+  color: var(--fg-faint);
+  opacity: 0.7;
+}
+
+.placeholderText {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 
   font-size: 0.75rem;
   color: var(--fg-faint);
-  text-align: center;
 }
 
 .playScrim {
@@ -201,8 +232,8 @@
 .title {
   overflow: hidden;
   display: block;
-
   flex: 1;
+
   min-inline-size: 0;
 
   font-size: 0.9375rem;
@@ -229,4 +260,26 @@
   color: var(--fg-faint);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* episode cards only: subtitle becomes a button (links to the episode
+   itself, see Card.tsx) -- same look as .subtitle, just interactive */
+.subtitleLink {
+  overflow: hidden;
+  display: block;
+  inline-size: 100%;
+
+  margin-block-start: 0.15rem;
+  text-align: start;
+
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--fg-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subtitleLink:hover,
+.subtitleLink:focus-visible {
+  color: var(--accent);
 }

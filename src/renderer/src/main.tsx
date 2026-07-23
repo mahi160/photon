@@ -7,18 +7,18 @@ import { RouterProvider } from '@tanstack/react-router'
 import { router } from './router'
 import { useSession } from './stores/session'
 import { useSettings } from './stores/settings'
-import { resolveTheme } from './lib/theme'
 import { setClientVersion } from './lib/jellyfin'
+import { applyCustomColors } from './lib/theme'
+import { invoke } from '@tauri-apps/api/core'
 
 function applyAppearance(): void {
-  const s = useSettings.getState()
-  document.documentElement.dataset.theme = resolveTheme(s.theme)
+  const settings = useSettings.getState()
+  document.documentElement.dataset.theme = settings.theme
+  applyCustomColors(settings.customColors)
 }
 
 applyAppearance()
 useSettings.subscribe(applyAppearance)
-// follow OS theme changes while in 'system' mode
-window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyAppearance)
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,11 +30,13 @@ const queryClient = new QueryClient({
   }
 })
 
-// restore session before the router mounts so auth guards see the real state;
-// runs alongside the real app version so the very first API call already
-// carries it instead of the "1.0.0" placeholder
-Promise.all([useSession.getState().restore(), window.api.appVersion().then(setClientVersion)]).then(
-  () => {
+// restore session before the router mounts so auth guards see the real state.
+// render must not depend on the (non-essential) app version call — if that
+// IPC rejects, the app must still mount.
+useSession
+  .getState()
+  .restore()
+  .finally(() => {
     createRoot(document.getElementById('root')!).render(
       <StrictMode>
         <QueryClientProvider client={queryClient}>
@@ -42,5 +44,9 @@ Promise.all([useSession.getState().restore(), window.api.appVersion().then(setCl
         </QueryClientProvider>
       </StrictMode>
     )
-  }
-)
+  })
+
+// fire-and-forget: version string is cosmetic, fetched in parallel
+invoke<string>('app_version')
+  .then(setClientVersion)
+  .catch(() => {})

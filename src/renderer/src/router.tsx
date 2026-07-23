@@ -17,9 +17,10 @@ import { Shows } from './pages/Shows'
 import { Search } from './pages/Search'
 // heavy pages load lazily — the shell (login/home/library/search) stays in the
 // entry chunk; defaultPreload:'intent' prefetches these on link hover anyway.
-// Player especially: it pulls the whole player/ dir and (transitively) hls.js.
+// Player especially: it pulls the whole player/ dir.
 const MovieDetails = lazyRouteComponent(() => import('./pages/MovieDetails'), 'MovieDetails')
 const ShowDetails = lazyRouteComponent(() => import('./pages/ShowDetails'), 'ShowDetails')
+const EpisodeDetails = lazyRouteComponent(() => import('./pages/EpisodeDetails'), 'EpisodeDetails')
 const Player = lazyRouteComponent(() => import('./pages/Player'), 'Player')
 const Settings = lazyRouteComponent(() => import('./pages/Settings'), 'Settings')
 
@@ -88,6 +89,11 @@ const showDetailsRoute = createRoute({
   path: '/shows/$seriesId',
   component: ShowDetails
 })
+const episodeDetailsRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: '/episode/$itemId',
+  component: EpisodeDetails
+})
 
 // player is chrome-free, outside the shell
 const playerRoute = createRoute({
@@ -115,7 +121,8 @@ const routeTree = rootRoute.addChildren([
       searchRoute,
       settingsRoute,
       movieDetailsRoute,
-      showDetailsRoute
+      showDetailsRoute,
+      episodeDetailsRoute
     ]),
     playerRoute
   ])
@@ -130,7 +137,10 @@ export const router = createRouter({
   defaultPreload: 'intent',
   defaultErrorComponent: RouteError,
   defaultNotFoundComponent: RouteNotFound,
-  history: createHashHistory()
+  history: createHashHistory(),
+  // native View Transitions crossfade between routes -- no-ops itself on
+  // webviews without document.startViewTransition (older WebKitGTK)
+  defaultViewTransition: true
 })
 
 declare module '@tanstack/react-router' {

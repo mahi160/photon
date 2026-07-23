@@ -1,0 +1,85 @@
+name: Rust CI
+
+# Compiles/links src-tauri on all three platforms on every PR that touches it
+# -- catches build.rs/libmpv-linkage breakage (the actually-uncertain part of
+# Windows/Linux support, see release.yml's build-windows/build-linux comments)
+# on a real Windows/Linux toolchain within minutes, instead of only finding
+# out during an actual release cut, or needing a real Windows/Linux box.
+# `cargo check`, not a full build/bundle -- no signing secrets needed here,
+# and this only needs to answer "does it compile and link", not "does it
+# bundle" (that's release.yml's job, once a real release is cut).
+on:
+  pull_request:
+    paths:
+      - "src-tauri/**"
+      - ".github/workflows/rust-ci.yml"
+  push:
+    branches: [main]
+    paths:
+      - "src-tauri/**"
+      - ".github/workflows/rust-ci.yml"
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install libmpv (macOS)
+        if: runner.os == 'macOS'
+        run: brew install mpv
+
+      - name: Install libmpv + webview deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libmpv-dev libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev patchelf
+
+      # Windows: same dance as release.yml's build-windows job -- see its
+      # comment for why (no pkg-config/vcpkg story for libmpv on Windows).
+      - name: Download libmpv dev package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $release = Invoke-RestMethod "https://api.github.com/repos/shinchiro/mpv-winbuild-cmake/releases/latest"
+          $asset = $release.assets | Where-Object { $_.name -like "mpv-dev-x86_64-*.7z" } | Select-Object -First 1
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile mpv-dev.7z
+          7z x mpv-dev.7z -o"mpv-dev" -y
+      - name: Get gendef (Windows)
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: mingw-w64-x86_64-tools-git
+          release: false
+      - name: gendef libmpv-2.dll -> libmpv-2.def (Windows)
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: gendef mpv-dev/libmpv-2.dll
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+      - name: lib.exe /def -> mpv.lib (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: lib /def:libmpv-2.def /name:libmpv-2.dll /out:mpv-dev/mpv.lib /machine:x64
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: cargo check
+        working-directory: src-tauri
+        env:
+          MPV_LIB_DIR: ${{ github.workspace }}/mpv-dev
+        run: cargo check --lib
+
+      - name: cargo test
+        working-directory: src-tauri
+        env:
+          MPV_LIB_DIR: ${{ github.workspace }}/mpv-dev
+        run: cargo test --lib

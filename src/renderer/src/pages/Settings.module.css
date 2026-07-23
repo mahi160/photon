@@ -1,9 +1,10 @@
-.page {
-  max-inline-size: 42rem;
-  margin-inline: auto;
-  padding-block: 3.5rem 4rem;
-  padding-inline: var(--gutter);
-
+/* desktop settings app shell: fixed sidebar, independently-scrolling
+   content -- .shell mounts once per visit to /settings, so the rise
+   plays on arrival only, never replays when a sidebar item is clicked
+   (only .contentInner's child swaps, see Settings.tsx) */
+.shell {
+  display: flex;
+  block-size: 100%;
   animation: rise var(--dur-slow) var(--ease-out) backwards;
 }
 
@@ -12,6 +13,102 @@
     transform: translateY(1rem);
     opacity: 0;
   }
+}
+
+.sidebar {
+  overflow-y: auto;
+  flex: 0 0 15rem;
+  flex-shrink: 0;
+
+  padding-block: 2rem;
+  padding-inline: 1.5rem;
+}
+
+/* continuous guide rule behind the whole list (like a doc's "on this
+   page" TOC) -- the active item's own bar (below) draws over it */
+.navList {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.navList::before {
+  content: '';
+
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+
+  inline-size: 1px;
+
+  background: var(--border);
+}
+
+.navItem {
+  position: relative;
+
+  padding-block: 0.4rem;
+  padding-inline: 1rem;
+
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--fg-muted);
+  text-align: center;
+
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.navItem:hover {
+  color: var(--fg);
+}
+
+/* same signature as the top nav's beam-underline (AppLayout .navLink),
+   just reoriented for a vertical list instead of a horizontal one --
+   drawn over the continuous guide line above */
+.navItem::before {
+  content: '';
+
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+
+  inline-size: 2px;
+  border-radius: var(--radius-full);
+
+  opacity: 0;
+  background: var(--beam);
+  box-shadow: var(--beam-glow);
+
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.navItemActive {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.navItemActive::before {
+  opacity: 1;
+}
+
+.content {
+  overflow-y: auto;
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.contentInner {
+  max-inline-size: 46rem;
+  margin-inline: auto;
+  padding-block: 2.5rem 4rem;
+  padding-inline: 2.5rem;
+}
+
+.hr {
+  margin-block: 1.75rem;
+  border: none;
+  border-block-start: 1px solid var(--border);
 }
 
 .pageTitle {
@@ -74,9 +171,33 @@
   border-color: var(--accent-border);
 }
 
-.textInput {
-  inline-size: 6rem;
+.colorSwatch {
+  cursor: pointer;
+
+  inline-size: 2.75rem;
+  block-size: 1.75rem;
+  padding: 0.15rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+
+  background: var(--surface-1);
+}
+
+.colorSwatch::-webkit-color-swatch {
+  border: none;
+  border-radius: calc(var(--radius-s) - 2px);
+}
+
+.mpvConfigInput {
+  resize: vertical;
+
+  inline-size: 22rem;
+  min-block-size: 5rem;
+  padding: 0.5rem 0.7rem;
+
   font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.4;
 }
 
 .toggle {
@@ -112,46 +233,6 @@
   transform: translateX(1rem);
 }
 
-.stepperGroup {
-  display: flex;
-  gap: 0.4rem;
-  align-items: center;
-}
-
-.stepBtn {
-  display: grid;
-  flex-shrink: 0;
-  place-items: center;
-
-  inline-size: 1.8rem;
-  block-size: 1.8rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-s);
-
-  font-size: 1rem;
-
-  background: var(--surface-1);
-
-  transition: background-color var(--dur-fast) var(--ease);
-}
-
-.stepBtn:hover {
-  background: var(--surface-3);
-}
-
-.stepInput {
-  inline-size: 4rem;
-  padding-block: 0.4rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-s);
-
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  text-align: center;
-
-  background: var(--surface-1);
-}
-
 .slabRow {
   display: flex;
   gap: 0.25rem;
@@ -182,32 +263,6 @@
 .slabActive {
   color: var(--fg);
   background: var(--surface-3);
-}
-
-.swatchRow {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.swatch {
-  inline-size: 1.75rem;
-  block-size: 1.75rem;
-  border: 2px solid transparent;
-  border-radius: var(--radius-full);
-
-  box-shadow: var(--shadow-1);
-
-  transition:
-    transform var(--dur-fast) var(--ease),
-    border-color var(--dur-fast) var(--ease);
-}
-
-.swatch:hover {
-  transform: scale(1.08);
-}
-
-.swatchActive {
-  border-color: var(--fg);
 }
 
 .buttons {
@@ -266,48 +321,49 @@
   background: var(--surface-2);
 }
 
-/* preferences / stats switcher */
-.pageHead {
-  display: flex;
-  gap: 1.25rem;
-  align-items: baseline;
-  justify-content: space-between;
+/* collapsible mpv config -- native <details>, no JS state needed */
+.advanced {
+  margin-block-start: 0.5rem;
 }
 
-.tabs {
+.advancedSummary {
+  cursor: pointer;
+
   display: flex;
-  gap: 0.25rem;
-
-  padding: 0.2rem;
-  border-radius: var(--radius-full);
-
-  background: var(--surface-1);
-}
-
-.tabBtn {
-  padding-block: 0.3rem;
-  padding-inline: 0.7rem;
-  border-radius: var(--radius-full);
+  gap: 0.4rem;
+  align-items: center;
 
   font-family: var(--font-mono);
   font-size: 0.6875rem;
-  color: var(--fg-faint);
+  font-weight: 500;
+  color: var(--fg-muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
+  list-style: none;
 
-  transition:
-    color var(--dur-fast) var(--ease),
-    background-color var(--dur-fast) var(--ease);
+  transition: color var(--dur-fast) var(--ease);
 }
 
-.tabBtn:hover {
+.advancedSummary::-webkit-details-marker {
+  display: none;
+}
+
+.advancedSummary:hover {
   color: var(--fg);
 }
 
-.tabBtnActive,
-.tabBtnActive:hover {
-  color: var(--fg);
-  background: var(--surface-3);
+.advancedChevron {
+  inline-size: 0.7rem;
+  block-size: 0.7rem;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.advanced[open] .advancedChevron {
+  transform: rotate(90deg);
+}
+
+.advancedBody {
+  margin-block-start: 1.25rem;
 }
 
 /* watch stats dashboard */
@@ -362,7 +418,15 @@
   border: 1px solid var(--surface-2);
   border-radius: var(--radius-s);
 
-  background: var(--surface-1);
+  /* signal: quarter-height gridlines make bar values readable at a glance,
+     not just decoration -- a real reference scale, like an instrument */
+  background:
+    repeating-linear-gradient(
+      to top,
+      transparent 0 calc(25% - 1px),
+      var(--surface-2) calc(25% - 1px) 25%
+    ),
+    var(--surface-1);
 }
 
 .statBar {

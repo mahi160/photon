@@ -37,8 +37,8 @@
 }
 
 .status {
-  padding-inline: var(--gutter);
   margin-block-end: 1.5rem;
+  padding-inline: var(--gutter);
   color: var(--fg-faint);
 }
 

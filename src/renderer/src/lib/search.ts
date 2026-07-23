@@ -1,6 +1,6 @@
 import type { BaseItem } from './jellyfin'
 
-// local fuzzy filter: prefix matches rank above substring matches (ADR-0001)
+// local filter: prefix + substring matching, prefix matches rank above substring matches (ADR-0001)
 export function filterLocal(items: BaseItem[], term: string, limit = 48): BaseItem[] {
   const q = term.toLowerCase()
   const starts: BaseItem[] = []

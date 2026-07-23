@@ -17,7 +17,14 @@
 /* full-bleed gradient scrims instead of floating cards — the video stays
    the subject, controls just sit legibly on top of it */
 .topScrim {
-  padding: 1.25rem 1.5rem;
+  /* clears the overlay title bar's traffic lights (tauri.conf.json) --
+     same idea as AppLayout .shell: they get their own strip, this scrim's
+     content sits below them rather than beside them. Only matters while
+     .layer is actually visible -- the dots themselves are hidden the rest
+     of the time (usePlayerEngine's traffic-light sync, tied to the same
+     `visible` state as this whole layer, see Player.tsx). */
+  padding-block: var(--titlebar-clearance) 1.25rem;
+  padding-inline: 1.5rem;
   background: linear-gradient(to bottom, color-mix(in oklch, black 65%, transparent), transparent);
 }
 
@@ -102,8 +109,10 @@
 .topRight {
   display: flex;
   flex-shrink: 0;
-  gap: 0.85rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   align-items: center;
+  justify-content: flex-end;
 }
 
 .methodBadge {
@@ -141,7 +150,7 @@
 
 .clock {
   font-family: var(--font-mono);
-  font-size: 0.875rem;
+  font-size: 1.05rem;
   color: color-mix(in oklch, white 75%, transparent);
   text-shadow: 0 1px 8px color-mix(in oklch, black 60%, transparent);
 }
@@ -221,8 +230,8 @@
    parent would also fade out children that rise above it — the trickplay
    preview bubble was invisible except its bottom slice */
 .dock::before {
-  content: '';
   pointer-events: none;
+  content: '';
 
   position: absolute;
   inset: 0;
@@ -236,6 +245,7 @@
 
   /* subtle glass — the blur fades out with the scrim so there's no hard edge */
   backdrop-filter: blur(10px);
+
   mask-image: linear-gradient(to top, black 55%, transparent);
 }
 
@@ -300,7 +310,6 @@
 
 .previewThumb {
   overflow: hidden;
-
   margin-block-end: 0.2rem;
   border-radius: calc(var(--radius-s) - 2px);
 }
@@ -352,6 +361,13 @@
   border-radius: var(--radius-full);
 
   appearance: none;
+
+  /* signature: the timeline is a beam of light -- the trace ahead of the
+     playhead is ruled like an instrument readout (a fixed tick pitch, not
+     real chapter data -- see .chapterTick for those), and the beam erases
+     it as playback catches up. Layer order (top to bottom): played beam,
+     buffered, tick ruler, base track -- ticks only show where neither beam
+     nor buffered has painted over them yet. */
   background:
     var(--beam) 0 0 / var(--pct, 0%) 100% no-repeat,
     linear-gradient(
@@ -359,6 +375,11 @@
         color-mix(in oklch, white 22%, transparent)
       )
       0 0 / var(--buf, 0%) 100% no-repeat,
+    repeating-linear-gradient(
+      to right,
+      color-mix(in oklch, white 30%, transparent) 0 1px,
+      transparent 1px 7px
+    ),
     color-mix(in oklch, white 13%, transparent);
 
   transition: block-size var(--dur-fast) var(--ease);
@@ -378,7 +399,7 @@
   background: white;
   box-shadow:
     0 0 0 3px color-mix(in oklch, var(--accent) 40%, transparent),
-    0 0 14px 2px color-mix(in oklch, var(--accent) 75%, transparent);
+    0 0 8px 1px color-mix(in oklch, var(--accent) 75%, transparent);
 
   transition: transform var(--dur-fast) var(--ease);
 }
@@ -632,7 +653,6 @@
   box-shadow: var(--shadow-2);
 
   transition: background-color var(--dur-fast) var(--ease);
-
   animation: menu-in var(--dur-med) var(--ease-out);
 }
 

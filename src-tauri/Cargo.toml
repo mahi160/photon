@@ -1,0 +1,53 @@
+[package]
+name = "photon"
+version = "2.0.0-next"
+description = "A calm, minimal desktop media player built exclusively for Jellyfin"
+authors = ["Salauddin Omar Sifat"]
+edition = "2021"
+
+[lib]
+name = "photon_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+pkg-config = "0.3"
+
+[dependencies]
+tauri = { version = "2", features = ["macos-private-api"] }
+tauri-plugin-autostart = "2"
+# ticket #11: auto-update, replacing electron-updater. Relaunch-after-install
+# uses AppHandle::request_restart (core tauri) directly -- no separate
+# tauri-plugin-process needed for that one call.
+tauri-plugin-updater = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+libmpv-sys = "3"
+libc = "0.2"
+# same version tauri itself uses (Window/WebviewWindow implement its
+# HasWindowHandle) -- lets engine.rs (platform-agnostic) hand a bare
+# RawWindowHandle down to mac::attach instead of importing objc2_app_kit
+# directly, so it stays a genuinely cross-platform seam for a future
+# windows::attach/linux::attach
+raw-window-handle = "0.6"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# objc2 crate family (ADR-0009) -- replaces cocoa/objc 0.2.x everywhere in
+# `mpv/` so the whole module has one Obj-C interop story, not two. Default
+# features left on for the AppKit/QuartzCore crates (each already ships a
+# near-complete default set; hand-picking a feature subset would just be
+# busywork this module has no need for). objc2-metal/objc2-io-surface are
+# `mpv/mac/gpu.rs`-only (checkpoint 3).
+objc2 = "0.6"
+objc2-app-kit = "0.3"
+objc2-foundation = "0.3"
+objc2-core-foundation = "0.3"
+objc2-quartz-core = "0.3"
+# "objc2-io-surface": off by default on objc2-metal itself (an optional
+# cross-crate interop feature, not part of its own kitchen-sink default) --
+# needed for the IOSurface-backed texture `mpv/mac/gpu.rs` builds (ADR-0009).
+objc2-metal = { version = "0.3", features = ["objc2-io-surface"] }
+objc2-io-surface = "0.3"
+core-graphics = "0.24"
+foreign-types = "0.5"

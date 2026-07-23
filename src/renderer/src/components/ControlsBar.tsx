@@ -3,7 +3,6 @@ import { Menu as BaseMenu } from '@base-ui/react/menu'
 import { Select as BaseSelect } from '@base-ui/react/select'
 import { Popover as BasePopover } from '@base-ui/react/popover'
 import {
-  ArrowUpRightSquare,
   Cc,
   Headphones,
   History,
@@ -17,6 +16,7 @@ import {
   Volume
 } from 'reicon-react'
 import type { MediaStream, BaseItem } from '../lib/jellyfin'
+import { noFocusOnClick } from '../lib/noFocusOnClick'
 import { speeds } from '../player/engine'
 import { Stepper, type StepperClasses } from './Stepper'
 import { Tip } from './Tip'
@@ -37,6 +37,7 @@ export interface ControlsBarProps {
   volume: number
   muted: boolean
   pip: boolean
+  pipAvailable: boolean
   fullscreen: boolean
   audioStreams: MediaStream[]
   audioIndex?: number
@@ -58,7 +59,6 @@ export interface ControlsBarProps {
   onSubtitleDelay: (s: number) => void
   onFullscreen: () => void
   onPiP: () => void
-  onOpenMpv?: () => void
 }
 
 function EndTimeDisplay({
@@ -97,6 +97,7 @@ type PlaybackMenusProps = Pick<
   | 'subtitleDelay'
   | 'subtitleDelayEnabled'
   | 'pip'
+  | 'pipAvailable'
   | 'fullscreen'
   | 'menuOpen'
   | 'onToggleMenu'
@@ -106,7 +107,6 @@ type PlaybackMenusProps = Pick<
   | 'onSubtitleDelay'
   | 'onFullscreen'
   | 'onPiP'
-  | 'onOpenMpv'
 >
 
 const PlaybackMenus = memo(function PlaybackMenus({
@@ -118,6 +118,7 @@ const PlaybackMenus = memo(function PlaybackMenus({
   subtitleDelay,
   subtitleDelayEnabled,
   pip,
+  pipAvailable,
   fullscreen,
   menuOpen,
   onToggleMenu,
@@ -126,8 +127,7 @@ const PlaybackMenus = memo(function PlaybackMenus({
   onSelectSubtitle,
   onSubtitleDelay,
   onFullscreen,
-  onPiP,
-  onOpenMpv
+  onPiP
 }: PlaybackMenusProps): React.JSX.Element {
   return (
     <>
@@ -135,8 +135,8 @@ const PlaybackMenus = memo(function PlaybackMenus({
         open={menuOpen === 'speed'}
         onOpenChange={(open) => onToggleMenu('speed', open)}
       >
-        <Tip label="Playback speed">
-          <BaseMenu.Trigger className={styles.iconBtn} aria-label="Playback speed">
+        <Tip label="Playback speed" kbd="< >">
+          <BaseMenu.Trigger className={styles.iconBtn} tabIndex={-1} aria-label="Playback speed">
             <span className={styles.rateLabel}>{rate}×</span>
           </BaseMenu.Trigger>
         </Tip>
@@ -150,6 +150,7 @@ const PlaybackMenus = memo(function PlaybackMenus({
                     onRate(s)
                     onToggleMenu('speed', false)
                   }}
+                  tabIndex={-1}
                   className={`${styles.menuItem} ${rate === s ? styles.menuItemActive : ''}`}
                 >
                   {s}×
@@ -178,18 +179,23 @@ const PlaybackMenus = memo(function PlaybackMenus({
         onOpenChange={(open) => onToggleMenu('subs', open)}
       >
         <Tip label="Subtitles">
-          <BaseSelect.Trigger className={styles.iconBtn} aria-label="Subtitles">
+          <BaseSelect.Trigger className={styles.iconBtn} tabIndex={-1} aria-label="Subtitles">
             <Cc weight={subtitleIndex !== null ? 'Filled' : 'Outline'} className={styles.icon} />
           </BaseSelect.Trigger>
         </Tip>
         <BaseSelect.Portal>
           <BaseSelect.Positioner alignItemWithTrigger side="top" sideOffset={10}>
             <BaseSelect.Popup className={styles.menu}>
-              <BaseSelect.Item value={null} className={styles.menuItem}>
+              <BaseSelect.Item value={null} tabIndex={-1} className={styles.menuItem}>
                 <BaseSelect.ItemText>Off</BaseSelect.ItemText>
               </BaseSelect.Item>
               {subtitleStreams.map((s) => (
-                <BaseSelect.Item key={s.Index} value={s.Index} className={styles.menuItem}>
+                <BaseSelect.Item
+                  key={s.Index}
+                  value={s.Index}
+                  tabIndex={-1}
+                  className={styles.menuItem}
+                >
                   <BaseSelect.ItemText>
                     {s.DisplayTitle ?? `Subtitle ${s.Index}`}
                     {s.DeliveryMethod !== 'External' && ' (burned-in)'}
@@ -208,6 +214,7 @@ const PlaybackMenus = memo(function PlaybackMenus({
         <Tip label="Subtitle sync" kbd="[ ]">
           <BasePopover.Trigger
             className={styles.iconBtn}
+            tabIndex={-1}
             disabled={!subtitleDelayEnabled}
             aria-label="Subtitle sync"
           >
@@ -242,26 +249,28 @@ const PlaybackMenus = memo(function PlaybackMenus({
         </BasePopover.Portal>
       </BasePopover.Root>
 
-      {onOpenMpv && (
-        <Tip label="Open in mpv">
-          <button className={styles.iconBtn} onClick={onOpenMpv} aria-label="Open in mpv">
-            <ArrowUpRightSquare className={styles.icon} />
+      {pipAvailable && (
+        <Tip label={pip ? 'Exit Picture in Picture' : 'Picture in Picture'} kbd="P">
+          <button
+            className={`${styles.iconBtn} ${pip ? styles.iconBtnActive : ''}`}
+            onClick={onPiP}
+            onMouseDown={noFocusOnClick}
+            tabIndex={-1}
+            aria-label="Picture in Picture"
+          >
+            <Pip weight={pip ? 'Filled' : 'Outline'} className={styles.icon} />
           </button>
         </Tip>
       )}
 
-      <Tip label={pip ? 'Exit Picture in Picture' : 'Picture in Picture'} kbd="P">
-        <button
-          className={`${styles.iconBtn} ${pip ? styles.iconBtnActive : ''}`}
-          onClick={onPiP}
-          aria-label="Picture in Picture"
-        >
-          <Pip weight={pip ? 'Filled' : 'Outline'} className={styles.icon} />
-        </button>
-      </Tip>
-
       <Tip label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'} kbd="F">
-        <button className={styles.iconBtn} onClick={onFullscreen} aria-label="Fullscreen">
+        <button
+          className={styles.iconBtn}
+          onClick={onFullscreen}
+          onMouseDown={noFocusOnClick}
+          tabIndex={-1}
+          aria-label="Fullscreen"
+        >
           {fullscreen ? <Minimize className={styles.icon} /> : <Maximize className={styles.icon} />}
         </button>
       </Tip>
@@ -277,6 +286,7 @@ export function ControlsBar({
   volume,
   muted,
   pip,
+  pipAvailable,
   fullscreen,
   audioStreams,
   audioIndex,
@@ -297,13 +307,18 @@ export function ControlsBar({
   onSelectSubtitle,
   onSubtitleDelay,
   onFullscreen,
-  onPiP,
-  onOpenMpv
+  onPiP
 }: ControlsBarProps): React.JSX.Element {
   return (
     <div className={styles.controlsRow}>
       <Tip label={state === 'playing' ? 'Pause' : 'Play'} kbd="Space">
-        <button className={styles.playBtn} onClick={onTogglePlay} aria-label="Play or pause">
+        <button
+          className={styles.playBtn}
+          onClick={onTogglePlay}
+          onMouseDown={noFocusOnClick}
+          tabIndex={-1}
+          aria-label="Play or pause"
+        >
           {state === 'playing' ? (
             <Pause weight="Filled" className={styles.icon} />
           ) : (
@@ -314,7 +329,13 @@ export function ControlsBar({
 
       {onPlayNext && (
         <Tip label={nextEpisode ? `Next: ${nextEpisode.Name}` : 'Next episode'}>
-          <button className={styles.iconBtn} onClick={onPlayNext} aria-label="Next episode">
+          <button
+            className={styles.iconBtn}
+            onClick={onPlayNext}
+            onMouseDown={noFocusOnClick}
+            tabIndex={-1}
+            aria-label="Next episode"
+          >
             <ForwardStep weight="Filled" className={styles.icon} />
           </button>
         </Tip>
@@ -322,7 +343,13 @@ export function ControlsBar({
 
       <div className={styles.volumeGroup}>
         <Tip label={muted ? 'Unmute' : 'Mute'} kbd="M">
-          <button className={styles.iconBtn} onClick={onMute} aria-label="Mute">
+          <button
+            className={styles.iconBtn}
+            onClick={onMute}
+            onMouseDown={noFocusOnClick}
+            tabIndex={-1}
+            aria-label="Mute"
+          >
             {muted || volume === 0 ? (
               <Mute className={styles.icon} />
             ) : (
@@ -340,6 +367,7 @@ export function ControlsBar({
           className={styles.volume}
           style={{ '--vol': `${(muted ? 0 : volume) * 100}%` } as React.CSSProperties}
           aria-label="Volume"
+          tabIndex={-1}
           onWheel={(e) => onVolumeStep(e.deltaY < 0 ? 0.05 : -0.05)}
         />
       </div>
@@ -357,6 +385,7 @@ export function ControlsBar({
         subtitleDelay={subtitleDelay}
         subtitleDelayEnabled={subtitleDelayEnabled}
         pip={pip}
+        pipAvailable={pipAvailable}
         fullscreen={fullscreen}
         menuOpen={menuOpen}
         onToggleMenu={onToggleMenu}
@@ -366,7 +395,6 @@ export function ControlsBar({
         onSubtitleDelay={onSubtitleDelay}
         onFullscreen={onFullscreen}
         onPiP={onPiP}
-        onOpenMpv={onOpenMpv}
       />
     </div>
   )

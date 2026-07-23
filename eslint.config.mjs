@@ -6,7 +6,9 @@ import eslintPluginReactHooks from 'eslint-plugin-react-hooks'
 import eslintPluginReactRefresh from 'eslint-plugin-react-refresh'
 
 export default defineConfig(
-  { ignores: ['**/node_modules', '**/dist', '**/out'] },
+  // rnd/ is an archived research spike (see rnd/mpv-spike/FINDINGS.md), not
+  // part of the shipped app -- don't lint dead prototype code
+  { ignores: ['**/node_modules', '**/dist', '**/out', '**/target', '**/dist-tauri', 'rnd/**'] },
   tseslint.configs.recommended,
   eslintPluginReact.configs.flat.recommended,
   eslintPluginReact.configs.flat['jsx-runtime'],

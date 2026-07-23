@@ -21,7 +21,6 @@ export function Home(): React.JSX.Element {
 
   return (
     <div className={styles.page}>
-      {isPending && <div className={styles.status}>Loading…</div>}
       {isError && (
         <div className={styles.status}>
           Cannot reach server.{' '}
@@ -33,10 +32,15 @@ export function Home(): React.JSX.Element {
           </button>
         </div>
       )}
-      <Row title="Continue Watching" items={resume.data} wide />
-      <Row title="Next Up" items={nextUp.data} wide />
-      <Row title="Recently Added Movies" items={movies.data} to="/movies" />
-      <Row title="Recently Added Shows" items={shows.data} to="/shows" />
+      <Row title="Continue Watching" items={resume.data} wide loading={resume.isPending} />
+      <Row title="Next Up" items={nextUp.data} wide loading={nextUp.isPending} />
+      <Row
+        title="Recently Added Movies"
+        items={movies.data}
+        to="/movies"
+        loading={movies.isPending}
+      />
+      <Row title="Recently Added Shows" items={shows.data} to="/shows" loading={shows.isPending} />
       {empty && (
         <div className={styles.empty}>Nothing here yet. Add media to your Jellyfin libraries.</div>
       )}
