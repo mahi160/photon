@@ -1,3 +1,10 @@
+# [2.0.0-pre.4](https://github.com/mahi160/photon/compare/v2.0.0-pre.3...v2.0.0-pre.4) (2026-07-23)
+
+
+### Features
+
+* **player:** show a calm overlay in-app while PiP owns playback ([#36](https://github.com/mahi160/photon/issues/36)) ([0901b33](https://github.com/mahi160/photon/commit/0901b3390e8d3dc381ff86558f72767b0dcc7f3b))
+
 # [2.0.0-pre.3](https://github.com/mahi160/photon/compare/v2.0.0-pre.2...v2.0.0-pre.3) (2026-07-23)
 
 
