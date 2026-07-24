@@ -363,11 +363,10 @@
   appearance: none;
 
   /* signature: the timeline is a beam of light -- the trace ahead of the
-     playhead is ruled like an instrument readout (a fixed tick pitch, not
-     real chapter data -- see .chapterTick for those), and the beam erases
-     it as playback catches up. Layer order (top to bottom): played beam,
-     buffered, tick ruler, base track -- ticks only show where neither beam
-     nor buffered has painted over them yet. */
+     playhead is a smooth, flat track (real chapter marks are drawn
+     separately, see .chapterTick), and the beam erases it as playback
+     catches up. Layer order (top to bottom): played beam, buffered, base
+     track. */
   background:
     var(--beam) 0 0 / var(--pct, 0%) 100% no-repeat,
     linear-gradient(
@@ -375,11 +374,6 @@
         oklch(from white l c h / 22%)
       )
       0 0 / var(--buf, 0%) 100% no-repeat,
-    repeating-linear-gradient(
-      to right,
-      oklch(from white l c h / 30%) 0 1px,
-      transparent 1px 7px
-    ),
     oklch(from white l c h / 13%);
 
   transition: block-size var(--dur-fast) var(--ease);
