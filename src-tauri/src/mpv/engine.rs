@@ -362,15 +362,24 @@ fn apply_set_text_track(mpv: *mut mpv_handle, sid: Option<i64>) -> Result<(), St
     }
 }
 
+// Turns a plain arg list into the null-terminated `*const c_char` array
+// mpv_command expects, keeping the backing CStrings alive alongside it (the
+// pointers are only valid as long as their CString does) -- shared by every
+// raw-handle command site below so this null-termination dance is written
+// exactly once.
+fn command_args(args: &[&str]) -> (Vec<CString>, Vec<*const std::os::raw::c_char>) {
+    let cstrs: Vec<CString> = args.iter().map(|s| CString::new(*s).unwrap()).collect();
+    let ptrs = cstrs.iter().map(|s| s.as_ptr()).chain(std::iter::once(std::ptr::null())).collect();
+    (cstrs, ptrs)
+}
+
 // Builds and sends a raw mpv_command from a handle -- free fn so the
 // observer thread (which only has the raw handle, not an MpvEngine) can
 // fire commands the same way MpvEngine::command does for &self call sites.
 // Fire-and-forget: callers here already treat failures as best-effort (a
 // missing tonemap label to remove is not an error worth surfacing).
 fn raw_command(mpv: *mut mpv_handle, args: &[&str]) {
-    let cstrs: Vec<CString> = args.iter().map(|s| CString::new(*s).unwrap()).collect();
-    let mut ptrs: Vec<*const std::os::raw::c_char> =
-        cstrs.iter().map(|s| s.as_ptr()).chain(std::iter::once(std::ptr::null())).collect();
+    let (_cstrs, mut ptrs) = command_args(args);
     unsafe {
         mpv_command(mpv, ptrs.as_mut_ptr());
     }
@@ -571,9 +580,7 @@ impl MpvEngine {
     }
 
     fn command(&self, args: &[&str]) -> Result<(), String> {
-        let cstrs: Vec<CString> = args.iter().map(|s| CString::new(*s).unwrap()).collect();
-        let mut ptrs: Vec<*const std::os::raw::c_char> =
-            cstrs.iter().map(|s| s.as_ptr()).chain(std::iter::once(std::ptr::null())).collect();
+        let (_cstrs, mut ptrs) = command_args(args);
         unsafe { check(mpv_command(self.mpv, ptrs.as_mut_ptr()), "mpv_command") }
     }
 
@@ -800,17 +807,7 @@ fn spawn_observer<R: Runtime>(
                 x if x == mpv_event_id_MPV_EVENT_FILE_LOADED => {
                     let drained = pending.lock().unwrap().drain();
                     if drained.start_seconds > 0.0 {
-                        let args = ["seek", &drained.start_seconds.to_string(), "absolute"];
-                        let cstrs: Vec<CString> =
-                            args.iter().map(|s| CString::new(*s).unwrap()).collect();
-                        let mut ptrs: Vec<*const std::os::raw::c_char> = cstrs
-                            .iter()
-                            .map(|s| s.as_ptr())
-                            .chain(std::iter::once(std::ptr::null()))
-                            .collect();
-                        unsafe {
-                            mpv_command(mpv, ptrs.as_mut_ptr());
-                        }
+                        raw_command(mpv, &["seek", &drained.start_seconds.to_string(), "absolute"]);
                     }
                     // adds first -- queued_text_index below resolves against
                     // whatever lands in `text_track_ids` here

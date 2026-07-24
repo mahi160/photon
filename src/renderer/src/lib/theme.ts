@@ -1,13 +1,14 @@
-export type Theme = 'gruvbox' | 'obsidian' | 'midnight' | 'forest' | 'rosepine'
+export type Theme = 'graphite' | 'gruvbox' | 'obsidian' | 'midnight' | 'rosepine' | 'everforest'
 
 // order here is the picker order and the header toggle's cycle order.
 // gruvbox is first/default -- see stores/settings.ts.
 export const themes: { key: Theme; label: string; dark: boolean }[] = [
   { key: 'gruvbox', label: 'Gruvbox Material', dark: true },
+  { key: 'graphite', label: 'Graphite', dark: true },
   { key: 'obsidian', label: 'Obsidian', dark: true },
   { key: 'midnight', label: 'Midnight', dark: true },
-  { key: 'forest', label: 'Forest', dark: true },
-  { key: 'rosepine', label: 'Rosé Pine', dark: false }
+  { key: 'rosepine', label: 'Rosé Pine', dark: false },
+  { key: 'everforest', label: 'Everforest', dark: false }
 ]
 
 export function themeLabel(theme: Theme): string {
@@ -31,9 +32,9 @@ export const colorTokens: { key: string; label: string }[] = [
   { key: '--fg', label: 'Text' },
   { key: '--fg-muted', label: 'Muted text' },
   { key: '--accent', label: 'Accent' },
-  { key: '--accent-2', label: 'Accent (secondary)' },
-  { key: '--accent-3', label: 'Direct play' },
-  { key: '--accent-4', label: 'Transcode' }
+  { key: '--info', label: 'Accent (secondary)' },
+  { key: '--success', label: 'Direct play' },
+  { key: '--warning', label: 'Transcode' }
 ]
 
 // applies saved per-token overrides on top of the active theme's own CSS --

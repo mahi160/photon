@@ -26,7 +26,7 @@
   background: var(--beam);
   box-shadow:
     var(--beam-glow),
-    0 0 80px 12px color-mix(in oklch, var(--accent) 22%, transparent);
+    0 0 80px 12px oklch(from var(--accent) l c h / 22%);
 
   animation: beam-in 1.2s var(--ease-out) backwards;
 }
@@ -75,7 +75,7 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-l);
 
-  background: color-mix(in oklch, var(--surface-1) 88%, transparent);
+  background: oklch(from var(--surface-1) l c h / 88%);
   backdrop-filter: blur(24px);
   box-shadow: var(--shadow-2);
 }
@@ -122,7 +122,7 @@
 .field:focus-visible {
   border-color: var(--accent-border);
   background: var(--surface-3);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 18%, transparent);
+  box-shadow: 0 0 0 3px oklch(from var(--accent) l c h / 18%);
 }
 
 .error {
@@ -144,7 +144,7 @@
   text-align: center;
 
   background: var(--beam);
-  box-shadow: 0 4px 16px -4px color-mix(in oklch, var(--accent) 45%, transparent);
+  box-shadow: 0 4px 16px -4px oklch(from var(--accent) l c h / 45%);
 
   transition:
     transform var(--dur-fast) var(--ease),
@@ -154,7 +154,7 @@
 
 .submit:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px -4px color-mix(in oklch, var(--accent) 60%, transparent);
+  box-shadow: 0 6px 20px -4px oklch(from var(--accent) l c h / 60%);
 }
 
 .submit:active:not(:disabled) {

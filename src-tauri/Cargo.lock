@@ -2386,7 +2386,7 @@ dependencies = [
 
 [[package]]
 name = "photon"
-version = "2.0.0-next"
+version = "2.0.0-pre.2"
 dependencies = [
  "core-graphics 0.24.0",
  "foreign-types",
