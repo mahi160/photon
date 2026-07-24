@@ -1,3 +1,10 @@
+# [2.0.0-pre.5](https://github.com/mahi160/photon/compare/v2.0.0-pre.4...v2.0.0-pre.5) (2026-07-24)
+
+
+### Bug Fixes
+
+* **theme:** revert default theme to gruvbox ([caa1cda](https://github.com/mahi160/photon/commit/caa1cdaddffd0e6faab557b52ea985b840b826ea))
+
 # [2.0.0-pre.4](https://github.com/mahi160/photon/compare/v2.0.0-pre.3...v2.0.0-pre.4) (2026-07-23)
 
 
