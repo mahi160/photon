@@ -61,10 +61,10 @@
   background:
     radial-gradient(
       42rem 42rem at 50% 42%,
-      color-mix(in oklch, var(--accent-2) 7%, transparent),
+      oklch(from var(--info) l c h / 7%),
       transparent 70%
     ),
-    color-mix(in oklch, black 82%, transparent);
+    oklch(from black l c h / 82%);
 }
 
 .errorText {
@@ -83,7 +83,7 @@
   color: var(--accent-fg);
 
   background: var(--accent);
-  box-shadow: 0 6px 20px -6px color-mix(in oklch, var(--accent) 60%, transparent);
+  box-shadow: 0 6px 20px -6px oklch(from var(--accent) l c h / 60%);
 
   transition: transform var(--dur-fast) var(--ease);
 }
@@ -94,12 +94,12 @@
 
 .errorBack {
   font-size: 0.875rem;
-  color: color-mix(in oklch, white 45%, transparent);
+  color: oklch(from white l c h / 45%);
   transition: color var(--dur-fast) var(--ease);
 }
 
 .errorBack:hover {
-  color: color-mix(in oklch, white 75%, transparent);
+  color: oklch(from white l c h / 75%);
 }
 
 /* shown while the session resolves / mpv attaches (ADR-0005: .stage stays
@@ -116,7 +116,7 @@
 .loadingSpinner {
   inline-size: 2rem;
   block-size: 2rem;
-  border: 3px solid color-mix(in oklch, white 20%, transparent);
+  border: 3px solid oklch(from white l c h / 20%);
   border-block-start-color: var(--accent);
   border-radius: var(--radius-full);
 

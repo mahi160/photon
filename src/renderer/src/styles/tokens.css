@@ -5,19 +5,25 @@
 :root {
   --font-sans: 'Schibsted Grotesk Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Spline Sans Mono Variable', ui-monospace, 'SF Mono', monospace;
+
   --radius-s: 0.5rem;
   --radius-m: 0.875rem;
   --radius-l: 1.5rem;
   --radius-full: 999rem;
+
   --gutter: clamp(1.5rem, 4vw, 3rem);
+
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
   --dur-fast: 140ms;
   --dur-med: 260ms;
   --dur-slow: 500ms;
+
   --z-nav: 10;
   --z-overlay: 20;
   --z-toast: 30;
+
   --titlebar-clearance: 2rem;
 }
 
@@ -26,22 +32,23 @@
    ========================================================================== */
 
 [data-theme='gruvbox'],
+[data-theme='graphite'],
 [data-theme='obsidian'],
-[data-theme='midnight'],
-[data-theme='forest'] {
+[data-theme='midnight'] {
   --accent-fg: #121316;
 
   color-scheme: dark;
 }
 
-[data-theme='rosepine'] {
-  --accent-fg: #faf4ed;
+[data-theme='rosepine'],
+[data-theme='everforest'] {
+  --accent-fg: #fafafa;
 
   color-scheme: light;
 }
 
 /* ==========================================================================
-   Gruvbox Material (Default) -- dark, medium contrast, material palette
+   Gruvbox Material Dark
    https://github.com/sainnhe/gruvbox-material
    ========================================================================== */
 
@@ -49,10 +56,27 @@
   --bg: #282828;
   --fg: #d4be98;
   --fg-muted: #a89984;
+
   --accent: #e78a4e;
-  --accent-2: #89b482;
-  --accent-3: #a9b665;
-  --accent-4: #d8a657;
+  --info: #89b482;
+  --success: #a9b665;
+  --warning: #d8a657;
+}
+
+/* ==========================================================================
+   Graphite
+   Minimal monochrome inspired by shadcn/ui
+   ========================================================================== */
+
+[data-theme='graphite'] {
+  --bg: #09090b;
+  --fg: #fafafa;
+  --fg-muted: #a1a1aa;
+
+  --accent: #f5f5f5;
+  --info: #d4d4d8;
+  --success: #71717a;
+  --warning: #52525b;
 }
 
 /* ==========================================================================
@@ -60,13 +84,14 @@
    ========================================================================== */
 
 [data-theme='obsidian'] {
-  --bg: #101114;
-  --fg: #f3f2ee;
+  --bg: #0f1014;
+  --fg: #ece9e3;
   --fg-muted: #9ea3ad;
-  --accent: #7c9dff;
-  --accent-2: #9b8cff;
-  --accent-3: #7cae93;
-  --accent-4: #d6b97d;
+
+  --accent: #8fa6ff;
+  --info: #b197fc;
+  --success: #7db38b;
+  --warning: #d4b56e;
 }
 
 /* ==========================================================================
@@ -74,41 +99,46 @@
    ========================================================================== */
 
 [data-theme='midnight'] {
-  --bg: #0f141c;
-  --fg: #edf2fb;
-  --fg-muted: #98a6ba;
-  --accent: #4e8cff;
-  --accent-2: #57c8ff;
-  --accent-3: #6cb68d;
-  --accent-4: #d1b46b;
-}
+  --bg: #081018;
+  --fg: #edf3ff;
+  --fg-muted: #96a7bc;
 
-/* ==========================================================================
-   Forest
-   ========================================================================== */
-
-[data-theme='forest'] {
-  --bg: #121614;
-  --fg: #edf3ef;
-  --fg-muted: #9ca9a3;
-  --accent: #66ba8d;
-  --accent-2: #7dcab3;
-  --accent-3: #90b27a;
-  --accent-4: #d7b46d;
+  --accent: #4c8cff;
+  --info: #3fc4ff;
+  --success: #56d18c;
+  --warning: #f2b84b;
 }
 
 /* ==========================================================================
    Rosé Pine Dawn
+   https://rosepinetheme.com
    ========================================================================== */
 
 [data-theme='rosepine'] {
   --bg: #faf4ed;
   --fg: #575279;
   --fg-muted: #797593;
-  --accent: #907cff;
-  --accent-2: #56949f;
-  --accent-3: #b4637a;
-  --accent-4: #ea9d34;
+
+  --accent: #b4637a;
+  --info: #907aa9;
+  --success: #56949f;
+  --warning: #ea9d34;
+}
+
+/* ==========================================================================
+   Everforest Light
+   https://github.com/sainnhe/everforest
+   ========================================================================== */
+
+[data-theme='everforest'] {
+  --bg: #fdf6e3;
+  --fg: #5c6a72;
+  --fg-muted: #829181;
+
+  --accent: #8da101;
+  --info: #3a94c5;
+  --success: #35a77c;
+  --warning: #d69922;
 }
 
 /* ==========================================================================
@@ -116,43 +146,59 @@
    ========================================================================== */
 
 :root {
+  /* Surfaces */
+
   --surface-1: color-mix(in oklch, var(--fg) 6%, var(--bg));
   --surface-2: color-mix(in oklch, var(--fg) 11%, var(--bg));
   --surface-3: color-mix(in oklch, var(--fg) 18%, var(--bg));
+
+  /* Borders */
+
   --border-strong: color-mix(in oklch, var(--fg) 30%, var(--bg));
-  --border: color-mix(in oklch, var(--border-strong) 60%, transparent);
+  --border: oklch(from var(--border-strong) l c h / 60%);
+
+  /* Text */
+
   --fg-faint: color-mix(in oklch, var(--fg-muted) 65%, var(--bg));
-  --accent-border: color-mix(in oklch, var(--accent) 45%, transparent);
-  --accent-hover: color-mix(in oklch, var(--accent) 88%, black);
-  --scrim: color-mix(in oklch, black 60%, transparent);
-  --scrim-soft: color-mix(in oklch, black 35%, transparent);
-  --shadow-1: 0 1px 2px color-mix(in oklch, black 30%, transparent);
+
+  /* Accent */
+
+  --accent-border: oklch(from var(--accent) l c h / 45%);
+  --accent-hover: oklch(from var(--accent) calc(l * 0.88) calc(c * 0.88) h);
+
+  /* Overlay */
+
+  --scrim: oklch(0% 0 0 / 60%);
+  --scrim-soft: oklch(0% 0 0 / 35%);
+
+  /* Shadows */
+
+  --shadow-1: 0 1px 2px oklch(0% 0 0 / 30%);
+
   --shadow-2:
-    0 10px 30px -10px color-mix(in oklch, black 55%, transparent),
-    0 2px 4px color-mix(in oklch, black 15%, transparent);
+    0 10px 30px -10px oklch(0% 0 0 / 55%),
+    0 2px 4px oklch(0% 0 0 / 15%);
 
-  /* Photon's signature beam */
+  /* Gradients */
 
-  --beam: linear-gradient(90deg, var(--accent), var(--accent-2));
+  --beam: linear-gradient(90deg, var(--accent), var(--info));
 
-  /* signal, not bloom: a tight trace, not a soft glow */
   --beam-glow:
-    0 0 4px color-mix(in oklch, var(--accent) 65%, transparent),
-    0 0 12px color-mix(in oklch, var(--accent) 25%, transparent);
-
-  /* Missing artwork */
+    0 0 4px oklch(from var(--accent) l c h / 65%),
+    0 0 12px oklch(from var(--accent) l c h / 25%);
 
   --artwork-fallback-bg: linear-gradient(
     145deg,
     color-mix(in oklch, var(--accent) 12%, var(--surface-2)),
-    color-mix(in oklch, var(--accent-2) 10%, var(--surface-2))
+    color-mix(in oklch, var(--info) 10%, var(--surface-2))
   );
 
   /* Player */
 
   --player-glass: color-mix(in oklch, black 58%, var(--accent) 4%);
   --player-glass-strong: color-mix(in oklch, black 72%, var(--accent) 6%);
+
   --player-fg: #efe8da;
-  --player-fg-muted: color-mix(in oklch, #efe8da 60%, transparent);
-  --player-border: color-mix(in oklch, white 10%, transparent);
+  --player-fg-muted: oklch(from #efe8da l c h / 60%);
+  --player-border: oklch(100% 0 0 / 10%);
 }

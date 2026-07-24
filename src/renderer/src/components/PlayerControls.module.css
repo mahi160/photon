@@ -25,7 +25,7 @@
      `visible` state as this whole layer, see Player.tsx). */
   padding-block: var(--titlebar-clearance) 1.25rem;
   padding-inline: 1.5rem;
-  background: linear-gradient(to bottom, color-mix(in oklch, black 65%, transparent), transparent);
+  background: linear-gradient(to bottom, oklch(from black l c h / 65%), transparent);
 }
 
 .topBar {
@@ -52,7 +52,7 @@
   block-size: 2.5rem;
   border-radius: var(--radius-full);
 
-  color: color-mix(in oklch, white 85%, transparent);
+  color: oklch(from white l c h / 85%);
 
   transition:
     color var(--dur-fast) var(--ease),
@@ -63,7 +63,7 @@
 .iconBtn:hover {
   transform: scale(1.06);
   color: white;
-  background: color-mix(in oklch, white 14%, transparent);
+  background: oklch(from white l c h / 14%);
 }
 
 .iconBtn:active {
@@ -91,7 +91,7 @@
   font-weight: 600;
   color: white;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 8px color-mix(in oklch, black 60%, transparent);
+  text-shadow: 0 1px 8px oklch(from black l c h / 60%);
   white-space: nowrap;
 }
 
@@ -100,9 +100,9 @@
 
   font-family: var(--font-mono);
   font-size: 0.75rem;
-  color: color-mix(in oklch, white 55%, transparent);
+  color: oklch(from white l c h / 55%);
   text-overflow: ellipsis;
-  text-shadow: 0 1px 8px color-mix(in oklch, black 60%, transparent);
+  text-shadow: 0 1px 8px oklch(from black l c h / 60%);
   white-space: nowrap;
 }
 
@@ -139,20 +139,20 @@
 }
 
 .methodDot[data-method='direct'] {
-  background: var(--accent-3);
-  box-shadow: 0 0 6px color-mix(in oklch, var(--accent-3) 70%, transparent);
+  background: var(--success);
+  box-shadow: 0 0 6px oklch(from var(--success) l c h / 70%);
 }
 
 .methodDot[data-method='transcode'] {
-  background: var(--accent-4);
-  box-shadow: 0 0 6px color-mix(in oklch, var(--accent-4) 70%, transparent);
+  background: var(--warning);
+  box-shadow: 0 0 6px oklch(from var(--warning) l c h / 70%);
 }
 
 .clock {
   font-family: var(--font-mono);
   font-size: 1.05rem;
-  color: color-mix(in oklch, white 75%, transparent);
-  text-shadow: 0 1px 8px color-mix(in oklch, black 60%, transparent);
+  color: oklch(from white l c h / 75%);
+  text-shadow: 0 1px 8px oklch(from black l c h / 60%);
 }
 
 .spinner {
@@ -160,7 +160,7 @@
 
   inline-size: 0.9rem;
   block-size: 0.9rem;
-  border: 2px solid color-mix(in oklch, white 25%, transparent);
+  border: 2px solid oklch(from white l c h / 25%);
   border-block-start-color: var(--accent);
   border-radius: var(--radius-full);
 
@@ -194,7 +194,7 @@
 
   color: white;
 
-  background: color-mix(in oklch, black 55%, transparent);
+  background: oklch(from black l c h / 55%);
 
   animation: pulse-pop 560ms var(--ease) forwards;
 }
@@ -238,8 +238,8 @@
 
   background: linear-gradient(
     to top,
-    color-mix(in oklch, black 78%, transparent),
-    color-mix(in oklch, black 45%, transparent) 55%,
+    oklch(from black l c h / 78%),
+    oklch(from black l c h / 45%) 55%,
     transparent
   );
 
@@ -295,7 +295,7 @@
   align-items: center;
 
   padding: 0.4rem 0.75rem;
-  border: 1px solid color-mix(in oklch, white 18%, transparent);
+  border: 1px solid oklch(from white l c h / 18%);
   border-radius: var(--radius-s);
 
   font-family: var(--font-mono);
@@ -303,7 +303,7 @@
   color: white;
   white-space: nowrap;
 
-  background: color-mix(in oklch, black 55%, transparent);
+  background: oklch(from black l c h / 55%);
   backdrop-filter: blur(14px);
   box-shadow: var(--shadow-2);
 }
@@ -347,7 +347,7 @@
   block-size: 0.2rem;
   border-radius: var(--radius-full);
 
-  background: color-mix(in oklch, white 65%, transparent);
+  background: oklch(from white l c h / 65%);
 }
 
 /* signature: the timeline is a beam of light. Layered backgrounds — played
@@ -371,16 +371,16 @@
   background:
     var(--beam) 0 0 / var(--pct, 0%) 100% no-repeat,
     linear-gradient(
-        color-mix(in oklch, white 22%, transparent),
-        color-mix(in oklch, white 22%, transparent)
+        oklch(from white l c h / 22%),
+        oklch(from white l c h / 22%)
       )
       0 0 / var(--buf, 0%) 100% no-repeat,
     repeating-linear-gradient(
       to right,
-      color-mix(in oklch, white 30%, transparent) 0 1px,
+      oklch(from white l c h / 30%) 0 1px,
       transparent 1px 7px
     ),
-    color-mix(in oklch, white 13%, transparent);
+    oklch(from white l c h / 13%);
 
   transition: block-size var(--dur-fast) var(--ease);
 }
@@ -398,8 +398,8 @@
   appearance: none;
   background: white;
   box-shadow:
-    0 0 0 3px color-mix(in oklch, var(--accent) 40%, transparent),
-    0 0 8px 1px color-mix(in oklch, var(--accent) 75%, transparent);
+    0 0 0 3px oklch(from var(--accent) l c h / 40%),
+    0 0 8px 1px oklch(from var(--accent) l c h / 75%);
 
   transition: transform var(--dur-fast) var(--ease);
 }
@@ -444,7 +444,7 @@
   opacity: 0;
   background:
     linear-gradient(white, white) 0 0 / var(--vol, 100%) 100% no-repeat,
-    color-mix(in oklch, white 15%, transparent);
+    oklch(from white l c h / 15%);
 
   transition:
     inline-size var(--dur-med) var(--ease),
@@ -470,7 +470,7 @@
 .time {
   font-family: var(--font-mono);
   font-size: 0.875rem;
-  color: color-mix(in oklch, white 85%, transparent);
+  color: oklch(from white l c h / 85%);
   white-space: nowrap;
 }
 
@@ -479,7 +479,7 @@
 
   font-family: var(--font-mono);
   font-size: 0.8125rem;
-  color: color-mix(in oklch, white 50%, transparent);
+  color: oklch(from white l c h / 50%);
   white-space: nowrap;
 }
 
@@ -539,13 +539,13 @@
 .menuItem:hover,
 .menuItem[data-highlighted] {
   color: var(--player-fg);
-  background: color-mix(in oklch, white 10%, transparent);
+  background: oklch(from white l c h / 10%);
 }
 
 .menuItemActive,
 .menuItem[data-selected] {
   color: var(--accent);
-  background: color-mix(in oklch, var(--accent) 14%, transparent);
+  background: oklch(from var(--accent) l c h / 14%);
 }
 
 /* subtitle sync popover — everything on one centered axis */
@@ -577,7 +577,7 @@
 .syncHint {
   font-family: var(--font-mono);
   font-size: 0.625rem;
-  color: color-mix(in oklch, white 35%, transparent);
+  color: oklch(from white l c h / 35%);
 }
 
 .stepperGroup {
@@ -599,13 +599,13 @@
   font-size: 1rem;
   color: var(--player-fg);
 
-  background: color-mix(in oklch, white 6%, transparent);
+  background: oklch(from white l c h / 6%);
 
   transition: background-color var(--dur-fast) var(--ease);
 }
 
 .stepBtn:hover {
-  background: color-mix(in oklch, white 12%, transparent);
+  background: oklch(from white l c h / 12%);
 }
 
 .stepBtn:disabled {
@@ -624,7 +624,7 @@
   color: var(--player-fg);
   text-align: center;
 
-  background: color-mix(in oklch, white 6%, transparent);
+  background: oklch(from white l c h / 6%);
 }
 
 .stepInput:disabled {
@@ -750,5 +750,5 @@
 }
 
 .nextUpDismiss:hover {
-  background: color-mix(in oklch, white 10%, transparent);
+  background: oklch(from white l c h / 10%);
 }

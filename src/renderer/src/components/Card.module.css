@@ -219,7 +219,7 @@
 
   block-size: 0.2rem;
 
-  background: color-mix(in oklch, black 45%, transparent);
+  background: oklch(from black l c h / 45%);
 }
 
 /* signature: the beam marks how far the light got */

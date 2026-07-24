@@ -206,12 +206,21 @@ export interface MediaStream {
   Profile?: string // audio profile, e.g. 'Dolby TrueHD + Dolby Atmos'
 }
 
+// the video stream and the default (or first) audio stream — shared by
+// mediaBadges/playerSpecialBadges below, both of which only ever badge
+// those two
+function defaultAV(streams: MediaStream[]): { v?: MediaStream; a?: MediaStream } {
+  return {
+    v: streams.find((s) => s.Type === 'Video'),
+    a:
+      streams.find((s) => s.Type === 'Audio' && s.IsDefault) ??
+      streams.find((s) => s.Type === 'Audio')
+  }
+}
+
 // short capability badges for a media source (details pages): 4K · HEVC · HDR10 · Atmos · 5.1
 export function mediaBadges(streams: MediaStream[]): string[] {
-  const v = streams.find((s) => s.Type === 'Video')
-  const a =
-    streams.find((s) => s.Type === 'Audio' && s.IsDefault) ??
-    streams.find((s) => s.Type === 'Audio')
+  const { v, a } = defaultAV(streams)
   const out: string[] = []
   if (v?.Width)
     out.push(
@@ -243,10 +252,7 @@ export function mediaBadges(streams: MediaStream[]): string[] {
 // clutter it -- the full breakdown (mediaBadges) still shows on the
 // movie/show details pages, unchanged.
 export function playerSpecialBadges(streams: MediaStream[]): string[] {
-  const v = streams.find((s) => s.Type === 'Video')
-  const a =
-    streams.find((s) => s.Type === 'Audio' && s.IsDefault) ??
-    streams.find((s) => s.Type === 'Audio')
+  const { v, a } = defaultAV(streams)
   const out: string[] = []
   if (v?.Width && v.Width >= 3800) out.push('4K')
   const range = v?.VideoRangeType
