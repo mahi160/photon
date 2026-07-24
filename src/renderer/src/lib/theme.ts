@@ -1,10 +1,10 @@
 export type Theme = 'graphite' | 'gruvbox' | 'obsidian' | 'midnight' | 'rosepine' | 'everforest'
 
 // order here is the picker order and the header toggle's cycle order.
-// graphite is first/default -- see stores/settings.ts.
+// gruvbox is first/default -- see stores/settings.ts.
 export const themes: { key: Theme; label: string; dark: boolean }[] = [
-  { key: 'graphite', label: 'Graphite', dark: true },
   { key: 'gruvbox', label: 'Gruvbox Material', dark: true },
+  { key: 'graphite', label: 'Graphite', dark: true },
   { key: 'obsidian', label: 'Obsidian', dark: true },
   { key: 'midnight', label: 'Midnight', dark: true },
   { key: 'rosepine', label: 'Rosé Pine', dark: false },

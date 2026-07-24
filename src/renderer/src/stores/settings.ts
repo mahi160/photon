@@ -54,7 +54,7 @@ const defaults: Omit<SettingsState, 'set' | 'reset'> = {
   subtitleColor: '#FFFFFF',
   subtitleBackgroundBox: false,
   mpvConfig: '',
-  theme: 'graphite',
+  theme: 'gruvbox',
   customColors: {},
   settingsSection: 'general'
 }
