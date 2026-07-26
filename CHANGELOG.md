@@ -1,3 +1,10 @@
+# [2.0.0-pre.6](https://github.com/mahi160/photon/compare/v2.0.0-pre.5...v2.0.0-pre.6) (2026-07-26)
+
+
+### Features
+
+* **mpv:** real GLX (Linux/X11) and WGL (Windows) render surfaces ([#37](https://github.com/mahi160/photon/issues/37)) ([c8e34d7](https://github.com/mahi160/photon/commit/c8e34d7311bfc766c87478f7a2771754186ee32d)), closes [#27](https://github.com/mahi160/photon/issues/27)
+
 # [2.0.0-pre.5](https://github.com/mahi160/photon/compare/v2.0.0-pre.4...v2.0.0-pre.5) (2026-07-24)
 
 
