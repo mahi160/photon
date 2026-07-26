@@ -5,10 +5,13 @@ name: Release
 # platform builds below only run once a release actually happens, and
 # undrafts it only once macOS's build succeeds (never publish a release
 # missing the one platform that's actually verified). build-windows/
-# build-linux are wired up per-request but `continue-on-error: true` --
-# neither has been run/observed on real hardware (no Windows/Linux box in
-# this environment), so they must never be able to block the macOS release
-# that already works. See each job's own comment for what's still unverified.
+# build-linux keep `continue-on-error: true` even now that their render
+# surfaces are real (not stub) implementations, see mpv/windows and
+# mpv/linux -- neither has been observed cutting a release on real hardware
+# yet (CI's `windows-latest`/`ubuntu-latest` runners cover compile+link,
+# not a human watching real video), so they still must never be able to
+# block the macOS release that already works. See each job's own comment
+# for what's still unverified.
 #
 # .releaserc.json marks `prod` as a prerelease channel ("pre") -- versions
 # come out as `2.0.0-pre.1`, `2.0.0-pre.2`, ... and the GitHub release is
@@ -20,10 +23,11 @@ name: Release
 # (confirmed the hard way: a single fully-prerelease branch config fails
 # with ERELEASEBRANCHES, "a minimum of 1 ... release branches are required"),
 # `main` is just there to satisfy that. Reflects where this actually stands:
-# v2 (the Electron -> Tauri replatform) is verified on macOS only, Windows/
-# Linux ship unverified stub render surfaces (see mpv/windows, mpv/linux).
-# Drop the `prerelease` flag once Windows/Linux are for-real verified to start
-# cutting stable releases again.
+# v2 (the Electron -> Tauri replatform) is verified end-to-end on macOS only;
+# Windows/Linux now have real GLX/WGL render surfaces (mpv/windows,
+# mpv/linux -- no longer stubs) but haven't shipped in an actual release yet.
+# Drop the `prerelease` flag once a Windows/Linux release has actually been
+# run and watched playing video on real hardware, not just compiled in CI.
 on:
   push:
     branches: [prod]
@@ -98,11 +102,12 @@ jobs:
           tagName: ${{ needs.release.outputs.tag }}
           releaseDraft: true
 
-  # ticket #11: Windows build -- wired up per request, unverified (no
-  # Windows box to run/observe this on). `continue-on-error: true` so a
-  # failure here can never block the macOS release (see publish-release's
-  # `needs`) -- treat this as "something to iterate on", not a
-  # guaranteed-working pipeline yet.
+  # ticket #11: Windows build -- wired up per request. `continue-on-error:
+  # true` so a failure here can never block the macOS release (see
+  # publish-release's `needs`) -- kept even now that `mpv/windows` has a
+  # real WGL render surface (compiles/links/tests green on a real
+  # `windows-latest` runner, see rust-ci.yml), since no actual release has
+  # been cut and watched playing video on real Windows hardware yet.
   #
   # Same ADR-0004 gap as macOS: this isn't the vendored LGPL libmpv build
   # either. Bigger problem here: Windows has no pkg-config/vcpkg story for
@@ -114,9 +119,9 @@ jobs:
   # own docs describe for exactly this (DOCS/compile-windows.md > "Linking
   # libmpv with MSVC Programs"): `gendef` the dll's exports into a `.def`,
   # then MSVC's `lib.exe /def:...`. build.rs picks up the result via
-  # MPV_LIB_DIR. The `mpv/windows/` render surface itself is still a stub
-  # (no WGL/D3D11 context yet -- see its own doc), so this produces an
-  # installer, but video won't actually render until that lands.
+  # MPV_LIB_DIR. `mpv/windows/` now has a real WGL render surface (issue
+  # #27), so this installer's video should actually render -- just not yet
+  # confirmed on real Windows hardware outside CI.
   build-windows:
     needs: [release]
     if: needs.release.outputs.published == 'true'
@@ -170,18 +175,20 @@ jobs:
           tagName: ${{ needs.release.outputs.tag }}
           releaseDraft: true
 
-  # ticket #11: Linux build -- also unverified (no Linux box tested here
-  # either), but far lower-risk than Windows: Ubuntu ships a real
-  # `libmpv-dev` package with a working .pc file, so build.rs's existing
-  # pkg-config probe (same code path as macOS's brew mpv) just works, no
-  # Linux-specific build.rs branch needed. One job covers *both* X11 and
-  # Wayland -- mpv's render API and WRY's WebKitGTK backend both pick their
-  # windowing backend (GLX/EGL, X11/Wayland) at runtime from the same
-  # binary, same as any GTK app; there's no separate "X11 build" vs
-  # "Wayland build" to wire up. What's still missing: `mpv/linux/`'s
-  # `RenderSurface` is a stub (no GLX/EGL context yet, see its own doc) --
-  # this produces installable deb/rpm/AppImage packages, but video won't
-  # actually render on either windowing system until that lands.
+  # ticket #11: Linux build -- far lower-risk than Windows: Ubuntu ships a
+  # real `libmpv-dev` package with a working .pc file, so build.rs's
+  # existing pkg-config probe (same code path as macOS's brew mpv) just
+  # works, no Linux-specific build.rs branch needed. One job covers *both*
+  # X11 and Wayland -- mpv's render API and WRY's WebKitGTK backend both
+  # pick their windowing backend (GLX/EGL, X11/Wayland) at runtime from the
+  # same binary, same as any GTK app; there's no separate "X11 build" vs
+  # "Wayland build" to wire up. `mpv/linux/`'s `RenderSurface` now has a
+  # real GLX backend (issue #27, X11 only -- Wayland's EGL/wl_egl_window
+  # backend is a follow-up, see its own doc), verified rendering an actual
+  # frame against a live X11/GLX session, not just compiled in CI -- this
+  # produces installable deb/rpm/AppImage packages with working X11 video;
+  # Wayland sessions still get the same "not implemented" error the whole
+  # module used to give until that follow-up lands.
   build-linux:
     needs: [release]
     if: needs.release.outputs.published == 'true'
