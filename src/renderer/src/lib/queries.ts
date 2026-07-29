@@ -94,8 +94,7 @@ export const searchIndexQuery = queryOptions({
         IncludeItemTypes: 'Movie,Series',
         Recursive: true,
         SortBy: 'SortName',
-        // results render as Cards (poster + progress), so UserData/ImageTags
-        // must stay — but only the Primary image tag is ever used
+        // results render as Cards (poster + progress): UserData/ImageTags must stay, but only Primary image tag used
         ImageTypeLimit: 1,
         EnableImageTypes: 'Primary'
       }

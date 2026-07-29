@@ -1,6 +1,4 @@
-// Typed updater IPC — the one native surface with enough shape (a status
-// type + an event stream) to be worth its own module. Everything else talks
-// to Tauri via a plain typed `invoke` at the call site (see #12 in AUDIT.md).
+// Typed updater IPC -- one native surface with enough shape (status type + event stream) to be worth own module; rest use plain typed `invoke` at call site (see #12 AUDIT.md).
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 

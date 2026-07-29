@@ -1,7 +1,6 @@
 export type Theme = 'graphite' | 'gruvbox' | 'obsidian' | 'midnight' | 'rosepine' | 'everforest'
 
-// order here is the picker order and the header toggle's cycle order.
-// gruvbox is first/default -- see stores/settings.ts.
+// order = picker order + header toggle cycle order. gruvbox first/default, see stores/settings.ts.
 export const themes: { key: Theme; label: string; dark: boolean }[] = [
   { key: 'gruvbox', label: 'Gruvbox Material', dark: true },
   { key: 'graphite', label: 'Graphite', dark: true },
@@ -24,9 +23,7 @@ export function nextTheme(theme: Theme): Theme {
   return themes[(i + 1) % themes.length].key
 }
 
-// the tokens a theme is actually built from (tokens.css) -- everything
-// else (surfaces, borders, shadows) is derived from these via color-mix,
-// so overriding just these 7 restyles the whole app.
+// tokens a theme is built from (tokens.css) -- rest (surfaces, borders, shadows) derives from these via color-mix, so overriding these 7 restyles whole app.
 export const colorTokens: { key: string; label: string }[] = [
   { key: '--bg', label: 'Background' },
   { key: '--fg', label: 'Text' },
@@ -37,10 +34,7 @@ export const colorTokens: { key: string; label: string }[] = [
   { key: '--warning', label: 'Transcode' }
 ]
 
-// applies saved per-token overrides on top of the active theme's own CSS --
-// inline style always wins over the [data-theme] rule regardless of source
-// order, so anything left out of `colors` just falls back to the theme's
-// stock value.
+// applies saved per-token overrides on active theme -- inline style always wins over [data-theme] rule, so omitted keys fall back to theme's stock value.
 export function applyCustomColors(colors: Record<string, string>): void {
   for (const t of colorTokens) {
     if (colors[t.key]) document.documentElement.style.setProperty(t.key, colors[t.key])

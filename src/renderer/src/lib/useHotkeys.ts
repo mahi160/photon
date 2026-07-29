@@ -13,21 +13,12 @@ function comboOf(e: KeyboardEvent): string {
 }
 
 export interface UseHotkeysOptions {
-  // Every player control is tabIndex={-1} (mouse/hotkey only, never a real
-  // Tab stop) -- the only thing that can still end up :focus-visible on
-  // that route is base-ui's own focus manager grabbing focus onto a
-  // just-opened menu/select popup (it finds nothing tabbable inside once
-  // every item is -1 too, and falls back to the popup container itself).
-  // That's not a genuine focused *control* the way the guard below means --
-  // without skipping it, opening the subtitle menu then pressing Space
-  // selected a track instead of pausing. AppLayout's shortcuts (real
-  // Tab-reachable cards/links) keep the guard.
+  // Player controls are tabIndex={-1}; base-ui's focus manager can still grab :focus-visible onto a just-opened popup's container. Skipping the guard there stops Space selecting a track instead of pausing. AppLayout's real Tab-reachable shortcuts keep the guard.
   ignoreFocusGuard?: boolean
 }
 
 export function useHotkeys(map: HotkeyMap, options: UseHotkeysOptions = {}): void {
-  // listener subscribes once; the ref keeps handlers fresh without
-  // resubscribing on every render (the player re-renders on playback ticks)
+  // listener subscribes once; ref keeps handlers fresh without resubscribing every render (player re-renders on playback ticks)
   const mapRef = useRef(map)
   useEffect(() => {
     mapRef.current = map
@@ -36,13 +27,9 @@ export function useHotkeys(map: HotkeyMap, options: UseHotkeysOptions = {}): voi
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       const target = e.target as HTMLElement | null
-      // A deliberately focused control keeps its native keys: Tab-focus and
-      // text-editing surfaces match :focus-visible in Chromium. Mouse-clicked
-      // buttons/sliders don't, so shortcuts keep working right after clicking
-      // a player control — preventDefault below also cancels the focused
-      // button's own Space activation (the double-toggle bug).
+      // Deliberately focused control keeps native keys: Tab-focus/text-editing match :focus-visible, mouse-clicks don't -- preventDefault below also cancels the focused button's own Space activation (double-toggle bug)
       if (!ignoreFocusGuard && target?.matches(':focus-visible')) return
-      // safety net: text entry always wins even when the heuristic doesn't apply
+      // safety net: text entry always wins even when heuristic doesn't apply
       if (target?.closest('input:not([type="range"]), select, textarea, [contenteditable="true"]'))
         return
       const handler = mapRef.current[comboOf(e)]

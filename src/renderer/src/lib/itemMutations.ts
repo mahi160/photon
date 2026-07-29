@@ -4,11 +4,7 @@ import { setFavorite, setPlayed } from './queries'
 import { queryKeys } from './queryKeys'
 import type { BaseItem, UserData } from './jellyfin'
 
-// Patches the toggled item's UserData in every cached query instead of
-// invalidating queryKeys.all() -- that refetches the entire library (and the
-// staleTime:Infinity search index) on a single heart/check click. Shared by
-// every favorite/watched toggle in the app (Card, MovieDetails, ShowDetails,
-// episode rows) so this fix can't go stale in just one of them again.
+// Patches toggled item's UserData in every cached query instead of invalidating queryKeys.all() -- that would refetch entire library + search index on one click. Shared by every favorite/watched toggle (Card, MovieDetails, ShowDetails, episode rows).
 export function patchUserData(qc: QueryClient, itemId: string, patch: Partial<UserData>): void {
   const patchOne = (it: BaseItem): BaseItem =>
     it.Id === itemId ? { ...it, UserData: { ...it.UserData, ...patch } } : it
