@@ -1,16 +1,5 @@
-//! Picture-in-Picture, ADR-0006 revision: hands playback off to a spawned,
-//! standalone system `mpv` (`--no-border --ontop`, its own JSON IPC) instead
-//! of shrinking Photon's own window. Unlike primary playback (ADR-0003: mpv
-//! must never be an optional, probed dependency), PiP genuinely is optional
-//! here -- `pip_available` gates the whole feature in the UI, and "no system
-//! mpv" just means no PiP button, not degraded core playback.
-//!
-//! `--input-ipc-server` is a Unix domain socket path on macOS/Linux, a named
-//! pipe path on Windows (`connect_ipc`/`ipc_path` below) -- mpv itself
-//! accepts the same flag either way, only the transport differs. Windows
-//! side is unverified (no Windows box to test against, see AGENTS.md/CI
-//! comments elsewhere) but low-risk relative to the render-surface work:
-//! plain blocking named-pipe I/O, not GPU/compositing.
+//! Picture-in-Picture, ADR-0006: hands off to a spawned standalone system `mpv` (`--no-border --ontop`, own JSON IPC) instead of shrinking Photon's window. PiP is optional unlike primary playback (ADR-0003) -- `pip_available` gates the UI, no system mpv just means no PiP button.
+//! `--input-ipc-server` is a Unix socket path on macOS/Linux, named pipe on Windows -- Windows side unverified (no test box) but low-risk: plain blocking pipe I/O, not GPU/compositing.
 
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Write};
@@ -22,9 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
-/// Where mpv's `--input-ipc-server` listens -- a real path to a socket file
-/// on Unix, a Win32 named-pipe name (not a filesystem path, though
-/// `std::fs`/`OpenOptions` accept it the same way) on Windows.
+/// Where mpv's `--input-ipc-server` listens -- real socket file path on Unix, Win32 named-pipe name on Windows.
 #[cfg(unix)]
 fn ipc_path() -> PathBuf {
     std::env::temp_dir().join(format!("photon-pip-{}.sock", std::process::id()))
@@ -35,9 +22,7 @@ fn ipc_path() -> PathBuf {
     PathBuf::from(format!(r"\\.\pipe\photon-pip-{}", std::process::id()))
 }
 
-/// Connects to whichever transport `ipc_path` returned. `UnixStream`/`File`
-/// both implement `Read + Write + try_clone` with the same semantics, so
-/// `spawn_poller` below never branches on platform beyond this one call.
+/// Connects to whichever transport `ipc_path` returned -- `UnixStream`/`File` share Read+Write+try_clone, so `spawn_poller` never branches on platform beyond this.
 #[cfg(unix)]
 fn connect_ipc(path: &Path) -> Option<UnixStream> {
     UnixStream::connect(path).ok()
@@ -51,15 +36,7 @@ fn connect_ipc(path: &Path) -> Option<std::fs::File> {
 #[derive(Default, Clone)]
 pub struct PipState(pub Arc<Mutex<Option<Child>>>);
 
-/// A GUI app launched via Finder/Dock/a `.dmg` install doesn't inherit the
-/// user's login-shell `PATH` -- confirmed report: PiP's "is mpv on PATH"
-/// probe worked in `pnpm dev` (started from a terminal, full `PATH`
-/// inherited) but always failed after installing the built `.dmg` and
-/// launching normally, hiding the PiP button even with `brew install mpv`
-/// already done. `brew`'s own bin dir (`/opt/homebrew` on Apple Silicon,
-/// `/usr/local` on Intel) never reaches a bare `Command::new("mpv")` there.
-/// Checked ahead of the bare name so an already-resolving `PATH` (dev
-/// builds, a differently configured shell) still wins.
+/// GUI apps launched via Finder/Dock don't inherit the login-shell PATH -- confirmed: PiP's mpv probe worked in `pnpm dev` (terminal PATH) but failed after installing the .dmg, hiding the PiP button even with mpv installed. Checked ahead of bare "mpv" so a resolving PATH still wins.
 fn mpv_binary() -> PathBuf {
     for candidate in ["/opt/homebrew/bin/mpv", "/usr/local/bin/mpv", "/opt/local/bin/mpv"] {
         let p = PathBuf::from(candidate);
@@ -101,30 +78,22 @@ pub fn pip_start(
     }
 
     let socket_path = ipc_path();
-    let _ = std::fs::remove_file(&socket_path); // stale socket from a crashed previous run (no-op on Windows: no on-disk file to remove)
+    let _ = std::fs::remove_file(&socket_path); // stale socket from a crashed previous run
 
     let mut cmd = Command::new(mpv_binary());
     cmd.arg("--no-border")
         .arg("--ontop")
         .arg("--on-all-workspaces") // follows across macOS Spaces / virtual desktops
         .arg("--title=Photon — Picture in Picture")
-        // --autofit sizes the window to the video's own aspect ratio (mpv's
-        // default keepaspect-window locks window size to it) -- a fixed
-        // WxH here would letterbox/pillarbox any video that isn't 16:9.
-        // --geometry (position only, no size) then places it bottom-right.
-        .arg("--autofit=640x360")
-        .arg("--geometry=-24-24") // mpv's own geometry syntax: bottom-right corner of the screen
+        .arg("--autofit=640x360") // sizes to video's own aspect ratio, avoids letterboxing a fixed WxH
+        .arg("--geometry=-24-24") // bottom-right corner of the screen
         .arg(format!("--input-ipc-server={}", socket_path.display()))
         .arg(format!("--start={start_seconds}"))
         .arg(format!("--volume={}", (volume.clamp(0.0, 1.0) * 100.0).round()))
         .arg(format!("--mute={}", if muted { "yes" } else { "no" }))
         .arg(format!("--speed={rate}"))
         .arg(format!("--pause={}", if paused { "yes" } else { "no" }));
-    // Carries the currently-active *text* subtitle over, if any -- an
-    // embedded (non-text) pick has no URL to hand this fresh process, so it
-    // just plays without subs in that case, same as none being selected.
-    // mpv fetches this itself (own HTTP stack), same as sub-add does for the
-    // in-process engine -- no auth/CORS handling needed here either.
+    // Carries the active text subtitle over, if any -- embedded (non-text) picks have no URL to hand off, so it plays without subs then.
     if let Some(sub_url) = sub_url {
         cmd.arg(format!("--sub-file={sub_url}"));
         if let Some(lang) = sub_lang {
@@ -145,11 +114,7 @@ pub fn pip_start(
     Ok(())
 }
 
-/// Force-closes the spawned mpv (e.g. the user toggled PiP off from
-/// Photon's own UI). The poller thread started in `pip_start` notices the
-/// socket close either way -- this kill, or the user closing mpv's own
-/// window -- and does the actual cleanup/`pip://ended` emit, so there's
-/// nothing else to do here.
+/// Force-closes the spawned mpv (user toggled PiP off). `spawn_poller`'s thread notices the socket close either way and does cleanup/`pip://ended`.
 #[tauri::command]
 pub fn pip_stop(state: tauri::State<'_, PipState>) {
     if let Some(child) = state.0.lock().unwrap().as_mut() {
@@ -157,20 +122,12 @@ pub fn pip_stop(state: tauri::State<'_, PipState>) {
     }
 }
 
-/// Polls the spawned mpv's own JSON IPC for its current position every
-/// 500ms -- simpler than wiring `observe_property`'s async event stream for
-/// one value, and mpv's IPC also pushes unrelated built-in event
-/// notifications unprompted, so responses to our own requests are picked
-/// out by their `"error"` field rather than assumed to be the very next
-/// line -- until the socket closes (mpv exited, killed or by the user),
-/// then reports the last known position back so the frontend can resume
-/// Photon's own (paused, still-loaded-at-the-handoff-point) engine there.
+/// Polls mpv's JSON IPC for position every 500ms -- simpler than wiring an async event stream for one value. mpv also pushes unprompted event lines, so responses are picked out by their "error" field, not assumed to be the next line. Reports last known position back once socket closes so Photon can resume.
 fn spawn_poller(app: AppHandle, state: Arc<Mutex<Option<Child>>>, socket_path: PathBuf, start_seconds: f64) {
     std::thread::spawn(move || {
         let mut last_position = start_seconds;
 
-        // mpv creates the socket file asynchronously after spawn -- retry
-        // briefly instead of racing it.
+        // mpv creates the socket file asynchronously after spawn -- retry briefly instead of racing it
         let mut connected = None;
         for _ in 0..50 {
             if let Some(s) = connect_ipc(&socket_path) {
@@ -188,9 +145,7 @@ fn spawn_poller(app: AppHandle, state: Arc<Mutex<Option<Child>>>, socket_path: P
                 if writer.write_all(request.as_bytes()).is_err() {
                     break;
                 }
-                // skip past mpv's own unprompted event lines to find our
-                // request's actual response (bounded -- never block forever
-                // on a line that isn't coming)
+                // skip past mpv's unprompted event lines to find our response (bounded, never blocks forever)
                 for _ in 0..10 {
                     let mut line = String::new();
                     if reader.read_line(&mut line).unwrap_or(0) == 0 {
