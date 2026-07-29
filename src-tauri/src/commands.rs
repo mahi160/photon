@@ -1,6 +1,4 @@
-//! Non-player IPC surface (issue #5): session storage, app/window info,
-//! launch-at-login. Playback (mpv:*) and updater commands live elsewhere
-//! (mpv module) / aren't ported yet (ticket #11).
+//! Non-player IPC surface (issue #5): session storage, app/window info, launch-at-login. mpv:* lives in mpv module; updater isn't ported yet (ticket #11).
 
 use keyring::Entry;
 #[cfg(target_os = "macos")]
@@ -42,19 +40,8 @@ pub fn app_set_fullscreen(window: tauri::Window, fullscreen: bool) {
     let _ = window.set_fullscreen(fullscreen);
 }
 
-/// Shows/hides the native traffic-light buttons themselves (not the whole
-/// title bar -- there's no separate title bar to show/hide in Overlay
-/// style, just these three buttons drawn over the content). Used only by
-/// the player (Player.tsx), synced to the same auto-hide `visible` state
-/// already driving PlayerControls' own opacity, so the dots disappear over
-/// the video along with everything else and only reappear on hover -- every
-/// other page leaves them alone (never calls this with `false`).
-///
-/// macOS-only concept (`titleBarStyle: "Overlay"` in tauri.conf.json is
-/// itself macOS-only) -- Windows/Linux have no equivalent native buttons to
-/// hide, so this is a no-op there rather than an error: the frontend calls
-/// it unconditionally, and "nothing to hide" is the correct behavior, not a
-/// missing feature.
+/// Shows/hides the native traffic-light buttons (Overlay style has no separate title bar, just these drawn over content) -- player only, synced to auto-hide `visible` so they fade with the controls.
+/// No-op on Windows/Linux (no equivalent buttons) -- frontend calls unconditionally.
 #[cfg(target_os = "macos")]
 #[tauri::command]
 pub fn app_set_traffic_lights_visible(window: tauri::Window, visible: bool) -> Result<(), String> {
@@ -89,9 +76,8 @@ pub fn app_get_login_item(app: AppHandle) -> bool {
 
 #[derive(Serialize, Deserialize, Default)]
 pub(crate) struct Prefs {
-    // gates updater::spawn_check
     #[serde(default)]
-    pub(crate) disable_auto_update: bool,
+    pub(crate) disable_auto_update: bool, // gates updater::spawn_check
 }
 
 fn prefs_file(app: &AppHandle) -> Option<std::path::PathBuf> {
@@ -100,8 +86,7 @@ fn prefs_file(app: &AppHandle) -> Option<std::path::PathBuf> {
     Some(dir.join("prefs.json"))
 }
 
-// pub(crate): updater.rs reads disable_auto_update at startup to decide
-// whether to check at all.
+// pub(crate): updater.rs reads this at startup to decide whether to check at all.
 pub(crate) fn read_prefs(app: &AppHandle) -> Prefs {
     prefs_file(app)
         .and_then(|p| fs::read_to_string(p).ok())
