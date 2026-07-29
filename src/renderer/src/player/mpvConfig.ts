@@ -1,9 +1,4 @@
-// Minimal subtitle-appearance GUI (Settings > Playback): the few knobs
-// people actually reach for (size/color/background box), not a full
-// per-property styling page -- ADR-0007 still holds. Returned pairs are
-// meant to be spread *before* parseMpvConfig's raw passthrough below, so a
-// matching raw `sub-*` line still wins (same "defaults, then user" order
-// engine.rs already applies its own hardcoded defaults in).
+// Minimal subtitle-appearance GUI (Settings > Playback): size/color/background box only, not a full styling page (ADR-0007). Spread *before* parseMpvConfig's raw passthrough so a matching raw sub-* line still wins.
 export function guiSubtitleConfig(settings: {
   subtitleFontSize: number
   subtitleColor: string
@@ -16,15 +11,8 @@ export function guiSubtitleConfig(settings: {
   ]
 }
 
-// Raw mpv-config passthrough (Settings > Playback, issue #9): replaces the
-// old per-property subtitle-styling GUI's role without rebuilding one.
-// Photon ships a sane default subtitle appearance (applied in engine.rs);
-// this is the escape hatch for anyone who wants more, or any other mpv
-// behavior — plain `key=value` lines, applied as extra mpv options at
-// launch (after Photon's defaults, so the user's values win).
-//
-// Invalid/unrecognized lines are silently dropped, never surfaced as an
-// error — a typo in this power-user field must never break playback.
+// Raw mpv-config passthrough (Settings > Playback, issue #9): escape hatch for anyone wanting more than Photon's default subtitle appearance (engine.rs), or other mpv behavior -- plain key=value lines, applied after Photon's defaults so user values win.
+// Invalid/unrecognized lines silently dropped, never surfaced as error -- a typo here must never break playback.
 export function parseMpvConfig(raw: string): [string, string][] {
   const pairs: [string, string][] = []
   for (const rawLine of raw.split('\n')) {
@@ -32,7 +20,7 @@ export function parseMpvConfig(raw: string): [string, string][] {
     if (!line || line.startsWith('#') || line.startsWith(';')) continue
     const withoutDashes = line.replace(/^--/, '')
     const eq = withoutDashes.indexOf('=')
-    if (eq <= 0) continue // no '=', or an empty key — bare flag lines aren't supported
+    if (eq <= 0) continue // no '=' or empty key — bare flag lines unsupported
     const key = withoutDashes.slice(0, eq).trim()
     const value = withoutDashes.slice(eq + 1).trim()
     if (!key) continue

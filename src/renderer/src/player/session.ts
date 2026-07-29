@@ -25,22 +25,12 @@ export interface PlaybackSession {
   startSeconds: number
 }
 
-// whether a stream index is deliverable as a text track (vs. selected as an
-// embedded track via engine.selectEmbeddedSubtitleTrack)
+// whether a stream index is deliverable as a text track (vs. embedded via engine.selectEmbeddedSubtitleTrack)
 export function isTextTrack(sess: Pick<PlaybackSession, 'textTracks'>, index: number): boolean {
   return sess.textTracks.some((t) => t.index === index)
 }
 
-// Jellyfin's MediaStream.Index numbers every stream in the *original*
-// file's raw layout, but the actual direct-stream/static URL mpv plays
-// drops every subtitle stream delivered externally (DeliveryMethod ===
-// 'External') -- confirmed against two real files via raw mpv IPC: mpv's
-// own demuxed track-list is shifted down by exactly one position for every
-// externally-delivered subtitle stream positioned before a given stream in
-// the source's raw index. Anything engine.selectAudioTrack/
-// selectEmbeddedSubtitleTrack resolves against mpv's *own* track-list (see
-// engine.rs's `select_track`) needs this correction first, or it silently
-// resolves to the wrong track (or none at all).
+// Jellyfin's MediaStream.Index numbers streams in the original file's raw layout, but mpv's demuxed track-list drops every externally-delivered subtitle (DeliveryMethod === 'External'), shifting later indexes down by one each -- confirmed via raw mpv IPC. engine.selectAudioTrack/selectEmbeddedSubtitleTrack resolve against mpv's own track-list (engine.rs's select_track), so this correction is required first or they silently pick the wrong track.
 export function toDemuxedIndex(
   sess: Pick<PlaybackSession, 'subtitleStreams'>,
   index: number
@@ -51,15 +41,7 @@ export function toDemuxedIndex(
   return index - stripped
 }
 
-// Whether switching the *embedded* (non-text) subtitle selection from
-// `current` to `next` (null = off) needs a fresh PlaybackInfo negotiation
-// instead of an instant mpv-side switch. Under direct play (ADR-0008) mpv
-// owns every embedded track itself, so this is always false there. Under a
-// Transcode fallback there's no mpv-selectable embedded track at all --
-// deviceProfile.ts declares no Encode subtitle profile, so a non-text pick
-// only exists because the server burned it into that transcode's pixels,
-// and burned pixels can't be toggled by any mpv property. Entering OR
-// leaving one needs the server to build a new stream.
+// Whether switching embedded (non-text) subtitle from `current` to `next` (null = off) needs a fresh PlaybackInfo negotiation vs. instant mpv-side switch. Direct play (ADR-0008): always false, mpv owns embedded tracks. Transcode: burned-in pixels can't be toggled by any mpv property, so entering or leaving one needs a new stream.
 export function embeddedSubtitleSwitchNeedsReload(
   sess: Pick<PlaybackSession, 'playMethod' | 'textTracks'>,
   current: number | null,
@@ -90,22 +72,8 @@ function fetchPlaybackInfo(
 ): Promise<PlaybackInfoResponse> {
   const s = currentSession()
   if (!s) throw new Error('Not signed in')
-  // Everything rides in the body as one PlaybackInfoDto (matches
-  // jellyfin-web's own client). Query-param support on this endpoint is
-  // deprecated and doesn't reliably bind into the same negotiation as the
-  // body fields — splitting fields across both silently dropped
-  // SubtitleStreamIndex in testing.
-  //
-  // Always direct play (ADR-0008): no EnableDirectPlay/EnableDirectStream
-  // override here, ever. The two things that used to force a client-side
-  // transcode request — picking a non-default audio track, and non-text
-  // (PGS/ASS) subtitles — are both real mpv capabilities now (see
-  // engine.rs's `select_track`): mpv demuxes the exact same file this
-  // negotiation resolves, so it can select any embedded audio/subtitle
-  // track itself, no server remux needed. If the server still can't direct
-  // play a source for a genuine reason (exotic codec, bitrate cap), it's
-  // free to fall back to TranscodingUrl below — this only removes
-  // *client-manufactured* reasons to ask for that.
+  // Everything rides in the body as one PlaybackInfoDto (matches jellyfin-web) -- query-param support here is deprecated, splitting fields across both silently dropped SubtitleStreamIndex in testing.
+  // Always direct play (ADR-0008): no EnableDirectPlay/EnableDirectStream override, ever. Non-default audio + non-text subtitles are real mpv capabilities (engine.rs's select_track), no server remux needed. Server still falls back to TranscodingUrl for genuine reasons (exotic codec, bitrate cap) -- this only removes client-manufactured reasons.
   return jf<PlaybackInfoResponse>(`/Items/${itemId}/PlaybackInfo`, {
     method: 'POST',
     body: {
@@ -131,19 +99,8 @@ export interface SubtitleSelection {
 
 const SUBTITLES_OFF: SubtitleSelection = { display: null, textTrack: null, embeddedTrack: null }
 
-// Which subtitle ends up active after a load. Explicit request wins (-1 =
-// explicitly off), else preferred language / server default when subtitles
-// are enabled. Every subtitle stream is playable directly now (ADR-0008) —
-// text-deliverable ones via engine.setTextTrack, everything else (PGS/VOBSUB/
-// styled ASS) via mpv's own embedded-track selection.
-//
-// A forced track (IsForced — foreign-dialogue-only, e.g. anime/foreign-
-// language films) is meant to show regardless of subtitlesEnabled: that
-// preference is about *normal* subtitles, not the handful of foreign lines a
-// forced track exists for. Only checked when subtitlesEnabled is off and
-// nothing else was explicitly requested — subtitlesEnabled=true already
-// reaches a real pick (preferred language or the server's own default,
-// which itself accounts for forced tracks) further down.
+// Which subtitle ends up active after load. Explicit request wins (-1 = off), else preferred language/server default when enabled. Every subtitle is playable directly now (ADR-0008) -- text via engine.setTextTrack, else mpv's embedded-track selection.
+// A forced track (IsForced, foreign-dialogue-only) shows regardless of subtitlesEnabled -- only checked when disabled and nothing else requested, since enabled already reaches a real pick that accounts for forced tracks.
 export function resolveSubtitleSelection(
   sess: {
     textTracks: TextTrackSource[]
@@ -188,9 +145,7 @@ export async function startPlayback(
   const streams = ms.MediaStreams ?? []
   const subtitleStreams = streams.filter((st) => st.Type === 'Subtitle')
 
-  // Always direct play when the server allows it (ADR-0008) — no client-side
-  // reason left to ask for anything else. TranscodingUrl only happens when
-  // the server itself decides direct play genuinely isn't possible.
+  // Always direct play when server allows it (ADR-0008) -- TranscodingUrl only when server itself decides direct play genuinely isn't possible.
   let url: string
   let playMethod: 'DirectPlay' | 'Transcode'
   if (ms.SupportsDirectPlay || ms.SupportsDirectStream) {
@@ -202,8 +157,7 @@ export async function startPlayback(
   } else {
     throw new Error('Playback failed.')
   }
-  // Built ourselves via subtitleStreamUrl, not st.DeliveryUrl -- see that
-  // function's doc for why the server-supplied URL is unsafe to use as-is.
+  // Built via subtitleStreamUrl, not st.DeliveryUrl -- see that function's doc for why the server-supplied URL is unsafe as-is.
   const textTracks: TextTrackSource[] = subtitleStreams
     .filter((st) => st.DeliveryMethod === 'External' && st.DeliveryUrl)
     .map((st) => ({
@@ -263,11 +217,7 @@ export function reportStopped(sess: PlaybackSession, positionSeconds: number): v
   }).catch(() => {})
 }
 
-// /Sessions/Playing/Stopped only updates progress tracking — it doesn't kill
-// the server-side ffmpeg job. Without this, switching audio/subtitles mid-
-// transcode leaves the old encode running and the new stream can still
-// resolve against it (jellyfin-web calls this before every track-switch
-// reload, for the same reason).
+// /Sessions/Playing/Stopped only updates progress tracking, doesn't kill the ffmpeg job -- without this, switching audio/subtitles mid-transcode leaves the old encode running (jellyfin-web calls this before every track-switch reload too).
 export async function stopActiveEncoding(sess: PlaybackSession): Promise<void> {
   await jf(`/Videos/ActiveEncodings`, {
     method: 'DELETE',
