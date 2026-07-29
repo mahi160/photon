@@ -40,8 +40,7 @@ export function Settings(): React.JSX.Element {
           ))}
         </div>
       </nav>
-      {/* the sidebar is the fixed part of "desktop settings app" scrolling
-          -- only this panel scrolls, not the whole page (see .content) */}
+      {/* sidebar is fixed part of "desktop settings app" scrolling -- only this panel scrolls, not whole page (see .content) */}
       <div className={styles.content}>
         <div className={styles.contentInner}>
           <Panel />

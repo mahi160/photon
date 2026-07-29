@@ -27,8 +27,7 @@ export function ServerSettings(): React.JSX.Element {
               <button
                 className={styles.ghostBtn}
                 onClick={() =>
-                  // don't refetch the search index: staleTime:Infinity,
-                  // fetched once per launch on purpose (ADR-0001)
+                  // don't refetch search index: staleTime:Infinity, fetched once per launch on purpose (ADR-0001)
                   queryClient.invalidateQueries({
                     predicate: (q) => q.queryKey.join('.') !== queryKeys.search.index().join('.')
                   })

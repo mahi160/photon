@@ -20,9 +20,7 @@ function EpisodeRow({ ep, onPlay }: { ep: BaseItem; onPlay: () => void }): React
   const pct = ep.UserData?.PlayedPercentage
   const img = imageUrl(ep, 320)
 
-  // two sibling buttons, not nested (Card convention, AGENTS.md): thumb
-  // plays, title opens details. WatchedButton sits beside the thumb button
-  // (not inside it) for the same reason -- a <button> can't nest a <button>.
+  // two sibling buttons, not nested (Card convention, AGENTS.md): thumb plays, title opens details. WatchedButton sits beside thumb button, same reason -- <button> can't nest <button>.
   return (
     <div className={styles.episodeRow}>
       <div className={styles.episodeThumbWrap}>

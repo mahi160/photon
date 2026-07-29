@@ -8,9 +8,7 @@ export function AppearanceSettings(): React.JSX.Element {
   const customColors = useSettings((s) => s.customColors)
   const set = useSettings((s) => s.set)
 
-  // saved override, or whatever the active theme currently resolves it to
-  // (applyCustomColors keeps that inline value in sync with the store, so
-  // this is always accurate without its own effect/state)
+  // saved override or whatever active theme resolves to -- applyCustomColors keeps inline value in sync with store, no own effect/state needed
   const valueOf = (key: string): string =>
     customColors[key] || getComputedStyle(document.documentElement).getPropertyValue(key).trim()
 
@@ -18,8 +16,7 @@ export function AppearanceSettings(): React.JSX.Element {
     <>
       <h1 className={styles.pageTitle}>Appearance</h1>
 
-      {/* theme + its colors read as one section (not two headers) -- a
-          theme is just a starting point for the swatches below it */}
+      {/* theme + colors read as one section (not two headers) -- theme is just starting point for swatches below */}
       <div className={styles.section}>
         <div className={styles.rows}>
           <SettingsRow label="Theme">
@@ -28,8 +25,7 @@ export function AppearanceSettings(): React.JSX.Element {
                 <button
                   key={t.key}
                   className={`${styles.slab} ${theme === t.key ? styles.slabActive : ''}`}
-                  // picking a theme starts from its stock palette, not
-                  // whatever was customized on top of the last one
+                  // picking theme starts from its stock palette, not last theme's customizations
                   onClick={() => set({ theme: t.key, customColors: {} })}
                 >
                   {t.label}

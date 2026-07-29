@@ -1,7 +1,6 @@
 import styles from './Settings.module.css'
 
-// ponytail: genuinely empty on purpose -- diagnostics/logging/dev options
-// land here as they're built, not stubbed out ahead of time.
+// ponytail: empty on purpose -- diagnostics/logging/dev options land here as built, not stubbed ahead of time.
 export function AdvancedSettings(): React.JSX.Element {
   return (
     <>

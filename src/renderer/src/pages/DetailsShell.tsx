@@ -6,10 +6,7 @@ import { Ratings } from '../components/Ratings'
 import { FavoriteButton } from '../components/FavoriteButton'
 import styles from './Details.module.css'
 
-// Shared shell between MovieDetails and ShowDetails: hero backdrop, poster,
-// title/favorite row, meta row, and the loading/error states. Both pages'
-// content genuinely diverges below this (badges/track pickers vs.
-// season/episode list), so only the identical wrapping is pulled out here.
+// Shared shell between MovieDetails/ShowDetails (hero, poster, title/favorite row, meta row, loading/error) -- content below diverges per page, only identical wrapping lives here.
 
 export function DetailsLoading(): React.JSX.Element {
   return (
@@ -60,9 +57,7 @@ export function DetailsHero({
 }): React.JSX.Element {
   return (
     <>
-      {/* ambient wash: the same backdrop, hugely blurred, bleeding down past
-         the hero's own clipped bounds into .content -- needs .page as its
-         positioned ancestor (not .hero, which clips it), see .page/.ambient */}
+      {/* ambient wash: same backdrop, blurred, bleeds past hero's clipped bounds into .content -- needs .page as positioned ancestor not .hero, see .page/.ambient */}
       {backdrop && (
         <div className={styles.ambient} aria-hidden="true">
           <img src={backdrop} alt="" className={styles.ambientImg} />

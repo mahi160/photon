@@ -21,8 +21,7 @@ export function Login(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  // Quick Connect: show a code, poll until it's approved from another
-  // signed-in Jellyfin session, then sign in with the secret
+  // Quick Connect: show code, poll til approved from another signed-in Jellyfin session, sign in with secret
   const [qc, setQc] = useState<{ code: string; secret: string; server: string } | null>(null)
 
   async function startQuickConnect(): Promise<void> {
@@ -68,9 +67,7 @@ export function Login(): React.JSX.Element {
   }
 
   return (
-    // overlay title bar (tauri.conf.json): this screen has no header of its
-    // own, so it's the only thing standing in for a drag region here (the
-    // form/inputs/buttons are excluded automatically, see drag.js)
+    // overlay title bar (tauri.conf.json): screen has no header, this is the only drag region here (form/inputs/buttons excluded automatically, see drag.js)
     <div className={styles.page} data-tauri-drag-region>
       <form onSubmit={submit} className={styles.form}>
         <h1 className={styles.brand}>

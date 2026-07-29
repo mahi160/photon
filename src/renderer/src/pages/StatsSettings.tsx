@@ -2,8 +2,7 @@ import { useState } from 'react'
 import { useWatchStats, dayKey, type DayStats } from '../stores/watchStats'
 import styles from './Settings.module.css'
 
-// Photon-local watch stats (see stores/watchStats.ts for what counts).
-// Read-only dashboard — no server round trips, everything is in localStorage.
+// Photon-local watch stats (see stores/watchStats.ts for what counts) -- read-only, no server round trips, all localStorage.
 
 function fmtDur(secs: number): string {
   const h = Math.floor(secs / 3600)
@@ -25,8 +24,7 @@ function lastNDays(days: Record<string, DayStats>, n: number, now: number): DayS
 export function StatsSettings(): React.JSX.Element {
   const days = useWatchStats((s) => s.days)
   const series = useWatchStats((s) => s.series)
-  // lazy initializer: the sanctioned place to read the wall clock during
-  // render — a stats snapshot doesn't need per-render freshness
+  // lazy initializer: sanctioned place to read wall clock during render -- stats snapshot doesn't need per-render freshness
   const [now] = useState(() => Date.now())
 
   const all = Object.values(days)
