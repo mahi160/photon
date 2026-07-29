@@ -1,11 +1,4 @@
-//! Render-loop profiler (perf-audit follow-up, see AUDIT.md #9/#11): times
-//! each `surface.render()` call from `spawn_render_loop` and appends a
-//! rolling summary to a log file every `LOG_INTERVAL` frames. stdlib only —
-//! no `tracing`/`log` crate pulled in for what's meant to answer "how slow
-//! is the render loop, really" on a real machine, not permanent telemetry.
-//! Backend-agnostic on purpose: wraps the one call site both the GPU and
-//! software (`mac/software.rs`) surfaces go through, instead of duplicating
-//! timing inside each backend.
+//! Render-loop profiler (AUDIT.md #9/#11): times each `surface.render()` call, logs a rolling summary every `LOG_INTERVAL` frames. stdlib only, not permanent telemetry -- answers "how slow is render, really" once, backend-agnostic.
 
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -13,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-const LOG_INTERVAL: u32 = 150; // ~5s at mpv's 30fps render-loop target
+const LOG_INTERVAL: u32 = 150; // ~5s at 30fps
 
 #[derive(Default)]
 struct Stats {
@@ -83,8 +76,7 @@ mod tests {
         }
         assert_eq!(profiler.stats.lock().unwrap().frames, LOG_INTERVAL - 1);
         profiler.time(|| {});
-        // logged and reset -- back to zero, not LOG_INTERVAL
-        assert_eq!(profiler.stats.lock().unwrap().frames, 0);
+        assert_eq!(profiler.stats.lock().unwrap().frames, 0); // logged and reset, not just capped
     }
 
     #[test]

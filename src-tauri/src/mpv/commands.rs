@@ -6,13 +6,12 @@ use tauri::{AppHandle, Manager, Runtime, State};
 #[derive(Default)]
 pub struct MpvState(pub Mutex<Option<MpvEngine>>);
 
-/// Returns "gpu" or "cpu" -- whichever render backend `MpvEngine::attach`
-/// (ADR-0009) landed on, for the player overlay's CPU-fallback badge.
+/// Returns "gpu" or "cpu" -- whichever backend `MpvEngine::attach` (ADR-0009) landed on, for the CPU-fallback badge.
 #[tauri::command]
 pub fn mpv_attach<R: Runtime>(app: AppHandle<R>, state: State<'_, MpvState>, extra_config: Vec<(String, String)>) -> Result<String, String> {
     let mut slot = state.0.lock().unwrap();
     if let Some(e) = slot.as_ref() {
-        return Ok(e.render_backend().to_string()); // idempotent — usePlayerEngine only constructs the engine once
+        return Ok(e.render_backend().to_string()); // idempotent -- engine constructed once
     }
     let window = app.get_webview_window("main").ok_or("no main window")?;
     let engine = MpvEngine::attach(&app, &window, &extra_config)?;
@@ -71,9 +70,7 @@ pub fn mpv_set_subtitle_delay(state: State<'_, MpvState>, seconds: f64) -> Resul
     with_engine(&state, |e| e.set_subtitle_delay(seconds))
 }
 
-/// Selects an embedded audio/subtitle track by the media's own stream index
-/// (see engine.rs's `select_track` doc — always direct play now, so every
-/// track Jellyfin reports is already in the file mpv itself is demuxing).
+/// Selects an embedded audio/subtitle track by stream index -- always direct play, so every Jellyfin track is already in the file mpv demuxes (see engine.rs's `select_track`).
 #[tauri::command]
 pub fn mpv_select_track(state: State<'_, MpvState>, kind: String, source_index: Option<i64>) -> Result<(), String> {
     with_engine(&state, |e| e.select_track(&kind, source_index))
@@ -90,7 +87,7 @@ pub fn mpv_set_rect(state: State<'_, MpvState>, x: f64, y: f64, w: f64, h: f64) 
 
 #[tauri::command]
 pub fn mpv_destroy(state: State<'_, MpvState>) -> Result<(), String> {
-    state.0.lock().unwrap().take(); // drop() tears down the observer thread + GL/mpv state
+    state.0.lock().unwrap().take(); // drop() tears down observer thread + GL/mpv state
     Ok(())
 }
 
@@ -108,39 +105,22 @@ where
     }
 }
 
-/// Render tick, woken by mpv's own update callback (see engine.rs's
-/// `RenderWaker`) instead of a blind fixed-rate poll.
+/// Render tick, woken by mpv's own update callback (`RenderWaker`) instead of a blind fixed-rate poll.
 pub fn spawn_render_loop<R: Runtime>(app: AppHandle<R>) {
     let profiler = RenderProfiler::new();
     std::thread::spawn(move || loop {
-        // render() now runs directly on this background thread instead of
-        // being marshalled onto the main thread every tick -- even after
-        // rendering at point resolution instead of full Retina backing
-        // resolution (quarter the bytes), the per-frame buffer alloc +
-        // CGImage build was still enough main-thread work to beachball the
-        // window at 30fps. CALayer.contents is documented as safe to set
-        // from a background thread (Core Animation's own threading model,
-        // unlike most of AppKit) -- this is the standard technique real
-        // custom video-compositing code uses for exactly this reason.
-        // `self.view`'s *other* AppKit calls (setFrame:, setHidden:) still
-        // only ever happen from set_rect() on the main thread (a Tauri
-        // command); render()'s own NSView touches are read only
-        // (bounds/isHidden/layer getters).
+        // render() runs here (not main thread): mac point-res render still beachballed main thread at 30fps; Windows/Linux WGL/GLX context needs one owning thread. set_rect stays main-thread.
         let Some(state) = app.try_state::<MpvState>() else {
             std::thread::sleep(std::time::Duration::from_millis(200));
             continue;
         };
-        // MpvState is locked only long enough to clone these two Arcs, not
-        // for the render itself (see RenderSurface's doc) -- otherwise a
-        // slow software-render frame would hold the *same* lock every
-        // play/pause/seek/volume command needs, stalling input behind it.
+        // MpvState locked only to clone these Arcs, not for render -- else a slow render frame stalls play/pause/seek/volume.
         let handle = state.0.lock().unwrap().as_ref().map(|e| (e.render_surface(), e.render_waker()));
         let Some((surface, waker)) = handle else {
             std::thread::sleep(std::time::Duration::from_millis(200)); // not attached yet
             continue;
         };
-        // Blocks until mpv reports a new frame; the timeout is a safety net,
-        // not the normal wakeup path (see RenderWaker's doc).
+        // Blocks until mpv reports a new frame; timeout is a safety net, not the normal wakeup path.
         waker.wait(std::time::Duration::from_millis(250));
         profiler.time(|| surface.lock().unwrap().render());
     });
