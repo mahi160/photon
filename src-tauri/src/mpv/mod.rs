@@ -3,12 +3,11 @@ pub mod engine;
 pub(crate) mod profile;
 pub(crate) mod surface;
 
-// `backend` aliases whichever platform module is compiled in -- `engine.rs`
-// only ever calls `backend::attach`, never `mac`/`windows`/`linux` directly
-// (ADR-0009's `RenderSurface` seam, shared bits in `surface.rs`). Only `mac`
-// has a real GPU/CPU render surface today; `windows`/`linux` are stubs that
-// compile and link but always return a "not implemented" error from
-// `attach()` -- see their own module docs.
+// Shared GL-onto-plain-window backend for `windows`(WGL)/`linux`(GLX) -- see its own doc. `mac` renders into its own off-screen FBO instead, unused here.
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+pub(crate) mod gl_surface;
+
+// `backend` aliases the compiled-in platform module -- engine.rs only calls `backend::attach` (ADR-0009's RenderSurface seam). mac: OpenGL->IOSurface->Metal with CPU fallback (mac/software.rs); windows/linux: WGL/GLX onto a plain child window, no fallback.
 #[cfg(target_os = "macos")]
 pub(crate) mod mac;
 #[cfg(target_os = "macos")]
