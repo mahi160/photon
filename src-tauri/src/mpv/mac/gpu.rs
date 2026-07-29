@@ -1,28 +1,7 @@
-//! GPU render surface (ADR-0009). mpv's *OpenGL* render API draws each frame
-//! into an off-screen FBO we own; that FBO's color attachment is a texture
-//! bound directly to an `IOSurface` (`CGLTexImageIOSurface2D` -- mpv's GL
-//! writes land straight in the IOSurface's own backing memory, no CPU copy);
-//! the same IOSurface is wrapped as a Metal texture and blitted each frame
-//! onto a `CAMetalLayer`'s current drawable, presenting through Core
-//! Animation's normal, fully-supported Metal compositing path (unlike the
-//! transparent-`NSOpenGLView` dead end `SoftwareSurface`'s module doc
-//! describes).
-//!
-//! `GpuSurface::new` is the *only* place this backend can fail -- GL
-//! context/pixel-format creation, FBO completeness, and the IOSurface/Metal-
-//! texture bindings are all checked, and any failure bubbles up as `Err` so
-//! `mac::attach` falls back to `SoftwareSurface` instead of ever leaving the
-//! player black (issue #12, User Story 3). Everything past construction
-//! (`render`/`set_rect`) treats a mid-session resize failure the same way
-//! `SoftwareSurface` treats "no frame ready yet": skip this tick, try again
-//! next one -- switching backends mid-session is out of scope (ADR-0009: the
-//! fallback decision is made once, here, not re-litigated per frame).
+//! GPU render surface (ADR-0009): mpv's GL render API draws into an off-screen FBO bound directly to an IOSurface (zero-copy), wrapped as a Metal texture and blitted onto a CAMetalLayer via Core Animation.
+//! GpuSurface::new is the only place this backend can fail -- setup failure bubbles up as Err so mac::attach falls back to SoftwareSurface instead of a black player (issue #12); a mid-session resize failure just skips a tick and retries.
 
-// mpv's OpenGL render API has no Metal equivalent to ask for instead --
-// `NSOpenGLContext`/`NSOpenGLPixelFormat` are the only way to get an actual
-// GL context on macOS, deprecated API or not (see the module doc's "no
-// Metal render API in libmpv" point, ADR-0009). Silenced, not worked
-// around -- there's nothing to migrate to here.
+// mpv has no Metal render API -- NSOpenGLContext/NSOpenGLPixelFormat is the only way to a real GL context on macOS, deprecated or not (ADR-0009). Silenced, not worked around.
 #![allow(deprecated)]
 
 use super::RenderSurface;
@@ -48,11 +27,7 @@ use std::os::raw::{c_char, c_int, c_uint};
 use std::sync::{Arc, Mutex};
 
 // ---- hand-declared GL/CGL FFI (ADR-0009) --------------------------------
-// A small, permanently-frozen surface (OpenGL's been deprecated on macOS
-// since 2018; these signatures haven't changed in over a decade) -- not
-// worth a `gl`/`glow` dependency for the ~10 calls below, matching this
-// module's existing precedent of hand-declaring the small FFI surface
-// pregenerated bindings miss (see `software.rs`'s `MPV_RENDER_PARAM_SW_*`).
+// Small, permanently-frozen surface (deprecated since 2018, signatures unchanged) -- not worth a gl/glow dependency for ~10 calls, same precedent as software.rs's MPV_RENDER_PARAM_SW_*.
 type GLenum = c_uint;
 type GLuint = c_uint;
 type GLint = c_int;
@@ -98,22 +73,17 @@ extern "C" {
     fn glFlush();
 }
 
-// mpv's OpenGL render API type string + FBO param -- `MPV_RENDER_PARAM_OPENGL_FBO`
-// itself IS in libmpv-sys's pregenerated bindings (the GL render API predates
-// the software one this module's sibling had to hand-patch), only the type
-// tag string (a C string literal macro, which bindgen never captures) needs
-// declaring here, same as `software.rs`'s `MPV_RENDER_API_TYPE_SW`.
+// FBO param IS in libmpv-sys's bindings (GL API predates the software one); only the type tag string (a
+// C macro bindgen never captures) needs declaring here, same as software.rs's MPV_RENDER_API_TYPE_SW.
 const MPV_RENDER_API_TYPE_OPENGL: &[u8] = b"opengl\0";
 
-/// GL/IOSurface/Metal resources sized to the surface's current on-screen
-/// rect -- rebuilt in `render()` whenever that size changes (construction
-/// doesn't know the real on-screen size yet; the first `set_rect` does).
+/// GL/IOSurface/Metal resources sized to the current on-screen rect -- rebuilt in render() when size changes (construction doesn't know it yet, first set_rect does).
 struct Sized {
     w: i32,
     h: i32,
     fbo: GLuint,
     gl_texture: GLuint,
-    _io_surface: CFRetained<IOSurfaceRef>, // kept alive only -- referenced via metal_texture/gl_texture below
+    _io_surface: CFRetained<IOSurfaceRef>, // kept alive only, referenced via metal_texture/gl_texture
     metal_texture: Retained<ProtocolObject<dyn MTLTexture>>,
 }
 
@@ -133,20 +103,16 @@ pub(crate) struct GpuSurface {
     device: Retained<ProtocolObject<dyn MTLDevice>>,
     queue: Retained<ProtocolObject<dyn MTLCommandQueue>>,
     metal_layer: Retained<CAMetalLayer>,
-    // `None` until the first real (non-zero) `set_rect`; rebuilt whenever
-    // the on-screen size changes.
-    sized: Mutex<Option<Sized>>,
+    sized: Mutex<Option<Sized>>, // None until first real set_rect; rebuilt when size changes
 }
 
-// See `SoftwareSurface`'s identical doc -- render() (background thread)
-// only touches read-only AppKit getters plus GL/Metal calls serialized by
-// this struct's own `gl_context`/`sized` mutex-equivalents; every AppKit
-// *mutation* happens from `set_rect` on the main thread.
+// See SoftwareSurface's identical doc -- render() (background thread) only touches read-only AppKit
+// getters plus GL/Metal calls; every AppKit mutation happens from set_rect on the main thread.
 unsafe impl Send for GpuSurface {}
 
 impl GpuSurface {
     pub(crate) fn new(mpv: *mut mpv_handle, content_view: &NSView, waker: &Arc<RenderWaker>) -> Result<Self, String> {
-        let mtm = unsafe { MainThreadMarker::new_unchecked() }; // see software.rs's identical note
+        let mtm = unsafe { MainThreadMarker::new_unchecked() }; // see software.rs's note
         let zero_frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(0.0, 0.0));
         let view = NSView::initWithFrame(NSView::alloc(mtm), zero_frame);
         view.setWantsLayer(true);
@@ -160,12 +126,9 @@ impl GpuSurface {
         metal_layer.setDevice(Some(&device));
         metal_layer.setPixelFormat(MTLPixelFormat::BGRA8Unorm);
         metal_layer.setFramebufferOnly(false); // we blit into the drawable's texture, not render into it
-        // real layer.setLayer coerces &CAMetalLayer -> &CALayer via its
-        // declared AppKit superclass (objc2's extern_class! super() chain)
-        view.setLayer(Some(&metal_layer));
+        view.setLayer(Some(&metal_layer)); // coerces &CAMetalLayer -> &CALayer via objc2's extern_class! super() chain
 
-        // Off-screen GL context -- no drawable/view attached; mpv renders
-        // into our own FBO below, never onto a default framebuffer.
+        // Off-screen GL context, no drawable/view attached -- mpv renders into our own FBO below.
         let attrs: &[NSOpenGLPixelFormatAttribute] = &[
             NSOpenGLPFAAccelerated,
             NSOpenGLPFAOpenGLProfile,
@@ -175,9 +138,7 @@ impl GpuSurface {
             NSOpenGLPFADoubleBuffer,
             0, // NSOpenGLPixelFormatAttribute array is 0-terminated
         ];
-        // Neither `NSOpenGLPixelFormat` nor `NSOpenGLContext` is
-        // `MainThreadOnly` (unlike `NSView`/`NSWindow` above) -- plain
-        // `AnyThread::alloc()`, no marker needed.
+        // Neither NSOpenGLPixelFormat nor NSOpenGLContext is MainThreadOnly (unlike NSView/NSWindow) -- plain AnyThread::alloc(), no marker needed.
         let attrs_ptr = std::ptr::NonNull::new(attrs.as_ptr() as *mut NSOpenGLPixelFormatAttribute).unwrap();
         let pixel_format = unsafe { NSOpenGLPixelFormat::initWithAttributes(NSOpenGLPixelFormat::alloc(), attrs_ptr) }
             .ok_or("NSOpenGLPixelFormat.initWithAttributes returned nil (no accelerated pixel format available)")?;
@@ -214,10 +175,7 @@ impl GpuSurface {
         Ok(Self { render_ctx, view, gl_context, device, queue, metal_layer, sized: Mutex::new(None) })
     }
 
-    /// (Re)builds the GL FBO + IOSurface + Metal-texture triple for `w`×`h`,
-    /// replacing whatever was previously sized. Returns `Err` on any GL/
-    /// IOSurface/Metal setup failure -- callers treat that as "skip this
-    /// frame", not a backend switch (see module doc).
+    /// (Re)builds the GL FBO + IOSurface + Metal-texture triple for w×h. Err on any setup failure -- callers treat that as "skip this frame", not a backend switch.
     fn resize(&self, w: i32, h: i32) -> Result<Sized, String> {
         self.gl_context.makeCurrentContext();
 
@@ -285,30 +243,18 @@ impl GpuSurface {
     }
 }
 
-/// mpv's `MPV_RENDER_PARAM_OPENGL_INIT_PARAMS` callback -- resolves any GL
-/// function name against whatever's already loaded into this process
-/// (OpenGL.framework, linked via build.rs) rather than mpv trying to link
-/// against it directly (mpv's own docs: "does not link to GL libraries
-/// directly").
+/// mpv's OPENGL_INIT_PARAMS callback -- resolves GL function names against OpenGL.framework already loaded (mpv itself doesn't link GL libraries directly).
 unsafe extern "C" fn gl_get_proc_address(_ctx: *mut c_void, name: *const c_char) -> *mut c_void {
-    // `RTLD_DEFAULT`: not exposed by the `libc` crate for this target, but a
-    // frozen, documented `<dlfcn.h>` sentinel value -- hand-declaring it is
-    // the same "small frozen FFI surface" call as the GL consts above.
+    // RTLD_DEFAULT: not exposed by the libc crate for this target, but a frozen <dlfcn.h> sentinel value.
     const RTLD_DEFAULT: *mut c_void = -2isize as *mut c_void;
     unsafe { libc::dlsym(RTLD_DEFAULT, name) }
 }
 
 fn create_io_surface(w: i32, h: i32) -> Result<CFRetained<IOSurfaceRef>, String> {
     let bytes_per_element = 4i32;
-    // No explicit IOSurfaceBytesPerRow: Metal's IOSurface-backed texture
-    // validation requires the stride 16-byte aligned, and `w * 4` (the naive
-    // stride) only happens to be a multiple of 16 when `w` is a multiple of
-    // 4 -- a fullscreen resize can easily land on a width where it isn't
-    // (e.g. 1710: 1710*4 = 6840, not divisible by 16), which crashed with
-    // "Texture Descriptor Validation ... bytesPerRow must be aligned to 16
-    // bytes". Omitting the key lets IOSurfaceCreate pick a correctly-aligned
-    // stride itself; both CGLTexImageIOSurface2D and the Metal texture read
-    // that stride back off the surface, never the value we'd have supplied.
+    // No explicit IOSurfaceBytesPerRow: Metal requires the stride 16-byte aligned, and naive `w * 4`
+    // isn't always (e.g. w=1710 -> 6840, not divisible by 16) -- crashed with a bytesPerRow validation
+    // error. Omitting the key lets IOSurfaceCreate pick a correctly-aligned stride itself.
     let keys = [
         CFString::from_str("IOSurfaceWidth"),
         CFString::from_str("IOSurfaceHeight"),
@@ -343,14 +289,12 @@ impl RenderSurface for GpuSurface {
 
     fn render(&self) {
         if self.render_ctx.is_null() {
-            return; // torn down -- see `teardown`
+            return; // torn down
         }
         if self.view.isHidden() {
             return;
         }
-        // ponytail: point resolution, same call as `SoftwareSurface::render`
-        // -- see that file's doc for why (Retina backing-store rendering is
-        // real upgrade work, not done for either backend here).
+        // ponytail: point resolution, not Retina backing-store -- real upgrade work, not done for either backend.
         let bounds = self.view.bounds();
         let (w, h) = (bounds.size.width as i32, bounds.size.height as i32);
         if w <= 0 || h <= 0 {
@@ -361,7 +305,7 @@ impl RenderSurface for GpuSurface {
         if !matches!(&*guard, Some(s) if s.w == w && s.h == h) {
             match self.resize(w, h) {
                 Ok(sized) => *guard = Some(sized),
-                Err(_) => return, // transient setup failure -- try again next tick
+                Err(_) => return, // transient failure, try again next tick
             }
         }
         let Some(sized) = guard.as_ref() else { return };
@@ -377,16 +321,12 @@ impl RenderSurface for GpuSurface {
             glViewport(0, 0, w, h);
             let rc = mpv_render_context_render(self.render_ctx, params.as_mut_ptr());
             if rc < 0 {
-                return; // no frame ready yet or a transient error -- try again next tick
+                return; // no frame ready yet or a transient error, try again next tick
             }
-            // Ensures mpv's GL writes into the IOSurface-bound texture are
-            // complete before Metal (a separate GPU command stream) reads
-            // the same memory below -- the minimum synchronization this
-            // zero-copy handoff needs.
-            glFlush();
+            glFlush(); // ensures mpv's GL writes finish before Metal reads the same memory (zero-copy handoff sync)
         }
 
-        let Some(drawable) = self.metal_layer.nextDrawable() else { return }; // layer not ready -- skip this tick
+        let Some(drawable) = self.metal_layer.nextDrawable() else { return }; // layer not ready, skip this tick
         let Some(cmd_buf) = self.queue.commandBuffer() else { return };
         let Some(encoder) = cmd_buf.blitCommandEncoder() else { return };
         unsafe { encoder.copyFromTexture_toTexture(&sized.metal_texture, &drawable.texture()) };
@@ -400,10 +340,7 @@ impl RenderSurface for GpuSurface {
             mpv_render_context_set_update_callback(self.render_ctx, None, std::ptr::null_mut());
             mpv_render_context_free(self.render_ctx);
         }
-        // Sized::drop issues glDelete* calls -- make sure our own GL context
-        // (not whichever, if any, happens to be current on this thread) is
-        // the one they land on.
-        self.gl_context.makeCurrentContext();
+        self.gl_context.makeCurrentContext(); // Sized::drop issues glDelete* calls, must land on our GL context
         *self.sized.lock().unwrap() = None; // frees the GL FBO/texture
         self.view.removeFromSuperview();
         self.render_ctx = std::ptr::null_mut();

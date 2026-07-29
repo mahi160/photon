@@ -1,32 +1,16 @@
-//! Platform-neutral half of the mpv render backend (ADR-0009): the
-//! `RenderSurface` trait, the `Backend` enum, and the GPU-vs-CPU fallback
-//! decision every platform module (`mac/`, `windows/`, `linux/`) implements
-//! against. Pulled out of `mac/mod.rs` so it isn't macOS-specific anymore --
-//! `engine.rs` only ever depends on this module plus `super::backend::attach`
-//! (a `#[cfg(target_os = ...)]`-selected alias in `mpv/mod.rs`), never on any
-//! one platform module directly.
+//! Platform-neutral half of mpv render backend (ADR-0009): `RenderSurface` trait, `Backend` enum, GPU-vs-CPU fallback decision every platform module implements against. engine.rs depends only on this + `backend::attach` alias, never a platform module directly.
 
-/// The three operations the shared engine code needs from whichever backend
-/// is active: reposition/hide, render one frame, and tear down before mpv
-/// itself is destroyed. `Send`: the render loop (`spawn_render_loop`,
-/// commands.rs) calls `render()` from its own background thread -- each
-/// implementation's own `unsafe impl Send` doc explains why that's safe for
-/// its particular platform object graph.
+/// Ops shared engine code needs from active backend: reposition/hide, render one frame, teardown before mpv destroyed. `Send`: render() runs off the render loop's background thread, see each impl's own `unsafe impl Send` doc.
 pub(crate) trait RenderSurface: Send {
-    /// Repositions to the given content-view-local rect (points, top-left
-    /// origin, matching `getBoundingClientRect()`), or hides entirely when
-    /// `w`/`h` is zero (placeholder not visible/mounted).
+    /// Repositions to content-view-local rect (points, top-left origin), or hides when w/h is zero.
     fn set_rect(&self, x: f64, y_top_left: f64, w: f64, h: f64);
-    /// Renders one ready mpv frame onto the surface, if one is available.
+    /// Renders one ready mpv frame, if available.
     fn render(&self);
-    /// Frees GL/GPU/mpv-render-context resources. Must run strictly before
-    /// `mpv_terminate_destroy` -- see `MpvEngine::drop`.
+    /// Frees GL/GPU/mpv-render-context resources -- must run before `mpv_terminate_destroy`, see `MpvEngine::drop`.
     fn teardown(&mut self);
 }
 
-/// Which backend actually ended up active -- surfaced up through
-/// `MpvEngine`/the `mpv_attach` Tauri command so the player-overlay badge
-/// (issue #12) can show a CPU-fallback indicator only when it's true.
+/// Which backend ended up active -- surfaced via `mpv_attach` for the CPU-fallback badge (issue #12).
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Backend {
     Gpu,
@@ -42,12 +26,7 @@ impl Backend {
     }
 }
 
-/// The GPU-vs-CPU fallback decision, pulled out as a pure function of two
-/// closures so it's unit-testable independent of the real GL/GPU calls a
-/// platform's own `attach()` makes (ADR-0009's testing decision) -- prints
-/// the one diagnostic line either way (issue #12's "clear log line"
-/// requirement) so a user report can be diagnosed without reproducing
-/// anything GPU-specific.
+/// GPU-vs-CPU fallback decision as a pure function of two closures, unit-testable without real GL/GPU calls (ADR-0009). Always logs one diagnostic line (issue #12).
 pub(crate) fn try_or_fallback<T>(
     gpu: impl FnOnce() -> Result<T, String>,
     fallback: impl FnOnce() -> Result<T, String>,
@@ -100,6 +79,6 @@ mod tests {
         let err = result.unwrap_err();
         assert!(err.contains("no GL context"), "{err}");
         assert!(err.contains("no software render either"), "{err}");
-        assert_eq!(backend, Backend::Cpu); // still reported as attempted-CPU, not a mystery state
+        assert_eq!(backend, Backend::Cpu); // reported as attempted-CPU, not unknown
     }
 }

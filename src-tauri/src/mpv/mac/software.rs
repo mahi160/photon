@@ -1,19 +1,5 @@
-//! mpv's *software* render API (`MPV_RENDER_API_TYPE_SW`) into a plain
-//! buffer, handed to a `CALayer` (via `layer.contents`) on a layer-backed
-//! `NSView` inserted below the window's (transparent) WKWebView -- see
-//! ADR-0005/0009 and `super::RenderSurface`. The permanent fallback when
-//! `GpuSurface` (checkpoint 3, ADR-0009) can't set up on a given machine, and
-//! today's only backend until then.
-//!
-//! ponytail: NOT the OpenGL render API, on purpose -- see ADR-0009 for why a
-//! plain `NSOpenGLView` doesn't work here (transparency/layer-backing), and
-//! why the real GPU path (`GpuSurface`) instead goes through an off-screen
-//! FBO + IOSurface + `CAMetalLayer`. Slower than GPU rendering (mpv's own
-//! docs: "very slow, because everything ... runs on the CPU"). Frame
-//! buffers are pooled (see `BUFFER_POOL_CAP`) instead of allocated fresh
-//! every render -- CoreGraphics decides when it's actually done with a
-//! given buffer (its release callback, not our render loop), so a buffer
-//! only rejoins the pool once CG says so; this can't tear.
+//! mpv's software render API into a plain buffer, handed to a CALayer on a layer-backed NSView below the window's transparent WKWebView (ADR-0005/0009) -- permanent fallback when GpuSurface can't set up.
+//! ponytail: not OpenGL on purpose, plain NSOpenGLView doesn't work here (transparency/layer-backing) -- slower (CPU-bound, mpv docs call it "very slow"), buffers pooled since CoreGraphics's release callback decides when one's free.
 
 use super::RenderSurface;
 use crate::mpv::engine::{on_render_update, RenderWaker};
@@ -38,16 +24,12 @@ const MPV_RENDER_PARAM_SW_STRIDE: mpv_render_param_type = 19;
 const MPV_RENDER_PARAM_SW_POINTER: mpv_render_param_type = 20;
 const MPV_RENDER_API_TYPE_SW: &[u8] = b"sw\0";
 
-// double/triple buffering headroom -- CALayer/the window server can still
-// be compositing the previous frame(s) when we go looking for a free
-// buffer; a small cap just bounds how many distinct allocations can be
-// alive at once, not a hard correctness requirement (see PooledBuffer::drop)
+// double/triple buffering headroom -- CALayer/window server can still be compositing previous frame(s)
+// when we look for a free buffer; cap just bounds live allocations, not a correctness requirement.
 const BUFFER_POOL_CAP: usize = 4;
 
-// Handed to CGDataProvider (via an Arc) instead of a plain Vec<u8> so we get
-// a callback for exactly when CoreGraphics is truly done reading it (the
-// data provider's release callback runs on Drop) -- the buffer only rejoins
-// `pool` at that point, never the instant we hand it off to CoreGraphics.
+// Handed to CGDataProvider via an Arc instead of a plain Vec<u8> so we get a callback for exactly when
+// CoreGraphics is done reading it (release callback runs on Drop) -- buffer rejoins `pool` only then.
 struct PooledBuffer {
     data: Vec<u8>,
     pool: Arc<Mutex<Vec<Vec<u8>>>>,
@@ -73,21 +55,12 @@ impl Drop for PooledBuffer {
 pub(crate) struct SoftwareSurface {
     render_ctx: *mut mpv_render_context,
     view: Retained<NSView>,
-    // created once -- CGColorSpace is the same for every frame, no reason to
-    // recreate it 5x/sec
-    colorspace: CGColorSpace,
-    // recycled Vec<u8> allocations, keyed by nothing -- render() just grabs
-    // whichever is free and resizes it (a no-op once it's grown to the
-    // current frame size, which is the steady-state case)
-    buffer_pool: Arc<Mutex<Vec<Vec<u8>>>>,
+    colorspace: CGColorSpace, // created once, same for every frame
+    buffer_pool: Arc<Mutex<Vec<Vec<u8>>>>, // recycled Vec<u8>s -- render() grabs whichever's free, resize is a no-op once grown to steady-state size
 }
 
-// `view` (an AppKit object) and `render_ctx`/mpv FFI calls aren't
-// automatically Send -- `render()` is called from the render loop's own
-// background thread (see the module doc + `RenderSurface`'s doc), which
-// only ever touches read-only AppKit getters (`bounds`, `isHidden`,
-// `layer`); every AppKit *mutation* (`setFrame`, `setHidden`) happens from
-// `set_rect` on the main thread (a Tauri command) instead.
+// view/render_ctx/mpv FFI aren't auto-Send -- render() (background thread) only touches read-only
+// AppKit getters (bounds, isHidden, layer); every mutation happens from set_rect on the main thread.
 unsafe impl Send for SoftwareSurface {}
 
 impl SoftwareSurface {
@@ -96,11 +69,7 @@ impl SoftwareSurface {
         content_view: &NSView,
         waker: &Arc<RenderWaker>,
     ) -> Result<Self, String> {
-        // ponytail: `MainThreadMarker::new_unchecked` -- `attach()`'s whole
-        // call chain (from the `mpv_attach` Tauri command down) has never
-        // checked thread affinity, on cocoa/objc 0.2.x or here; preserving
-        // that rather than introducing a new runtime check as a drive-by
-        // part of this migration.
+        // ponytail: MainThreadMarker::new_unchecked -- attach()'s whole call chain never checked thread affinity, preserved as-is rather than adding a new runtime check.
         let mtm = unsafe { MainThreadMarker::new_unchecked() };
         let zero_frame = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(0.0, 0.0));
         let view = NSView::initWithFrame(NSView::alloc(mtm), zero_frame);
@@ -142,39 +111,26 @@ impl RenderSurface for SoftwareSurface {
             self.view.setHidden(true);
             return;
         }
-        // # Safety: not retained internally per objc2-app-kit's own doc, but
-        // this view is always still attached (only detached in `teardown`,
-        // which also stops any further `set_rect` calls -- see the struct's
-        // Drop-ordering contract on `MpvEngine`).
+        // SAFETY: not retained internally per objc2-app-kit's doc, but this view stays attached until teardown (which also stops further set_rect calls, see MpvEngine's Drop-ordering contract).
         let superview = unsafe { self.view.superview() }.expect("render surface view detached");
         let parent_bounds = superview.bounds();
-        // AppKit's NSView origin is bottom-left; the frontend reports
-        // top-left (CSS) coordinates.
-        let y = parent_bounds.size.height - y_top_left - h;
+        let y = parent_bounds.size.height - y_top_left - h; // AppKit's NSView origin is bottom-left, frontend reports top-left (CSS)
 self.view.setFrame(NSRect::new(NSPoint::new(x, y), NSSize::new(w, h)));
         self.view.setHidden(false);
         self.render();
     }
 
-    /// Renders one frame into an in-memory buffer and hands it to the
-    /// view's layer as a `CGImage`. Called from the render loop's own
-    /// background thread each time mpv wakes `RenderWaker`, and once
-    /// synchronously at the end of `set_rect`.
+    /// Renders one frame into an in-memory buffer, hands it to the view's layer as a CGImage. Called
+    /// from the render loop's background thread on each RenderWaker wake, and once at end of set_rect.
     fn render(&self) {
         if self.render_ctx.is_null() {
-            return; // torn down (MpvEngine dropped) -- see `teardown`
+            return; // torn down (MpvEngine dropped)
         }
         if self.view.isHidden() {
             return;
         }
-        // ponytail: rendering at *point* resolution, not the 2x/HiDPI
-        // backing-store resolution `convertRectToBacking:` would give us.
-        // Quarters the per-frame buffer/CGImage cost on Retina displays,
-        // which is what actually made 30fps possible instead of
-        // beachballing (see `spawn_render_loop`'s doc) -- most streamed
-        // video isn't native 4K anyway, so this is rarely a visible loss.
-        // CALayer's default contentsScale (1.0) matches a point-sized
-        // image correctly; no extra config needed.
+        // ponytail: point resolution, not 2x/HiDPI backing-store -- quarters per-frame cost on Retina,
+        // what actually made 30fps possible instead of beachballing. CALayer's default contentsScale (1.0) matches a point-sized image, no extra config needed.
         let bounds = self.view.bounds();
         let (w, h) = (bounds.size.width as i32, bounds.size.height as i32);
         if w <= 0 || h <= 0 {
@@ -183,9 +139,7 @@ self.view.setFrame(NSRect::new(NSPoint::new(x, y), NSSize::new(w, h)));
 
         let stride: usize = (w as usize) * 4;
         let len = stride * (h as usize);
-        // reuse a pooled allocation when one's free -- `resize` is a no-op
-        // once it's already grown to `len` (the steady-state case, size
-        // only changes on window resize)
+        // reuse a pooled allocation when free -- resize is a no-op once already grown to len
         let mut data = self.buffer_pool.lock().map(|mut p| p.pop()).unwrap_or_default().unwrap_or_default();
         data.resize(len, 0);
 
@@ -201,9 +155,7 @@ self.view.setFrame(NSRect::new(NSPoint::new(x, y), NSSize::new(w, h)));
         ];
         let rc = unsafe { mpv_render_context_render(self.render_ctx, params.as_mut_ptr()) };
         if rc < 0 {
-            // no frame ready yet or a transient error -- return the buffer
-            // to the pool instead of just dropping it, so a transient miss
-            // doesn't force a one-off reallocation on the next tick
+            // no frame ready or a transient error -- return the buffer to the pool instead of dropping it
             if let Ok(mut pool) = self.buffer_pool.lock() {
                 if pool.len() < BUFFER_POOL_CAP {
                     pool.push(data);
@@ -227,31 +179,20 @@ self.view.setFrame(NSRect::new(NSPoint::new(x, y), NSSize::new(w, h)));
             0, // kCGRenderingIntentDefault
         );
         let Some(layer) = self.view.layer() else { return };
-        // # Safety: CGImageRef is a toll-free-bridged CF type -- CALayer's
-        // `contents` property accepts it directly (Apple's own documented
-        // behavior for that property, not something this cast invents).
+        // SAFETY: CGImageRef is a toll-free-bridged CF type, CALayer's contents accepts it directly (Apple's documented behavior).
         unsafe {
             layer.setContents(Some(&*(image.as_ptr() as *const AnyObject)));
         }
-        // Core Animation normally flushes implicit transactions on the next
-        // run-loop pass of whichever thread touched the layer -- this
-        // render loop runs on a plain std::thread with no run loop at all,
-        // so without an explicit flush the contents change just sits
-        // pending forever (screen shows the punched-through hole to
-        // nothing: solid black) even though mpv genuinely produced a real
-        // frame. Forces it to the window server immediately.
+        // Core Animation flushes implicit transactions on the next run-loop pass, but this render loop has
+        // no run loop -- without an explicit flush the change sits pending forever (shows solid black).
         CATransaction::flush();
     }
 
-    /// Frees the render context and removes the view. Called from
-    /// `MpvEngine::drop` while holding the surface's own mutex -- see
-    /// `RenderSurface`'s doc for why this must happen here (not via `Drop`)
-    /// and why nulling `render_ctx` afterward matters.
+    /// Frees the render context and removes the view. Called from MpvEngine::drop while holding the
+    /// surface's own mutex -- see RenderSurface's doc for why not via Drop, and why nulling render_ctx matters.
     fn teardown(&mut self) {
         unsafe {
-            // Unregister before freeing the context -- otherwise a callback
-            // could fire (mpv's own thread) referencing a `RenderWaker`
-            // that `MpvEngine`'s `Drop` is about to free once this returns.
+            // Unregister before freeing the context -- else a callback could fire referencing a RenderWaker MpvEngine's Drop is about to free.
             mpv_render_context_set_update_callback(self.render_ctx, None, std::ptr::null_mut());
             mpv_render_context_free(self.render_ctx);
         }
