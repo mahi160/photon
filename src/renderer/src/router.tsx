@@ -15,9 +15,7 @@ import { Home } from './pages/Home'
 import { Movies } from './pages/Movies'
 import { Shows } from './pages/Shows'
 import { Search } from './pages/Search'
-// heavy pages load lazily — the shell (login/home/library/search) stays in the
-// entry chunk; defaultPreload:'intent' prefetches these on link hover anyway.
-// Player especially: it pulls the whole player/ dir.
+// heavy pages lazy-load; shell stays in entry chunk, defaultPreload:'intent' prefetches on hover. Player pulls whole player/ dir.
 const MovieDetails = lazyRouteComponent(() => import('./pages/MovieDetails'), 'MovieDetails')
 const ShowDetails = lazyRouteComponent(() => import('./pages/ShowDetails'), 'ShowDetails')
 const EpisodeDetails = lazyRouteComponent(() => import('./pages/EpisodeDetails'), 'EpisodeDetails')
@@ -37,7 +35,7 @@ const loginRoute = createRoute({
   }
 })
 
-// everything below requires a session
+// below requires a session
 const appRoute = createRoute({
   getParentRoute: () => rootRoute,
   id: 'app',
@@ -47,7 +45,7 @@ const appRoute = createRoute({
   component: Outlet
 })
 
-// browsing screens share the sidebar layout
+// browsing screens share sidebar layout
 const shellRoute = createRoute({
   getParentRoute: () => appRoute,
   id: 'shell',
@@ -79,8 +77,7 @@ const movieDetailsRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: '/movies/$itemId',
   component: MovieDetails,
-  // surprise=1: arrived via "Surprise me" — details page runs a cancellable
-  // auto-play countdown
+  // surprise=1: arrived via "Surprise me" — details page runs cancellable auto-play countdown
   validateSearch: (search: Record<string, unknown>): { surprise?: boolean } =>
     search.surprise ? { surprise: true } : {}
 })
@@ -95,7 +92,7 @@ const episodeDetailsRoute = createRoute({
   component: EpisodeDetails
 })
 
-// player is chrome-free, outside the shell
+// player is chrome-free, outside shell
 const playerRoute = createRoute({
   getParentRoute: () => appRoute,
   path: '/player/$itemId',
@@ -128,18 +125,14 @@ const routeTree = rootRoute.addChildren([
   ])
 ])
 
-// hash history: the packaged app loads index.html via file://, where
-// window.location.pathname is the absolute disk path, not '/' — browser
-// history (the default) tries to match that as a route and fails with a
-// blank "Not Found" screen. Hash history ignores the file:// path entirely.
+// hash history: packaged app loads index.html via file://, pathname is disk path not '/' — browser history 404s on it, hash history ignores it.
 export const router = createRouter({
   routeTree,
   defaultPreload: 'intent',
   defaultErrorComponent: RouteError,
   defaultNotFoundComponent: RouteNotFound,
   history: createHashHistory(),
-  // native View Transitions crossfade between routes -- no-ops itself on
-  // webviews without document.startViewTransition (older WebKitGTK)
+  // native View Transitions crossfade routes -- no-ops on webviews without document.startViewTransition (older WebKitGTK)
   defaultViewTransition: true
 })
 
