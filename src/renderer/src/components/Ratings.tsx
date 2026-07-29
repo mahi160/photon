@@ -2,9 +2,7 @@ import { Heart, Star } from 'reicon-react'
 import type { BaseItem } from '../lib/jellyfin'
 import styles from './Ratings.module.css'
 
-// Star = community score, heart = critics %. Monochrome, sits in the meta
-// row like any other entry. Data is the server's own metadata scrape — no
-// external rating API involved.
+// star = community score, heart = critics % -- data is server's own metadata scrape, no external rating API
 export function Ratings({ item }: { item: BaseItem }): React.JSX.Element | null {
   const community = item.CommunityRating
   const critic = item.CriticRating

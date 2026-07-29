@@ -71,8 +71,7 @@ function EndTimeDisplay({
   rate: number
 }): React.JSX.Element | null {
   if (duration <= 0) return null
-  // ponytail: genuinely needs the wall clock every render (playback ticks
-  // currentTime forward) — no pure/lazy-init substitute exists for "now"
+  // ponytail: needs wall clock every render (currentTime ticks forward), no pure substitute for "now"
   // eslint-disable-next-line react-hooks/purity
   const endsAt = new Date(Date.now() + ((duration - currentTime) / (rate || 1)) * 1000)
   return (
@@ -82,11 +81,7 @@ function EndTimeDisplay({
   )
 }
 
-// Everything below is untouched by playback ticks (speed/audio/subtitle/sync
-// menus, mpv/PiP/fullscreen). It's memoized so those base-ui popovers don't
-// reconcile on every `time` update from the video element — only when a
-// track/menu actually changes. None of ControlsBar's other props (time,
-// duration, play/pause state, volume) are in this list on purpose.
+// memoized: speed/audio/subtitle/sync/PiP/fullscreen menus don't need to reconcile on every `time` tick, only on track/menu change
 type PlaybackMenusProps = Pick<
   ControlsBarProps,
   | 'rate'

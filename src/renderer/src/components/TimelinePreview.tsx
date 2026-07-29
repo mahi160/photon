@@ -35,9 +35,8 @@ export function TimelinePreview({
   const [preview, setPreview] = useState<{ x: number; t: number } | null>(null)
   const [showRemaining, setShowRemaining] = useState(false)
 
-  // server trickplay thumbs (Jellyfin 10.9+); absent → text-only bubble.
-  // ponytail: first media source, smallest width variant — items have one
-  // source in practice and a hover thumb doesn't need the large tiles
+  // server trickplay thumbs (Jellyfin 10.9+), absent -> text-only bubble
+  // ponytail: first media source, smallest width variant -- hover thumb doesn't need large tiles
   const tp = useMemo(() => {
     const [mediaSourceId, widths] = Object.entries(item.Trickplay ?? {})[0] ?? []
     const infos = Object.values(widths ?? {})
@@ -83,8 +82,7 @@ export function TimelinePreview({
                     className={styles.previewThumb}
                     style={{ inlineSize: tp.info.Width, blockSize: tp.info.Height }}
                   >
-                    {/* <img>, not background-image: load failures surface in the
-                        console instead of silently showing an empty box */}
+                    {/* <img> not background-image: load failures surface in console, not a silent empty box */}
                     <img
                       src={url}
                       alt=""

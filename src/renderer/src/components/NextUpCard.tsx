@@ -20,7 +20,6 @@ export function NextUpCard({
 }: NextUpCardProps): React.JSX.Element | null {
   const autoplayNext = useSettings((s) => s.autoplayNext)
 
-  // show only in final 30 seconds
   if (duration <= 0 || remaining > 30 || remaining <= 0) return null
 
   return (
