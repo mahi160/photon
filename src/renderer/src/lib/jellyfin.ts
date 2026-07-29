@@ -22,8 +22,7 @@ export function deviceId(): string {
   return id
 }
 
-// set once at startup from the real app version (main.tsx) — falls back to
-// this if that IPC round trip hasn't resolved yet on the very first request
+// set once at startup from real app version (main.tsx) — fallback if IPC round trip hasn't resolved yet on the first request
 let clientVersion = '1.0.0'
 export function setClientVersion(v: string): void {
   clientVersion = v
@@ -49,8 +48,7 @@ export class JellyfinError extends Error {
   }
 }
 
-// a dropped/asleep server otherwise hangs on the OS TCP timeout (minutes)
-// instead of the friendly "Cannot reach server" message showing up fast
+// a dropped/asleep server otherwise hangs on the OS TCP timeout (minutes) instead of failing fast
 const REQUEST_TIMEOUT_MS = 10_000
 
 export async function jf<T>(
@@ -194,7 +192,7 @@ export interface MediaStream {
   DisplayTitle?: string
   IsTextSubtitleStream?: boolean
   IsDefault?: boolean // container disposition flag — what the browser plays in direct play
-  IsForced?: boolean // foreign-dialogue-only track (e.g. anime, foreign-language films) — shows regardless of the subtitlesEnabled preference
+  IsForced?: boolean // foreign-dialogue-only track — shows regardless of subtitlesEnabled preference
   DeliveryMethod?: string
   DeliveryUrl?: string
   IsExternal?: boolean
@@ -206,9 +204,7 @@ export interface MediaStream {
   Profile?: string // audio profile, e.g. 'Dolby TrueHD + Dolby Atmos'
 }
 
-// the video stream and the default (or first) audio stream — shared by
-// mediaBadges/playerSpecialBadges below, both of which only ever badge
-// those two
+// video stream + default (or first) audio stream — shared by mediaBadges/playerSpecialBadges below
 function defaultAV(streams: MediaStream[]): { v?: MediaStream; a?: MediaStream } {
   return {
     v: streams.find((s) => s.Type === 'Video'),
@@ -245,12 +241,7 @@ export function mediaBadges(streams: MediaStream[]): string[] {
   return out
 }
 
-// player-overlay-only badges (issue #12): only the notable attributes --
-// 4K, HDR/HDR10+/Dolby Vision variants, and Dolby Atmos. Plain codec names,
-// resolutions below 4K, and stereo/plain-surround layouts stay off the
-// overlay so the normal case (1080p, standard codecs, direct play) doesn't
-// clutter it -- the full breakdown (mediaBadges) still shows on the
-// movie/show details pages, unchanged.
+// player-overlay-only badges (issue #12): 4K, HDR/HDR10+/Dolby Vision, Dolby Atmos only -- keeps the normal case (1080p, standard codecs, direct play) uncluttered; full breakdown (mediaBadges) stays on details pages.
 export function playerSpecialBadges(streams: MediaStream[]): string[] {
   const { v, a } = defaultAV(streams)
   const out: string[] = []
@@ -279,8 +270,7 @@ export interface ChapterInfo {
   Name?: string
 }
 
-// Jellyfin 10.9+ trickplay (scrub thumbnails): tiles of thumbs per media source.
-// Outer key = mediaSourceId, inner key = width variant.
+// Jellyfin 10.9+ trickplay (scrub thumbnails): tiles of thumbs per media source. Outer key = mediaSourceId, inner key = width variant.
 export interface TrickplayInfo {
   Width: number
   Height: number
@@ -390,34 +380,8 @@ export function directStreamUrl(itemId: string, mediaSourceId: string): string {
   return `${session.server}/Videos/${itemId}/stream?static=true&mediaSourceId=${mediaSourceId}&api_key=${session.token}`
 }
 
-// Text-subtitle delivery URL, built ourselves rather than trusting the
-// server's own MediaStream.DeliveryUrl. That field bakes in whatever
-// startPositionTicks the PlaybackInfo request's StartTimeTicks was (server
-// source: SubtitleController's .../Subtitles/{index}/{startPositionTicks}/
-// Stream.{format} route, fed by StreamInfo.GetSubtitleStreamInfo) -- and
-// without `copyTimestamps=true` (which the server never sets for this field),
-// a nonzero startPositionTicks makes SubtitleEncoder.FilterEvents rebase
-// every cue's start/end time to count from 0, for the transcode case where
-// the *video* stream itself also restarts counting from 0 at that offset.
-// mpv (direct play, ADR-0008) never does that: it seeks the one full,
-// original file to `startSeconds` and keeps that file's real absolute
-// timeline running. Feeding it cues rebased to 0 desyncs every one of
-// them by the resume offset -- for any partially-watched item (Continue
-// Watching is Photon's primary resume surface), every cue ends up already
-// in mpv's past the moment playback starts, so nothing ever renders.
-// Hardcoding startPositionTicks to 0 here sidesteps the rebase entirely
-// (FilterEvents no-ops for both the filter and the rebase at offset 0),
-// giving back this stream's real, untouched absolute timestamps.
-// No startPositionTicks path segment: that segment requires a newer server
-// route (GetSubtitleWithTicks) this client has no version check for --
-// omitting it hits the older, more universally supported GetSubtitle route
-// instead, which defaults startPositionTicks to 0 query-side regardless.
-//
-// .srt, not .vtt: see deviceProfile.ts's SubtitleProfiles doc -- Jellyfin's
-// vtt conversion emits a malformed `Region:` header for source subtitles
-// with cue positioning, which makes mpv's webvtt decoder silently drop
-// every cue in the file. Format here must match the SubtitleProfiles entry
-// that got this stream marked External in the first place.
+// Text-subtitle delivery URL, built ourselves instead of trusting server's MediaStream.DeliveryUrl -- that field bakes in a nonzero startPositionTicks (from PlaybackInfo's StartTimeTicks), which rebases every cue's start/end to count from 0 for the transcode case (SubtitleController/StreamInfo.GetSubtitleStreamInfo, no copyTimestamps=true). mpv (direct play, ADR-0008) seeks the real file and keeps its true absolute timeline, so rebased cues desync by the resume offset -- for Continue Watching items every cue ends up in mpv's past, nothing renders. Omitting startPositionTicks here (older GetSubtitle route, defaults to 0) sidesteps the rebase entirely.
+// .srt not .vtt: see deviceProfile.ts's SubtitleProfiles doc -- Jellyfin's vtt conversion emits a malformed Region: header, mpv's webvtt decoder silently drops every cue past it. Format must match the SubtitleProfiles entry that marked this stream External.
 export function subtitleStreamUrl(itemId: string, mediaSourceId: string, index: number): string {
   if (!session) throw new JellyfinError(0, 'Not signed in')
   return `${session.server}/Videos/${itemId}/${mediaSourceId}/Subtitles/${index}/Stream.srt?api_key=${session.token}`
