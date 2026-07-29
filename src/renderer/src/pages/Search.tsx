@@ -60,8 +60,7 @@ export function Search(): React.JSX.Element {
   const addHistory = useSearchHistory((s) => s.add)
   const removeHistory = useSearchHistory((s) => s.remove)
   const clearHistory = useSearchHistory((s) => s.clear)
-  // longer, separate debounce than the live search — only save once the user
-  // has actually stopped, not just paused mid-word
+  // longer, separate debounce than live search -- save once user actually stopped, not just paused mid-word
   const settled = useDebounced(q, 1000)
   useEffect(() => {
     if (settled.length >= 2) addHistory(settled)

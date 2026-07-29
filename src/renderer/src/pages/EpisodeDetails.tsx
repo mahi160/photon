@@ -28,9 +28,7 @@ export function EpisodeDetails(): React.JSX.Element {
   const [sub, setSub] = useState<number | undefined>()
   const [thumbLoaded, setThumbLoaded] = useState(false)
 
-  // next episode: same season's next index, or next season's first --
-  // conditional queries (react-query's own `enabled` pattern, not a
-  // conditional hook call) since item/its season aren't known until loaded
+  // next episode: same season's next index, or next season's first -- conditional queries (enabled pattern) since item/season unknown until loaded
   const seriesId = item?.SeriesId
   const seasonId = item?.SeasonId
   const seasons = useQuery({ ...seasonsQuery(seriesId ?? ''), enabled: !!seriesId })
@@ -38,8 +36,7 @@ export function EpisodeDetails(): React.JSX.Element {
     ...episodesQuery(seriesId ?? '', seasonId ?? ''),
     enabled: !!seriesId && !!seasonId
   })
-  // defensive: array position determines "next season", don't trust the
-  // server to have already returned them in index order
+  // defensive: array position determines "next season", don't trust server to return them in index order
   const sortedSeasons = seasons.data
     ? [...seasons.data].sort((a, b) => (a.IndexNumber ?? 0) - (b.IndexNumber ?? 0))
     : undefined
@@ -67,8 +64,7 @@ export function EpisodeDetails(): React.JSX.Element {
       ? sortedEpisodes[episodeIdx + 1]
       : sortedNextSeasonEpisodes?.[0]
 
-  // episodes rarely have their own backdrop -- the wide episode thumb reads
-  // fine as a hero image too, and beats an empty scrim
+  // episodes rarely have own backdrop -- wide episode thumb works fine as hero image, beats empty scrim
   const hero = backdropUrl(item, 1280) ?? imageUrl(item, 1280)
   const thumb = imageUrl(item, 640)
   const position = ticksToSeconds(item.UserData?.PlaybackPositionTicks)
@@ -202,9 +198,7 @@ export function EpisodeDetails(): React.JSX.Element {
         </div>
         {nextEpisode && (
           <div className={styles.epSection}>
-            {/* .epHead (not just the bare title) -- it's the one carrying the
-                margin-block-end gap before whatever comes next, see
-                Details.module.css */}
+            {/* .epHead carries margin-block-end gap before what's next, see Details.module.css */}
             <div className={styles.epHead}>
               <h2 className={styles.epHeadTitle}>Next Episode</h2>
             </div>
