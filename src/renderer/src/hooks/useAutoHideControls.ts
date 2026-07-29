@@ -26,10 +26,7 @@ export function useAutoHideControls(
     return () => clearTimeout(hideTimerRef.current)
   }, [])
 
-  // ponytail: these arm a setTimeout (an external system) in response to
-  // mount / a playbackState change — the canonical Effect use case. The
-  // setState-in-effect rule flags it anyway; no pure substitute exists for
-  // "start a hide timer".
+  // ponytail: arms setTimeout on mount/playbackState change, canonical Effect use case; setState-in-effect rule flags it anyway, no pure substitute for "start a hide timer"
   // initial show
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

@@ -9,10 +9,7 @@ export interface MediaSessionHandlers {
   nextEpisode?: BaseItem | null
 }
 
-// Single owner of the OS media-key surface. Handlers are read through a ref
-// so registration happens once (plus when prev/next availability flips) —
-// depending on the handlers object itself re-ran this every playback tick,
-// and the cleanup's `metadata = null` kept wiping the overlay's title.
+// Single owner of OS media-key surface. Handlers read through a ref so registration happens once (plus prev/next flips) -- depending on handlers object re-ran this every tick, cleanup's `metadata = null` kept wiping overlay title.
 export function useMediaSession(handlers: MediaSessionHandlers): void {
   const ref = useRef(handlers)
   useEffect(() => {
@@ -47,8 +44,7 @@ export function useMediaSession(handlers: MediaSessionHandlers): void {
     }
   }, [hasPrev, hasNext])
 
-  // metadata belongs to playback loads (usePlayback sets it per item) — only
-  // clear it when the player actually leaves, never on re-registration
+  // metadata belongs to playback loads (usePlayback sets per item) -- clear only when player actually leaves, never on re-registration
   useEffect(() => {
     return () => {
       navigator.mediaSession.metadata = null

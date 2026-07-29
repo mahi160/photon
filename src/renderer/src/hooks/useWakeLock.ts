@@ -1,11 +1,6 @@
 import { useEffect } from 'react'
 
-// Screen Wake Lock API (WKWebView/Safari 16.4+, so covered on Photon's own
-// shipping target) instead of any native/Rust power-management code --
-// exactly what it's for, no reason to duplicate it. Re-acquires on
-// visibility change: the API itself force-releases the lock whenever the
-// document goes hidden (window minimized/Spaces-switched), which a desktop
-// player hits far more than a browser tab ever would.
+// Screen Wake Lock API (WKWebView/Safari 16.4+, covers Photon's shipping target), no need to duplicate in native/Rust. Re-acquires on visibility change: API force-releases lock whenever document hides (minimize/Spaces-switch), which desktop hits often.
 export function useWakeLock(active: boolean): void {
   useEffect(() => {
     if (!active || !('wakeLock' in navigator)) return
@@ -23,7 +18,7 @@ export function useWakeLock(active: boolean): void {
           sentinel = s
         })
         .catch(() => {
-          // e.g. low battery / policy denial -- just play without the lock
+          // e.g. low battery / policy denial -- play without lock
         })
     }
     acquire()
