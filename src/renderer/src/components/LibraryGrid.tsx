@@ -16,20 +16,13 @@ const sorts: { key: SortKey; label: string }[] = [
   { key: 'release', label: 'Release' }
 ]
 
-// must match .grid's `minmax(10.5rem, 1fr)` / `gap: 1.75rem 1rem` — the
-// virtualizer chunks items into rows itself (no built-in grid mode), so the
-// row math here has to mirror the CSS grid it's replacing
+// mirrors .grid's minmax(10.5rem,1fr)/gap -- virtualizer has no grid mode, row math replicates CSS grid
 const MIN_CARD_PX = 168 // 10.5rem
 const COLUMN_GAP_PX = 16 // 1rem
-// Card.module.css's own `contain-intrinsic-size` guess for a card's height
-const ESTIMATED_ROW_PX = 280
+const ESTIMATED_ROW_PX = 280 // Card.module.css's contain-intrinsic-size guess
 
-// how many columns actually fit at the current container width — same
-// arithmetic `repeat(auto-fill, minmax(...))` does, recomputed on resize.
-// State-backed callback ref, not a plain useRef: the grid div only mounts
-// once `data` has loaded (it's behind a conditional), so a plain useRef's
-// effect (deps never change) would fire once against a still-null .current
-// and never observe anything, leaving columns stuck at the initial 1.
+// columns that fit at current width (mirrors repeat(auto-fill, minmax(...))), recomputed on resize
+// state-backed ref not plain useRef: grid div mounts late (behind conditional), plain ref's effect would fire once against null .current
 function useColumnCount(): [number, (el: HTMLElement | null) => void] {
   const [el, setEl] = useState<HTMLElement | null>(null)
   const [columns, setColumns] = useState(1)
@@ -61,20 +54,18 @@ export function LibraryGrid({
 
   const virtualizer = useVirtualizer({
     count: rowCount,
-    // the scrolling ancestor is .main (AppLayout), not this component's own
-    // element or the window — see the data-scroll-root comment there
+    // scrolling ancestor is .main (AppLayout), not this element or window — see data-scroll-root comment there
     getScrollElement: () => document.querySelector<HTMLElement>('[data-scroll-root]'),
     estimateSize: () => ESTIMATED_ROW_PX,
     overscan: 3
   })
 
-  // decision-paralysis killer: random unwatched movie → details page, which
-  // runs a cancellable auto-play countdown (?surprise=1)
+  // picks random unwatched movie -> details page, runs cancellable auto-play countdown (?surprise=1)
   function surpriseMe(): void {
     if (!data?.length) return
     const unwatchedOnly = useSettings.getState().surpriseUnwatchedOnly
     const unwatched = unwatchedOnly ? data.filter((i) => !i.UserData?.Played) : data
-    const pool = unwatched.length ? unwatched : data // everything watched → anything goes
+    const pool = unwatched.length ? unwatched : data // all watched -> fall back to anything
     const pick = pool[Math.floor(Math.random() * pool.length)]
     navigate({ to: '/movies/$itemId', params: { itemId: pick.Id }, search: { surprise: true } })
   }
@@ -149,8 +140,7 @@ export function LibraryGrid({
                 }}
               >
                 {rowItems.map((item, i) =>
-                  // stagger only the very first row — animating a full
-                  // library's worth of cards at once is just jank, not polish
+                  // stagger only first row -- animating whole library at once is jank, not polish
                   row.index === 0 ? (
                     <div
                       key={item.Id}

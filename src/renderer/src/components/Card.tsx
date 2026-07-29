@@ -6,9 +6,7 @@ import { FavoriteButton } from './FavoriteButton'
 import { WatchedButton } from './WatchedButton'
 import styles from './Card.module.css'
 
-// Card semantics (CONTEXT.md): click card / hover play button = play,
-// click title label = details. For episodes specifically: title links to
-// the series (what you're browsing), subtitle links to the episode itself.
+// Card semantics (CONTEXT.md): click card/hover-play = play, click title = details; episodes: title -> series, subtitle -> episode
 export function Card({
   item,
   wide = false
@@ -19,9 +17,7 @@ export function Card({
   const navigate = useNavigate()
   const img = imageUrl(item, wide ? 480 : 360)
   const pct = item.UserData?.PlayedPercentage
-  // lazy initializer: the sanctioned place to read the wall clock during
-  // render — a "new" badge doesn't need per-render freshness
-  const [now] = useState(() => Date.now())
+  const [now] = useState(() => Date.now()) // lazy init: "new" badge doesn't need per-render freshness
   const isNew = !!item.DateCreated && now - Date.parse(item.DateCreated) < 7 * 86_400_000
   const [loaded, setLoaded] = useState(false)
 
@@ -29,9 +25,7 @@ export function Card({
     navigate({ to: '/player/$itemId', params: { itemId: item.Id } })
   }
 
-  // episodes: title row links to the *series* (what you're actually
-  // browsing for), subtitle links to the episode itself -- movies/shows
-  // keep the plain title-links-to-itself behavior
+  // episodes: title links to series (browsing context), subtitle links to episode itself
   function openTitle(e: React.MouseEvent): void {
     e.stopPropagation()
     if (item.Type === 'Movie') navigate({ to: '/movies/$itemId', params: { itemId: item.Id } })

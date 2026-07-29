@@ -21,13 +21,8 @@ function fmt(seconds: number): string {
     : `${mm}:${String(s % 60).padStart(2, '0')}`
 }
 
-// Shown over the (paused, handed-off) in-process player while PiP owns
-// playback in its own spawned mpv window (ADR-0006) -- that window has no
-// Photon UI of its own to carry a title/progress/back button, so this is
-// the calm "it's playing elsewhere" stand-in for the normal controls.
-// Anchored to the same bottom-right corner `pip_start` actually spawns mpv
-// into (`--geometry=-24-24`), not centered -- the one thing this card can
-// say truthfully is which way the video went.
+// shown over paused in-process player while PiP owns playback in spawned mpv window (ADR-0006), which has no Photon UI of its own
+// anchored bottom-right to match pip_start's --geometry=-24-24 spawn corner, not centered
 export function PipOverlay(p: PipOverlayProps): React.JSX.Element {
   const poster = imageUrl(p.item, 320)
   const pct = p.duration > 0 ? `${Math.min(100, (p.time / p.duration) * 100)}%` : '0%'

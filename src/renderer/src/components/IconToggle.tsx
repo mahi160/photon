@@ -1,10 +1,6 @@
 import { Tip } from './Tip'
 
-// Shared shape for every icon-only on/off button in the app (favorite,
-// watched, ...): a tooltip/aria-label that flips with state, an active
-// style, and an icon the caller already resolved (weight/fill differs per
-// icon). Styling stays per-caller (className/activeClassName) since each
-// call site's icon sits in a differently-sized/positioned control.
+// shared shape for icon-only on/off buttons (favorite, watched, ...): tooltip/aria-label flips with state, styling stays per-caller
 export function IconToggle({
   active,
   labelOn,
@@ -15,7 +11,7 @@ export function IconToggle({
   activeClassName
 }: {
   active: boolean
-  labelOn: string // shown/announced when `active` (e.g. "Remove from favorites")
+  labelOn: string // announced when active, e.g. "Remove from favorites"
   labelOff: string
   icon: React.ReactNode
   onClick: (e: React.MouseEvent) => void

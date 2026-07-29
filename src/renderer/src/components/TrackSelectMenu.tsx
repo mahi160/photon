@@ -48,8 +48,7 @@ export function TrackSelectMenu({
               </BaseMenu.Item>
             ))}
             {!tracks.length && (
-              // plain text, not a BaseMenu.Item -- nothing to select when the
-              // track list is empty, so it shouldn't look/behave clickable
+              // plain text not BaseMenu.Item -- empty track list shouldn't look/behave clickable
               <div className={styles.menuItem} aria-disabled="true">
                 {defaultLabel ?? 'Default'}
               </div>

@@ -2,10 +2,7 @@ import { Link, type ErrorComponentProps } from '@tanstack/react-router'
 import { PhotonMark } from './PhotonMark'
 import styles from './RouteFallback.module.css'
 
-// wired in as the router's defaultErrorComponent/defaultNotFoundComponent —
-// without these, any render throw or bad deep link is a blank white screen
-// with no way back except force-quitting the app.
-
+// router's defaultErrorComponent/defaultNotFoundComponent -- without these, render throws/bad deep links are a blank screen
 export function RouteError({ error, reset }: ErrorComponentProps): React.JSX.Element {
   return (
     <div className={styles.page}>

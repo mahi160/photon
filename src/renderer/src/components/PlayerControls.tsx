@@ -14,9 +14,7 @@ export interface Props {
   item: BaseItem
   playMethod: 'DirectPlay' | 'Transcode'
   specialBadges: string[]
-  // ADR-0009 -- true only when playback fell back to the CPU render path;
-  // GPU rendering (the normal case) shows nothing (issue #12)
-  cpuFallback: boolean
+  cpuFallback: boolean // ADR-0009: CPU render fallback only, GPU (normal) shows nothing (issue #12)
   state: 'playing' | 'paused' | 'buffering'
   time: number
   duration: number
@@ -54,12 +52,10 @@ export interface Props {
 
 export function PlayerControls(p: Props): React.JSX.Element {
   const [menu, setMenu] = useState<'audio' | 'subs' | 'speed' | 'sync' | null>(null)
-  // stable identity — ControlsBar's menu group is memoized against ticking time
+  // stable identity -- ControlsBar's menu group is memoized against ticking time
   const onToggleMenu = useCallback((m: 'audio' | 'subs' | 'speed' | 'sync', open: boolean) => {
     setMenu(open ? m : null)
-    // don't let a closed menu's trigger retain focus -- useHotkeys treats a
-    // focused control as "let the browser handle this key" instead of
-    // running our shortcuts (:focus-visible guard, see useHotkeys.ts)
+    // closed menu shouldn't retain focus -- useHotkeys defers to browser on focused controls (see useHotkeys.ts)
     if (!open) (document.activeElement as HTMLElement | null)?.blur()
   }, [])
   const [now, setNow] = useState(() => Date.now())
@@ -67,7 +63,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
   const [pulse, setPulse] = useState<{ kind: 'playing' | 'paused'; id: number } | null>(null)
   const prevState = useRef(p.state)
 
-  // wall clock: 30s tick
+  // wall clock, 30s tick
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000)
     return () => clearInterval(id)
@@ -86,13 +82,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
     }
   }, [p.state])
 
-  // pin controls open while a menu/popover is open -- hovering the dock
-  // *without* one open no longer pins indefinitely (see
-  // useAutoHideControls.ts): a motionless cursor resting over the controls
-  // used to keep them up forever, which is the "overlay never goes away"
-  // report -- any real mouse movement still re-pokes the same idle timer
-  // via .stage's own onMouseMove, menu open/close is the only other case
-  // that needs to override it.
+  // pin open only while menu/popover open (useAutoHideControls.ts) -- motionless hover used to pin forever; real movement still re-pokes idle timer
   const { onPinChange } = p
   useEffect(() => {
     onPinChange(menu !== null)
@@ -123,11 +113,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
           </div>
         )}
 
-        {/* overlay title bar (tauri.conf.json): traffic lights float over
-            this scrim instead of reserving their own strip -- marking it a
-            drag region gives the window a way to be moved from here; the
-            Back button/badges (real clickable elements) are excluded
-            automatically (see drag.js), no separate handling needed */}
+        {/* overlay title bar: traffic lights float over scrim, drag region moves window; Back button/badges auto-excluded (see drag.js) */}
         <div className={styles.topScrim} data-tauri-drag-region>
           <div className={styles.topBar}>
             <Tip label="Back">

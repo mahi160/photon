@@ -1,7 +1,6 @@
 import { NumberField } from '@base-ui/react/number-field'
 
-// One accessible number stepper for the whole app. Styling stays with the
-// caller (settings surface vs. player glass), so class names come in as props.
+// one accessible number stepper for whole app -- styling stays with caller (settings vs. player glass)
 export interface StepperClasses {
   group: string
   btn: string

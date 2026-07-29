@@ -1,10 +1,6 @@
 import styles from './PhotonMark.module.css'
 
-/* the Photon mark — reicon's "black-hole-3" outline. Geometry lives here
-   once; resources/icon.svg (app icon) uses the same path data with baked
-   colors since OS icons render outside CSS. In-app it reads --accent, the
-   same token the nav beam and progress bars use, so the mark re-themes for
-   free. */
+// Photon mark (reicon's "black-hole-3"), reads --accent so it re-themes with nav beam/progress bars. resources/icon.svg bakes same path with static colors (OS icons render outside CSS)
 export function PhotonMark({ className }: { className?: string }): React.JSX.Element {
   return (
     <svg
