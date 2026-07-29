@@ -1,8 +1,6 @@
 import { create } from 'zustand'
 
-// transient cross-page UI state that doesn't belong in settings (not a
-// preference, nothing to persist) -- currently just the shortcuts overlay,
-// openable from both AppLayout's '?' hotkey and Settings > About.
+// transient cross-page UI state, not settings (nothing to persist) -- currently just shortcuts overlay, opened by AppLayout's '?' hotkey or Settings > About.
 interface UiState {
   shortcutsOpen: boolean
   setShortcutsOpen: (open: boolean) => void

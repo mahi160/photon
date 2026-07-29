@@ -1,10 +1,8 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-// Per-item audio/subtitle pick, remembered across sessions so re-opening the
-// same file resumes with the track you last chose for it. Keyed by item Id.
-// ponytail: no eviction — a few thousand entries is still a tiny localStorage
-// payload, not worth an LRU until someone's library makes that untrue.
+// Per-item audio/subtitle pick, remembered across sessions, keyed by item Id.
+// ponytail: no eviction -- few thousand entries is tiny localStorage payload, add LRU if a huge library ever needs it.
 interface TrackChoice {
   audioStreamIndex?: number
   subtitleStreamIndex?: number // -1 = explicitly off
