@@ -2,12 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { BaseItem } from '../lib/jellyfin'
 
-// Photon-local watch time, fed by the player's progress ticks whenever
-// playback is actually running — paused and buffering time never counts.
-// Real minutes sat watching, not content minutes (2× speed for an hour
-// records an hour). No server dependency; stats start at zero on the day
-// this shipped — Jellyfin has no "watched via which app" history to
-// backfill from.
+// Photon-local watch time, fed by player's progress ticks while actually playing (paused/buffering don't count). Real minutes watched, not content minutes (2x speed for an hour = an hour). No server dependency, no backfill (Jellyfin has no per-app watch history).
 export interface DayStats {
   movieSecs: number
   episodeSecs: number

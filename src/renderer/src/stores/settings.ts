@@ -16,18 +16,13 @@ interface SettingsState {
   // subtitles
   preferredSubtitleLanguage: string // ISO 639-2, '' = off unless default
   subtitlesEnabled: boolean
-  preferredAudioLanguage: string // ISO 639-2, '' = server default. Kept in sync with the player.
+  preferredAudioLanguage: string // ISO 639-2, '' = server default, kept in sync with player
   lastSubtitleDelay: number // seconds, restored on next playback
-  // minimal subtitle-appearance GUI (issue #9 follow-up) -- a few common
-  // knobs, not a full styling page (ADR-0007 still holds: no per-property
-  // GUI). Applied as mpv options at launch, before the raw passthrough
-  // below so a matching raw key still wins. See mpvConfig.ts's
-  // guiSubtitleConfig.
+  // minimal subtitle-appearance GUI (issue #9): few knobs not full styling page (ADR-0007), applied at launch before raw passthrough below so matching raw key still wins, see mpvConfig.ts guiSubtitleConfig
   subtitleFontSize: number // scaled px at 720p window height, matches --sub-font-size
   subtitleColor: string // #RRGGBB, matches --sub-color
   subtitleBackgroundBox: boolean // opaque box behind subtitle text vs. none
-  // mpv (issue #9): raw `key=value` lines, applied as extra mpv options at
-  // launch on top of Photon's default subtitle appearance. See mpvConfig.ts.
+  // mpv (issue #9): raw `key=value` lines, applied as extra mpv options on top of defaults, see mpvConfig.ts
   mpvConfig: string
   // general
   theme: Theme
@@ -64,8 +59,7 @@ export const useSettings = create<SettingsState>()(
     (set, get) => ({
       ...defaults,
       set: (partial) => set(partial),
-      // reset restores preferences, not where you are in the Settings UI --
-      // resetting from Server > Danger Zone shouldn't also bounce you to General
+      // reset restores preferences, not Settings UI position -- Danger Zone reset shouldn't bounce to General
       reset: () => set({ ...defaults, settingsSection: get().settingsSection })
     }),
     { name: 'photon.settings' }
