@@ -34,14 +34,12 @@ export function Player(): React.JSX.Element {
   const search = useSearch({ from: '/app/player/$itemId' })
   const navigate = useNavigate()
 
-  // mpv composites into a native surface positioned under this placeholder's
-  // on-screen rect (ADR-0005)
+  // mpv composites into a native surface positioned under this placeholder's on-screen rect (ADR-0005)
   const videoRef = useRef<HTMLDivElement>(null)
   const item = useQuery(itemQuery(itemId))
   const player = usePlayback(videoRef, item.data, search)
   const { engine, session } = player
-  // stable callbacks pulled out so hook deps can name exactly what they use
-  // (depending on `engine`/`player` themselves would churn every render)
+  // stable callbacks pulled out so hook deps name exactly what they use (depending on engine/player themselves would churn every render)
   const { adjustVolume, toggleMute, currentTime, seek } = engine
   const {
     subtitleIsText,
@@ -51,46 +49,27 @@ export function Player(): React.JSX.Element {
     playItem
   } = player
 
-  // extract toast and auto-hide controls
   const { message: toast, show: showToast } = useToast(1200)
   const { visible, setPinned, poke } = useAutoHideControls(engine.state)
   useWakeLock(engine.state === 'playing')
-  // native traffic-light dots (overlay title bar, tauri.conf.json) hide/show
-  // in lockstep with the rest of the controls -- they're AppKit-drawn, over
-  // the video, so CSS opacity/pointer-events (PlayerControls' own auto-hide)
-  // can't reach them; this is the one native-side echo of that same state.
+  // native traffic-light dots (overlay title bar) are AppKit-drawn over the video, CSS opacity/pointer-events can't reach them -- this is the native-side echo of the same visible state
   useEffect(() => {
     void invoke('app_set_traffic_lights_visible', { visible })
   }, [visible])
-  // ...and always restored on the way out -- every other page expects them
-  // on, this must never leak past the player route
+  // always restored on the way out -- must never leak past the player route
   useEffect(() => {
     return () => void invoke('app_set_traffic_lights_visible', { visible: true })
   }, [])
-  // AppLayout owns '?' + the overlay everywhere else, but the player route
-  // is chrome-free (outside AppLayout, see router.tsx) -- without its own
-  // copy there's no way to discover e.g. the chapter-skip shortcut while
-  // actually watching something
+  // AppLayout owns '?' + overlay elsewhere, but player route is chrome-free (outside AppLayout) -- needs its own copy to discover shortcuts while watching
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
-  // Native OS window fullscreen (Tauri's set_fullscreen), not the DOM
-  // Fullscreen API -- WebKit implements document.documentElement's Fullscreen
-  // API by presenting the fullscreen element in a *separate* window/layer
-  // outside the app's own NSWindow, which the mpv NSView (composited as a
-  // sibling under the *original* window's content view, see engine.rs) never
-  // gets carried into: fullscreen showed no video, and the real window
-  // underneath (still receiving actual clicks) could visually desync from
-  // whatever WebKit was presenting, making clicks land wrong. Native window
-  // fullscreen keeps everything in the same NSWindow/content view, so the
-  // mpv surface keeps compositing correctly.
+  // Native OS window fullscreen (Tauri's set_fullscreen), not DOM Fullscreen API -- WebKit presents the fullscreen element in a separate window/layer the mpv NSView (composited under the original window, engine.rs) never gets carried into, showing no video and desyncing clicks. Native window fullscreen keeps everything in the same NSWindow so mpv keeps compositing correctly.
   const [fullscreen, setFullscreen] = useState(false)
   const fullscreenRef = useRef(false)
   useEffect(() => {
     fullscreenRef.current = fullscreen
   }, [fullscreen])
-  // never strand the app in fullscreen when leaving the player -- no native
-  // DOM Fullscreen auto-exit to rely on anymore, Esc is handled explicitly
-  // below
+  // never strand the app in fullscreen on leaving the player -- no DOM auto-exit anymore, Esc handled explicitly below
   useEffect(() => {
     return () => {
       if (fullscreenRef.current) void invoke('app_set_fullscreen', { fullscreen: false })
@@ -105,9 +84,7 @@ export function Player(): React.JSX.Element {
     })
   }, [])
 
-  // stable identities: these feed the player's track-select menus, which are
-  // memoized to skip re-rendering on every playback tick (base-ui popovers
-  // aren't cheap to reconcile dozens of times a minute for nothing)
+  // stable identities: feed the player's memoized track-select menus (base-ui popovers aren't cheap to reconcile every playback tick)
   const bumpVolume = useCallback(
     (delta: number): void => {
       const v = adjustVolume(delta)
@@ -120,7 +97,7 @@ export function Player(): React.JSX.Element {
     showToast(toggleMute() ? 'Muted' : 'Unmuted')
   }, [toggleMute, showToast])
 
-  // subtitle sync: shift delay by the same step as the slider, text subs only
+  // subtitle sync: shift delay by same step as the slider, text subs only
   const shiftSubtitleDelay = useCallback(
     (step: number): void => {
       if (!subtitleIsText) return
@@ -131,8 +108,7 @@ export function Player(): React.JSX.Element {
     [subtitleIsText, subtitleDelay, changeDelay, showToast]
   )
 
-  // a burned-in pick reloads the stream (server transcode start can take a
-  // few seconds) — say so, instead of leaving the picker looking unresponsive
+  // burned-in pick reloads the stream (transcode start takes a few seconds) — say so, instead of picker looking unresponsive
   const selectSubtitle = useCallback(
     (index: number | null): void => {
       playerSelectSubtitle(index)
@@ -149,8 +125,7 @@ export function Player(): React.JSX.Element {
     [playerSelectSubtitle, session, showToast]
   )
 
-  // the episode after the one playing (dock's next button); NextUp can't be
-  // used here — mid-episode it still points at the current one
+  // episode after the one playing (dock's next button); NextUp can't be used here — mid-episode it still points at current one
   const playing = player.session?.item
   // server-detected intro/outro ranges (Jellyfin 10.9+, empty on older servers)
   const segments = useQuery({ ...mediaSegmentsQuery(playing?.Id ?? ''), enabled: !!playing })
@@ -158,9 +133,7 @@ export function Player(): React.JSX.Element {
   const activeSegment = segments.data?.find(
     (s) => s.Type !== 'Unknown' && timeTicks >= s.StartTicks && timeTicks < s.EndTicks
   )
-  // auto-skip intros/recaps/previews (never credits — NextUpCard owns the end
-  // of an episode). Each segment skips once per item, so seeking back into an
-  // intro on purpose doesn't fight the user.
+  // auto-skip intros/recaps/previews (never credits — NextUpCard owns episode end). Skips once per item so seeking back into an intro on purpose doesn't fight the user.
   const autoSkip = useSettings((s) => s.autoSkipSegments)
   const autoSkipped = useRef(new Set<string>())
   useEffect(() => {
@@ -172,7 +145,7 @@ export function Player(): React.JSX.Element {
     showToast(`Skipped ${segmentNoun(activeSegment.Type)}`)
   }, [autoSkip, activeSegment, playing, seek, showToast])
 
-  // one fetch serves both directions — the adjacentTo response contains them
+  // one fetch serves both directions — adjacentTo response contains them
   const adjacent = useQuery({
     queryKey: queryKeys.item.adjacent(playing?.Id ?? ''),
     enabled: playing?.Type === 'Episode' && !!playing.SeriesId,
@@ -200,8 +173,7 @@ export function Player(): React.JSX.Element {
     nextEpisode: nextEp
   })
 
-  // keyboard shortcuts (PRD: Navigation); repeat-guarded where holding the
-  // key would flap the state instead of progressing it
+  // keyboard shortcuts (PRD: Navigation); repeat-guarded where holding the key would flap state instead of progressing it
   useHotkeys(
     {
       space: (e) => {
@@ -221,7 +193,7 @@ export function Player(): React.JSX.Element {
         if (!e.repeat) toggleFullscreen()
       },
       escape: (e) => {
-        // exit only -- never enter fullscreen via Escape
+        // exit only, never enter fullscreen via Escape
         if (!e.repeat && fullscreen) toggleFullscreen()
       },
       p: (e) => {
@@ -269,9 +241,7 @@ export function Player(): React.JSX.Element {
     showToast(dir === 1 ? 'Next chapter' : 'Previous chapter')
   }
 
-  // keyboard-reachable equivalent of the audio/subtitle menus (which live in
-  // base-ui popovers with tabIndex={-1} — the player's controls are mouse or
-  // hotkey only, see useHotkeys.ts)
+  // keyboard-reachable equivalent of the audio/subtitle menus (base-ui popovers with tabIndex={-1}, controls are mouse/hotkey only, see useHotkeys.ts)
   function cycleAudio(): void {
     if (!session || session.audioStreams.length < 2) return
     const current = player.audioIndex ?? session.mediaSource.DefaultAudioStreamIndex
@@ -297,16 +267,14 @@ export function Player(): React.JSX.Element {
     showToast(`Speed ${next}×`)
   }
 
-  // stable identities for the same reason as the callbacks above — these
-  // feed menu/button props on the memoized part of the controls bar
+  // stable identities, same reason as callbacks above — feed memoized controls-bar props
   const playNextEpisode = useMemo(
     () => (nextEp ? () => void playItem(nextEp) : undefined),
     [nextEp, playItem]
   )
 
   const displayDuration = engine.duration || ticksToSeconds(session?.mediaSource.RunTimeTicks)
-  // only the notable quality/HDR/audio tags (issue #12) -- the full
-  // breakdown (mediaBadges) is a details-pages-only thing now
+  // only notable quality/HDR/audio tags (issue #12) -- full breakdown (mediaBadges) is details-pages-only now
   const specialBadges = useMemo(
     () => playerSpecialBadges(session?.mediaSource.MediaStreams ?? []),
     [session]
@@ -317,7 +285,7 @@ export function Player(): React.JSX.Element {
       className={styles.stage}
       onMouseMove={poke}
       onClick={() => {
-        // controls hidden = their click layer is inert; don't eat the click
+        // controls hidden = click layer inert; don't eat the click
         if (!visible) {
           engine.togglePlay()
           poke()

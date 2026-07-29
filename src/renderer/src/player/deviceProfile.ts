@@ -1,12 +1,5 @@
-// DeviceProfile — tells the server what this client can play directly, so it
-// knows when transcoding genuinely isn't needed (PRD: API Usage).
-//
-// mpv is the sole playback engine (ADR-0003) and does its own demuxing/
-// decoding via ffmpeg (ADR-0008) — unlike a browser <video>/MediaSource tag,
-// it isn't limited to whatever codecs the OS's media framework happens to
-// expose to the webview. This claims that real, broad capability directly
-// instead of probing MediaSource.isTypeSupported() (a leftover from the old
-// HTML5 engine that under-claimed support and caused needless transcodes).
+// DeviceProfile — tells server what this client can play directly, so it knows when transcoding isn't needed (PRD: API Usage).
+// mpv is the sole playback engine (ADR-0003), demuxes/decodes via ffmpeg (ADR-0008) — not limited to webview-exposed codecs like a <video> tag. Claims that broad capability directly instead of probing MediaSource.isTypeSupported() (old HTML5-engine leftover that under-claimed support, caused needless transcodes).
 
 // bitrate sent when the user picks "Auto" (settings.maxBitrate = 0)
 export const AUTO_BITRATE = 140_000_000
@@ -16,8 +9,7 @@ function rangeCondition(value: string): object {
 }
 
 export function buildDeviceProfile(maxBitrate: number): object {
-  // every common video codec ffmpeg (mpv's decoder backend) ships with —
-  // not gated behind a webview capability check, see module doc
+  // every common video codec ffmpeg (mpv's decoder backend) ships with — not gated behind a webview capability check
   const videoCodecs = ['h264', 'hevc', 'vp8', 'vp9', 'av1', 'mpeg2video', 'mpeg4', 'vc1']
   const audioCodecs = [
     'aac',
@@ -33,16 +25,7 @@ export function buildDeviceProfile(maxBitrate: number): object {
     'pcm_s24le'
   ]
 
-  // permissive video-range declaration per codec, including every Dolby
-  // Vision variant Jellyfin's VideoRangeType enum defines (DOVI/
-  // DOVIWithHDR10/DOVIWithHLG/DOVIWithSDR/DOVIWithEL/DOVIWithHDR10Plus/
-  // DOVIWithELHDR10Plus) alongside HDR10/HDR10Plus/HLG. ffmpeg (mpv's decoder
-  // backend) decodes Dolby Vision streams -- at minimum via the HDR10-
-  // compatible base layer/RPU-agnostic path profiles 5/8 fall back to.
-  // Omitting any of these makes the server assume the client can't handle
-  // that range and insert an HDR->SDR tonemap filter, i.e. a transcode, for
-  // no reason (see jellyfin/jellyfin#16687 for the same class of bug on
-  // other clients that only declared a subset of these).
+  // permissive range declaration: every Dolby Vision variant + HDR10/HDR10Plus/HLG. ffmpeg decodes DV streams (at minimum via HDR10-compatible base layer). Omitting any makes server assume client can't handle it and insert an HDR->SDR tonemap transcode for no reason (jellyfin/jellyfin#16687, same bug class on other clients).
   const hdrRanges =
     'SDR|HDR10|HDR10Plus|HLG|DOVI|DOVIWithHDR10|DOVIWithHLG|DOVIWithSDR|DOVIWithEL|DOVIWithHDR10Plus|DOVIWithELHDR10Plus'
   const codecProfiles = videoCodecs.map((codec) => ({
@@ -62,10 +45,7 @@ export function buildDeviceProfile(maxBitrate: number): object {
         AudioCodec: audioCodecs.join(',')
       }
     ],
-    // schema safety net, not a path this client's own logic ever asks for
-    // (always direct play, ADR-0008) — only reached if the server itself
-    // decides a source genuinely can't be direct played (exotic codec,
-    // bitrate cap it wants to enforce, etc).
+    // schema safety net, not a path this client asks for (always direct play, ADR-0008) — only reached if server decides a source genuinely can't be direct played
     TranscodingProfiles: [
       {
         Container: 'mp4',
@@ -79,32 +59,11 @@ export function buildDeviceProfile(maxBitrate: number): object {
         BreakOnNonKeyFrames: true
       }
     ],
-    // The server's direct-play eligibility check runs GetSubtitleProfile()
-    // against whatever subtitle is currently requested and rejects direct
-    // play outright unless the result is Drop/External/Embed -- anything
-    // that falls through to its own Encode default (i.e. every format with
-    // no matching profile here) disqualifies direct play for the *whole*
-    // request, not just the subtitle, forcing a full transcode. Confirmed
-    // against jellyfin server's StreamBuilder.GetVideoDirectPlayProfile.
+    // Server's direct-play eligibility check (StreamBuilder.GetVideoDirectPlayProfile) rejects the *whole* request unless GetSubtitleProfile() resolves to Drop/External/Embed -- any format with no matching profile falls to Encode, forcing a full transcode.
     SubtitleProfiles: [
-      // srt (not vtt) External for text formats (subrip/ass/ssa/mov_text/
-      // etc, server converts on the fly) -- keeps these on the Text
-      // Subtitle path so delay/appearance styling keeps working (only text
-      // tracks support that, see engine.setTextTrack). vtt was tried first,
-      // but Jellyfin's ASS/SSA->vtt conversion emits a malformed `Region:`
-      // header (real WebVTT spec: `REGION` on its own line, newline-
-      // separated settings, not `Region:` with space-separated key:value
-      // pairs) whenever the source has cue positioning -- confirmed against
-      // a real server response. mpv's webvtt decoder silently drops every
-      // cue in the file once it hits that malformed header (track still
-      // shows up, selectable, just empty). Plain srt has no region/style
-      // block at all, sidestepping this class of bug entirely -- no loss,
-      // since Photon ships one fixed subtitle style regardless (ADR-0007).
+      // srt (not vtt) External for text formats -- keeps delay/styling working (text-only, see engine.setTextTrack). vtt was tried first, but Jellyfin's ASS/SSA->vtt conversion emits a malformed `Region:` header when source has cue positioning, and mpv's webvtt decoder silently drops every cue past it. Plain srt has no region/style block, sidesteps this -- no loss, Photon ships one fixed subtitle style anyway (ADR-0007).
       { Format: 'srt', Method: 'External' },
-      // Embed for the image-based formats mpv selects as an embedded track
-      // instead (ADR-0008, engine.selectEmbeddedSubtitleTrack) -- this is
-      // what tells the server direct play doesn't need to burn these in.
-      // ass/ssa deliberately excluded: those stay on the srt path above.
+      // Embed for image-based formats mpv selects as embedded track (ADR-0008, engine.selectEmbeddedSubtitleTrack) -- tells server not to burn these in. ass/ssa excluded, stay on srt path above.
       { Format: 'pgssub', Method: 'Embed' },
       { Format: 'dvdsub', Method: 'Embed' },
       { Format: 'dvbsub', Method: 'Embed' }

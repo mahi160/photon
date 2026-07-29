@@ -24,10 +24,7 @@ import {
 } from './session'
 import { usePlayerEngine, type PlayerEngineApi } from './usePlayerEngine'
 
-// Jellyfin side of playback: session lifecycle, track selection, progress
-// reporting and autoplay-next. Composes usePlayerEngine; the Player page only
-// wires UI to this API. Settings are read imperatively (useSettings.getState())
-// so callbacks never go stale.
+// Jellyfin side of playback: session lifecycle, track selection, progress reporting, autoplay-next. Settings read imperatively (useSettings.getState()) so callbacks never go stale.
 
 export interface StartParams {
   start?: number
@@ -53,7 +50,7 @@ export interface PlaybackApi {
 
 export async function resolvePlayable(item: BaseItem): Promise<BaseItem> {
   if (item.Type !== 'Series') return item
-  // series card was clicked: play next-up, falling back to the first episode
+  // series card clicked: play next-up, fall back to first episode
   const s = await jf<ItemsResult>('/Shows/NextUp', {
     query: { seriesId: item.Id, Limit: 1 }
   })
@@ -63,13 +60,7 @@ export async function resolvePlayable(item: BaseItem): Promise<BaseItem> {
   throw new Error('Nothing to play.')
 }
 
-// What to request from the server on first load (exported for tests).
-// Audio: explicit request, else preferred language, else English, else the
-// container default, else first — whichever one it is, mpv can switch to it
-// after load regardless (selectAudioTrack, see the load effect below).
-// Subtitle preference must be in the *initial* request so the resolved
-// MediaSource's DefaultSubtitleStreamIndex reflects it. -1 keeps the request
-// from picking up the server's own default when subs are off.
+// Initial track request (exported for tests). Subtitle pref must be in the initial request so DefaultSubtitleStreamIndex reflects it; -1 stops server defaulting subs on when they're off.
 export function pickInitialTracks(
   streams: MediaStream[],
   settings: {
@@ -114,16 +105,11 @@ export function usePlayback(
   const [error, setError] = useState<string | null>(null)
   const [audioIndex, setAudioIndex] = useState<number | undefined>(undefined)
   const [subtitleDelay, setSubtitleDelay] = useState(0)
-  // display state only — persistence (settings/track memory) is a user-intent
-  // side effect and lives exclusively in selectSubtitle below
+  // display state only — persistence lives in selectSubtitle below
   const [subtitleIndex, setSubtitleIndex] = useState<number | null>(null)
   const subtitleIsText =
     subtitleIndex !== null && session !== null && isTextTrack(session, subtitleIndex)
-  // mirrors so selectSubtitle/selectAudio can no-op a redundant re-select
-  // (base-ui's Select fires onValueChange on its own initial sync, not just
-  // real user picks) without needing subtitleIndex/audioIndex in their own
-  // dependency arrays — those callbacks must keep a stable identity, they
-  // feed memoized track-select menus
+  // mirrors let selectSubtitle/selectAudio no-op redundant re-selects (base-ui Select fires onValueChange on initial sync too) without needing state in their own dep arrays
   const subtitleIndexRef = useRef(subtitleIndex)
   const audioIndexRef = useRef(audioIndex)
   useEffect(() => {
@@ -155,7 +141,7 @@ export function usePlayback(
     }
   )
 
-  // stable engine commands, so loadFor (and the initial-load effect) stay stable
+  // stable engine commands so loadFor (and the initial-load effect) stay stable
   const {
     load: engineLoad,
     setTextTrack,
@@ -178,17 +164,12 @@ export function usePlayback(
       }
     ): Promise<boolean> => {
       const settings = useSettings.getState()
-      // a new PlaySessionId replaces the old one (track switch, next episode):
-      // close the old session first so the server stops its transcode/progress
+      // new PlaySessionId replaces old one (track switch, next episode): close old session first so server stops transcode/progress
       const prev = sessionRef.current
       if (prev) {
         sessionRef.current = null
         reportStopped(prev, engineCurrentTime())
-        // Stopped only updates progress tracking, not the ffmpeg job itself —
-        // without this the old encode keeps running and a track-switch reload
-        // can still resolve against it (stale audio/subtitles). Must be
-        // awaited: starting the new one while the old is still alive is
-        // exactly the race this is meant to avoid.
+        // Stopped only updates progress tracking, not the ffmpeg job — must await, or new session can race the still-running old encode
         if (prev.playMethod === 'Transcode') await stopActiveEncoding(prev)
       }
       try {
@@ -205,12 +186,7 @@ export function usePlayback(
         })
         reportStart(sess, sess.startSeconds)
 
-        // toDemuxedIndex/selectAudioTrack/selectEmbeddedSubtitleTrack resolve
-        // against mpv's own track-list for the file it's demuxing — only
-        // meaningful under direct play (ADR-0008). A genuine Transcode
-        // fallback re-encodes into a track layout mpv never sees the source
-        // side of, so live selection is skipped there; whatever the initial
-        // PlaybackInfo request negotiated is what stays active.
+        // toDemuxedIndex/selectAudioTrack/selectEmbeddedSubtitleTrack resolve against mpv's own track-list — only meaningful under direct play (ADR-0008); Transcode fallback keeps whatever PlaybackInfo negotiated
         const directPlay = sess.playMethod === 'DirectPlay'
 
         if (directPlay && opts.audioStreamIndex !== undefined)
@@ -221,11 +197,7 @@ export function usePlayback(
         if (sel.textTrack !== null) setTextTrack(sel.textTrack)
         else if (directPlay && sel.embeddedTrack !== null)
           selectEmbeddedSubtitleTrack(toDemuxedIndex(sess, sel.embeddedTrack))
-        // mpv auto-selects the container's own "default" subtitle track on
-        // load unless told otherwise — explicitly turn it off rather than
-        // let a file's default embedded track override "subtitles off".
-        // Safe regardless of playMethod: turning subs off never needs the
-        // source-index lookup above.
+        // mpv auto-selects container's default subtitle track on load — explicitly turn off rather than let it override "subtitles off"
         else if (sel.embeddedTrack === null) selectEmbeddedSubtitleTrack(null)
 
         // restore last subtitle sync offset, text tracks only
@@ -254,23 +226,17 @@ export function usePlayback(
     ]
   )
 
-  // initial load once item arrives; the key guard makes re-runs no-ops.
-  // `attempt` bumps on retry to force a reload of the same item. Declared
-  // before playItem/handleEnded so their closures can read it.
+  // initial load once item arrives, key guard makes re-runs no-ops. `attempt` bumps on retry to force reload of same item.
   const [attempt, setAttempt] = useState(0)
   const loadedKey = useRef<string | null>(null)
 
-  // play a different item in place (next-episode button, autoplay-next).
-  // resets per-item track state — stream indexes don't carry across files.
-  // Stable identity (react-query-cached `nextEpisode` data flows straight
-  // into a menu button prop) so it doesn't force that menu to re-render
-  // on every playback tick.
+  // play different item in place (next-episode button, autoplay-next). resets per-item track state. Stable identity so cached nextEpisode data doesn't force menu re-render.
   const playItem = useCallback(
     async (next: BaseItem): Promise<void> => {
       loadedKey.current = `${next.Id}#${attempt}`
       setError(null)
       setAudioIndex(undefined)
-      // on failure stay put — the error layer (with retry) is already showing
+      // on failure stay put — error layer (with retry) already showing
       if (await loadFor(next, { startSeconds: 0 })) {
         navigate({ to: '/player/$itemId', params: { itemId: next.Id }, search: {}, replace: true })
       }
@@ -280,8 +246,7 @@ export function usePlayback(
 
   async function handleEnded(prev?: BaseItem): Promise<void> {
     if (useSettings.getState().autoplayNext && prev?.Type === 'Episode' && prev.SeriesId) {
-      // ponytail: relies on the server having processed the Stopped report; if the
-      // same episode comes back we bail to avoid a loop
+      // ponytail: relies on server having processed Stopped report; bail if same episode comes back to avoid a loop
       const next = await jf<ItemsResult>('/Shows/NextUp', {
         query: { seriesId: prev.SeriesId, Limit: 1 }
       })
@@ -302,11 +267,9 @@ export function usePlayback(
     setError(null)
     resolvePlayable(item)
       .then((playable) => {
-        // remembered pick for this item wins over language prefs/server
-        // default, but an explicit URL param (deep link) still wins over that
+        // remembered pick wins over language prefs/server default; explicit URL param (deep link) wins over that
         const remembered = useTrackMemory.getState().byItem[playable.Id]
-        // track picking only sees stream info if the playable item carries it
-        // (movies/episodes fetched with MediaSources)
+        // track picking only sees stream info if playable item carries it (movies/episodes fetched with MediaSources)
         const { audioStreamIndex, subtitleStreamIndex } = pickInitialTracks(
           playable.MediaSources?.[0]?.MediaStreams ?? [],
           useSettings.getState(),
@@ -330,15 +293,13 @@ export function usePlayback(
       })
   }, [item, start, audio, sub, attempt, loadFor])
 
-  // one immediate report on the playing→paused edge (button, hotkey, PiP,
-  // media keys); also keeps the ref the 10s interval below reads fresh
+  // one immediate report on playing→paused edge (button, hotkey, PiP, media keys); also keeps ref the 10s interval below reads fresh
   const { state: engineState, currentTime } = engine
   const engineStateRef = useRef(engineState)
   useEffect(() => {
     const was = engineStateRef.current
     engineStateRef.current = engineState
-    // tell the OS the real state so its overlay button (and the action it
-    // dispatches) is correct — play/pause both map to togglePlay otherwise
+    // tell OS the real state so its overlay button is correct — play/pause both map to togglePlay otherwise
     navigator.mediaSession.playbackState = engineState === 'paused' ? 'paused' : 'playing'
     if (engineState === 'paused' && was === 'playing') {
       const sess = sessionRef.current
@@ -346,18 +307,16 @@ export function usePlayback(
     }
   }, [engineState, currentTime])
 
-  // progress reporting every 10s. Reads engine state via the ref so the
-  // interval survives play/pause/buffer flaps — recreating it on each one
-  // would reset the cadence and could starve reports on a stuttering stream.
+  // progress reporting every 10s. Reads engine state via ref so interval survives play/pause/buffer flaps without resetting cadence.
   useEffect(() => {
     const id = setInterval(() => {
       const sess = sessionRef.current
       if (!sess) return
       const paused = engineStateRef.current === 'paused'
       reportProgress(sess, currentTime(), paused)
-      // local watch stats — only time actually playing counts
+      // local watch stats — only actually-playing time counts
       if (engineStateRef.current === 'playing') useWatchStats.getState().record(sess.item, 10)
-      // keep the OS media overlay's progress bar roughly honest
+      // keep OS media overlay's progress bar roughly honest
       const dur = ticksToSeconds(sess.mediaSource.RunTimeTicks)
       if (dur > 0) {
         try {
@@ -373,11 +332,9 @@ export function usePlayback(
     return () => clearInterval(id)
   }, [currentTime])
 
-  // OS media keys are registered by useMediaSession (Player page) — the
-  // single owner of that surface; this hook only sets metadata/position
+  // OS media keys registered by useMediaSession (Player page); this hook only sets metadata/position
 
-  // volume/mute survive across sessions; debounced — a slider drag is dozens of
-  // changes and each settings.set() writes localStorage
+  // volume/mute survive across sessions; debounced — slider drag is dozens of changes, each settings.set() writes localStorage
   const { volume: engineVolume, muted: engineMuted } = engine
   useEffect(() => {
     const id = setTimeout(
@@ -387,10 +344,7 @@ export function usePlayback(
     return () => clearTimeout(id)
   }, [engineVolume, engineMuted])
 
-  // Track-switch actions below are wrapped in useCallback: they end up as
-  // props on the player's track-select menus (base-ui popovers), and those
-  // menus are memoized to skip the re-render every playback tick brings —
-  // that memoization only holds if these callbacks keep a stable identity.
+  // Track-switch actions wrapped in useCallback: feed memoized track-select menus, must keep stable identity
   const selectSubtitle = useCallback(
     (index: number | null): void => {
       const sess = sessionRef.current
@@ -407,9 +361,7 @@ export function usePlayback(
         })
         useTrackMemory.getState().remember(sess.item.Id, { subtitleStreamIndex: index })
       }
-      // Transcode fallback only: a non-text pick either side of this switch
-      // is/was burned into that stream's pixels, which only a fresh
-      // negotiation can change (direct play never hits this, see the helper)
+      // Transcode fallback only: non-text pick either side is/was burned into pixels, only fresh negotiation changes it (direct play never hits this)
       if (embeddedSubtitleSwitchNeedsReload(sess, subtitleIndexRef.current, index)) {
         void loadFor(sess.item, {
           startSeconds: engineCurrentTime(),
@@ -420,14 +372,7 @@ export function usePlayback(
         return
       }
       setSubtitleIndex(index)
-      // direct play (ADR-0008) — mpv selects any embedded track itself, text
-      // or not, no reload needed either way (guaranteed by the check above).
-      // setTextTrack/selectEmbeddedSubtitleTrack both ultimately just set
-      // mpv's one "sid" property (different index resolution, same target) —
-      // exactly one of them must fire per switch, never both: the second
-      // call always wins, so a "clear the other kind first" call right
-      // before/after the real one doesn't clear anything, it just stomps the
-      // selection back off a moment after making it.
+      // direct play (ADR-0008) — mpv selects any embedded track, no reload needed. setTextTrack/selectEmbeddedSubtitleTrack both set mpv's one "sid" property — exactly one must fire per switch, never both (second call always wins)
       if (index !== null && isTextTrack(sess, index)) {
         setTextTrack(index)
       } else {
@@ -445,9 +390,7 @@ export function usePlayback(
       const language = sess.audioStreams.find((s) => s.Index === index)?.Language
       if (language) useSettings.getState().set({ preferredAudioLanguage: language })
       useTrackMemory.getState().remember(sess.item.Id, { audioStreamIndex: index })
-      // Transcode fallback: its output carries only the one audio track the
-      // server already negotiated -- switching needs a fresh transcode with
-      // the new index, mpv has no second embedded track to select there.
+      // Transcode fallback: output carries only the one audio track server negotiated -- switching needs a fresh transcode
       if (sess.playMethod !== 'DirectPlay') {
         void loadFor(sess.item, {
           startSeconds: engineCurrentTime(),
@@ -457,8 +400,7 @@ export function usePlayback(
         })
         return
       }
-      // direct play (ADR-0008) — mpv switches its own embedded audio track
-      // instantly, no reload/re-buffer needed
+      // direct play (ADR-0008) — mpv switches embedded audio track instantly, no reload/re-buffer needed
       selectAudioTrack(toDemuxedIndex(sess, index))
     },
     [selectAudioTrack, loadFor, engineCurrentTime]

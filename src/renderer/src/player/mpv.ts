@@ -16,18 +16,8 @@ interface Tick {
   muted: boolean
 }
 
-// PlaybackEngine backed by in-process libmpv (render API, ADR-0003/0005),
-// composited under `element`'s on-screen rect instead of a <video> tag — see
-// src-tauri/src/mpv/engine.rs. PiP (ADR-0006 rev.) hands playback off to a
-// standalone, borderless/always-on-top *system* mpv process instead — see
-// src-tauri/src/pip.rs — pausing this in-process engine for the handoff so
-// there's no double audio, and resuming it at the position the spawned mpv
-// reports back on close (`pip://ended`, fired whether the user closed it or
-// `exitPiP` did).
-//
-// currentTime()/duration()/paused()/buffered() are synchronous per the
-// PlaybackEngine contract, but IPC to Rust is inherently async — this class
-// mirrors the last "mpv://tick" snapshot locally instead of round-tripping.
+// PlaybackEngine backed by in-process libmpv (render API, ADR-0003/0005), composited under `element`'s on-screen rect — see src-tauri/src/mpv/engine.rs. PiP (ADR-0006) hands off to a standalone system mpv process (src-tauri/src/pip.rs), pausing this engine to avoid double audio and resuming on `pip://ended`.
+// currentTime()/duration()/paused()/buffered() are sync per PlaybackEngine contract, but IPC is async — mirrors last "mpv://tick" snapshot instead of round-tripping.
 export class MpvEngine implements PlaybackEngine {
   private listeners: Listeners = {
     time: new Set(),
@@ -50,10 +40,7 @@ export class MpvEngine implements PlaybackEngine {
   private resizeObserver: ResizeObserver
   private rectListenersAbort = new AbortController()
   private ready: Promise<void>
-  // stashed for enterPiP -- the currently-loaded stream URL, last rate, and
-  // active text-subtitle (if any) aren't otherwise tracked/observable off
-  // this engine. Embedded (non-text) subtitle picks have no URL to hand a
-  // spawned PiP process, so PiP only ever carries text tracks over.
+  // stashed for enterPiP: not otherwise tracked/observable off this engine. Embedded (non-text) subtitle picks have no URL, so PiP only ever carries text tracks over.
   private url = ''
   private rate = 1
   private textTracks: TextTrackSource[] = []
@@ -62,9 +49,7 @@ export class MpvEngine implements PlaybackEngine {
   private backend: 'gpu' | 'cpu' | null = null
 
   constructor(private element: HTMLElement) {
-    // GUI subtitle knobs first, so a matching key in the raw passthrough
-    // below still wins (same order as engine.rs's own hardcoded defaults
-    // vs. this whole extraConfig list) -- see guiSubtitleConfig's doc.
+    // GUI subtitle knobs first, so a matching raw passthrough key still wins (same order as engine.rs's hardcoded defaults)
     const settings = useSettings.getState()
     const extraConfig = [...guiSubtitleConfig(settings), ...parseMpvConfig(settings.mpvConfig)]
     this.ready = invoke<string>('mpv_attach', { extraConfig }).then((backend) => {
@@ -74,18 +59,14 @@ export class MpvEngine implements PlaybackEngine {
 
     this.resizeObserver = new ResizeObserver(() => this.syncRect())
     this.resizeObserver.observe(element)
-    // element size doesn't change on scroll/window move, but its on-screen
-    // *position* does — mpv's surface is positioned in window-local
-    // coordinates, so any of these can shift it
+    // element size doesn't change on scroll/window move, but its on-screen position does — mpv's surface uses window-local coords
     const signal = this.rectListenersAbort.signal
     window.addEventListener('resize', this.syncRect, { signal })
     window.addEventListener('scroll', this.syncRect, { signal, capture: true })
 
     void listen<Tick>('mpv://tick', ({ payload }) => {
       const prev = this.last
-      // duration/buffered have no dedicated event on this interface —
-      // `last` is updated before emitting so duration()/buffered() are
-      // already fresh for anything reading them off the 'time' callback
+      // duration/buffered have no dedicated event — `last` updated before emitting so duration()/buffered() are fresh for anything reading off 'time'
       this.last = payload
       this.emit('time', payload.time)
       if (payload.paused !== prev.paused || payload.coreIdle !== prev.coreIdle) {
@@ -102,9 +83,7 @@ export class MpvEngine implements PlaybackEngine {
       this.emit('error', 'Playback failed.')
     }).then((un) => this.unlisten.push(un))
 
-    // fires once the spawned PiP mpv process exits, for either reason (user
-    // closed its window, or exitPiP() killed it) -- single place that
-    // resumes this engine, so both paths behave identically
+    // fires once spawned PiP mpv exits (user closed window, or exitPiP() killed it) -- single place that resumes this engine
     void listen<number>('pip://ended', ({ payload }) => {
       this.seek(payload)
       this.emit('pip', false)
@@ -133,10 +112,7 @@ export class MpvEngine implements PlaybackEngine {
     this.textTracks = req.textTracks
     this.activeTextIndex = null
     await invoke('mpv_load', { url: req.url, startSeconds: req.startSeconds })
-    // mpv fetches subtitle URLs itself (its own HTTP stack, no CORS) — no
-    // need to fetch/blob these through the main process.
-    // Rust owns the index -> mpv "sid" mapping (and the load-race deferral
-    // for it, see engine.rs's add_subtitle) -- no map to keep in sync here.
+    // mpv fetches subtitle URLs itself (own HTTP stack, no CORS). Rust owns index -> mpv "sid" mapping (see engine.rs's add_subtitle) -- no map to sync here.
     await Promise.all(
       req.textTracks.map(async (t) => {
         try {
@@ -165,11 +141,7 @@ export class MpvEngine implements PlaybackEngine {
     void invoke('mpv_set_rate', { rate })
   }
 
-  // Fires directly, like play/pause/seek/setRate -- *not* chained on `ready`
-  // here (only the one-time initial apply in `applyInitialVolume` needs
-  // that, see its own doc). Every call after construction reaches an
-  // already-attached engine; adding a needless `.then()` per call was the
-  // "mute doesn't react as fast as the other buttons" report.
+  // Fires directly like play/pause/seek/setRate, not chained on `ready` (only applyInitialVolume needs that) -- needless .then() per call was the "mute reacts slower than other buttons" bug.
   setVolume(volume: number): void {
     void invoke('mpv_set_volume', { volume: Math.max(0, Math.min(1, volume)) })
   }
@@ -178,12 +150,7 @@ export class MpvEngine implements PlaybackEngine {
     void invoke('mpv_set_muted', { muted })
   }
 
-  // Chained on `ready`, not fire-and-forget: usePlayerEngine applies the
-  // persisted lastVolume/lastMuted right at construction, before mpv_attach
-  // resolves — a bare invoke can win the (non-FIFO) MpvState lock race, hit
-  // the still-empty engine slot, and silently drop the initial value for the
-  // whole session. Only this one-time call needs the wait; every later
-  // setVolume/setMuted (user actions) fires straight through above.
+  // Chained on `ready`, not fire-and-forget: applied before mpv_attach resolves — a bare invoke can win the non-FIFO MpvState lock race and silently drop the initial value for the whole session.
   applyInitialVolume(volume: number, muted: boolean): void {
     void this.ready.then(() => {
       void invoke('mpv_set_volume', { volume: Math.max(0, Math.min(1, volume)) })
@@ -191,15 +158,7 @@ export class MpvEngine implements PlaybackEngine {
     })
   }
 
-  // These three (unlike setVolume/setMuted above) resolve against server-
-  // reported track state (add_subtitle's index -> mpv "sid" map, or mpv's
-  // own demuxed track-list) that can legitimately not have what's asked --
-  // e.g. a text track whose sub-add never landed, or a source index mpv's
-  // own file never actually contains. Rust surfaces that as a rejected
-  // promise; fire-and-forget silently dropped it into an unhandled-
-  // rejection (only visible with devtools already open, no context) --
-  // logged here instead so "a subtitle just doesn't show up" always leaves
-  // a paper trail.
+  // Unlike setVolume/setMuted, these three can legitimately ask for track state that doesn't exist (sub-add never landed, source index absent) -- Rust rejects the promise, so log it instead of an invisible unhandled-rejection, keeping "subtitle doesn't show up" debuggable.
   setTextTrack(index: number | null): void {
     this.activeTextIndex = index
     void invoke('mpv_set_text_track', { index }).catch((e) =>
@@ -226,20 +185,9 @@ export class MpvEngine implements PlaybackEngine {
   async enterPiP(): Promise<void> {
     if (!this.url) return
     const wasPaused = this.last.paused
-    // hands the active *text* subtitle (if any) over via --sub-file -- the
-    // spawned mpv fetches it itself, same as sub-add does for the in-process
-    // engine, no auth/CORS concerns either. An embedded (non-text) pick has
-    // no URL to give it; PiP just plays without subs in that case, same as
-    // if none were selected at all.
+    // hands active *text* subtitle (if any) via --sub-file -- spawned mpv fetches it itself, no auth/CORS concerns. Embedded (non-text) pick has no URL, PiP just plays without subs.
     const activeText = this.textTracks.find((t) => t.index === this.activeTextIndex)
-    // Pausing only *after* `pip_start` actually resolves -- previously this
-    // paused unconditionally before the await, with the call site never
-    // awaiting/catching this method's own promise (`void e.enterPiP()`).
-    // A failed spawn (mpv missing/crashed, despite `pip_available`'s own
-    // check) left the main engine paused with no PiP window ever having
-    // appeared, no error surfaced, and no way back except pressing play
-    // manually -- exactly the "stuck on a paused frame" symptom. Now a
-    // failure never touches playback at all.
+    // Pause only *after* pip_start resolves -- pausing unconditionally before the await left a failed spawn stuck on a paused frame with no PiP window and no way back but manual play.
     try {
       await invoke('pip_start', {
         url: this.url,
@@ -256,12 +204,11 @@ export class MpvEngine implements PlaybackEngine {
       this.emit('error', 'Picture-in-Picture failed to start.')
       return
     }
-    this.pause() // avoid double audio while the spawned mpv also plays this stream
+    this.pause() // avoid double audio while spawned mpv also plays this stream
     this.emit('pip', true)
   }
 
-  // Just kills the spawned process -- `pip://ended` (above) does the actual
-  // resume, so closing it from here or from its own window behave the same.
+  // kills the spawned process -- `pip://ended` above does the actual resume, so closing from here or its own window behaves the same
   async exitPiP(): Promise<void> {
     await invoke('pip_stop')
   }
@@ -296,7 +243,7 @@ export class MpvEngine implements PlaybackEngine {
     this.rectListenersAbort.abort()
     for (const un of this.unlisten) un()
     this.unlisten = []
-    void invoke('pip_stop') // don't orphan a floating mpv window if the player unmounts mid-PiP
+    void invoke('pip_stop') // don't orphan a floating mpv window if player unmounts mid-PiP
     void invoke('mpv_destroy')
   }
 }

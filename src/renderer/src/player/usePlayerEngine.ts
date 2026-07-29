@@ -3,8 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { MpvEngine } from './mpv'
 import type { LoadRequest, PlaybackEngine } from './engine'
 
-// Mirrors engine state into React and funnels every engine write through one
-// place, so component code never holds a second copy of playback state.
+// Mirrors engine state into React, funnels every engine write through one place so component code never holds a second copy of playback state.
 
 export interface EngineHandlers {
   onEnded?: (positionSeconds: number) => void
@@ -55,7 +54,7 @@ export function usePlayerEngine(
   useEffect(() => {
     handlersRef.current = handlers
   })
-  const initialRef = useRef(initial) // applied once, at engine creation
+  const initialRef = useRef(initial) // applied once at engine creation
 
   const engineRef = useRef<PlaybackEngine | null>(null)
   const [state, setState] = useState<'playing' | 'paused' | 'buffering'>('buffering')
@@ -69,14 +68,12 @@ export function usePlayerEngine(
   const [pipAvailable, setPipAvailable] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // system mpv is genuinely optional (unlike in-process playback) -- PiP
-  // just hides itself when there's nothing to spawn
+  // system mpv is genuinely optional (unlike in-process playback) -- PiP just hides itself when there's nothing to spawn
   useEffect(() => {
     void invoke<boolean>('pip_available').then(setPipAvailable)
   }, [])
   const rateRef = useRef(initial.rate)
-  // mirrors so adjustVolume/toggleMute keep stable identities (they feed
-  // memoized controls) and can report the value they just set
+  // mirrors let adjustVolume/toggleMute keep stable identities and report the value they just set
   const volumeRef = useRef(initial.volume)
   const mutedRef = useRef(initial.muted)
 
@@ -91,8 +88,7 @@ export function usePlayerEngine(
       e.on('state', setState)
       e.on('error', setError)
       e.on('pip', setPip)
-      // volumechange is the single source of truth — covers slider, hotkeys,
-      // and anything outside our UI (media keys, PiP window)
+      // volumechange is the single source of truth — covers slider, hotkeys, and anything outside our UI (media keys, PiP window)
       e.on('volume', (v, m) => {
         volumeRef.current = v
         mutedRef.current = m
@@ -130,9 +126,7 @@ export function usePlayerEngine(
   const currentTime = useCallback(() => engineRef.current?.currentTime() ?? 0, [])
   const renderBackend = useCallback(() => engineRef.current?.renderBackend() ?? null, [])
 
-  // decide off the engine's freshest pause mirror (last tick), not the React
-  // `state` value — during 'buffering' `state` can't tell playing-but-stalled
-  // from paused, so toggling off it would make pause unreachable mid-buffer
+  // decide off engine's freshest pause mirror (last tick), not React `state` — during 'buffering' state can't tell playing-but-stalled from paused, would make pause unreachable mid-buffer
   const togglePlay = useCallback(() => {
     const e = engineRef.current
     if (!e) return
@@ -153,7 +147,7 @@ export function usePlayerEngine(
     e?.setVolume(clamped)
     setVolume(clamped)
     if (clamped > 0) {
-      e?.setMuted(false) // raising volume implies "I want sound"
+      e?.setMuted(false) // raising volume implies "want sound"
       mutedRef.current = false
       setMuted(false)
     }
