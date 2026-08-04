@@ -43,6 +43,8 @@ export interface PlaybackEngine {
   selectEmbeddedSubtitleTrack(index: number | null): void // non-text (PGS/VOBSUB/styled ASS); null = off
   enterPiP(): Promise<void>
   exitPiP(): Promise<void>
+  // Generic mpv command passthrough (screenshot, frame-step, cycle deinterlace, ...) -- see MpvEngine's doc.
+  runCommand(args: string[]): void
   // Render backend attach() landed on (ADR-0009, macOS only) -- null until attach resolves, or on an engine with no such concept. Drives player overlay's CPU-fallback badge only, never gates behavior.
   renderBackend(): 'gpu' | 'cpu' | null
   currentTime(): number

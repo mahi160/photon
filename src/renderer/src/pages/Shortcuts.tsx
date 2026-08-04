@@ -85,6 +85,9 @@ export function ShortcutsOverlay({
                   keys={['[', ']']}
                   join="/"
                 />
+                <Item label="Step one frame back / forward" keys={[',', '.']} join="/" />
+                <Item label="Toggle deinterlace" keys={['D']} />
+                <Item label="Screenshot" keys={['⇧', 'S']} />
               </div>
             </section>
           </div>

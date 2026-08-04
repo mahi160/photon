@@ -170,6 +170,12 @@ export class MpvEngine implements PlaybackEngine {
     void invoke('mpv_set_subtitle_delay', { seconds })
   }
 
+  // Generic mpv command passthrough (screenshot, frame-step, cycle deinterlace, ...) -- one Rust command
+  // instead of one #[tauri::command] per mpv command, see commands.rs's mpv_run_command doc.
+  runCommand(args: string[]): void {
+    void invoke('mpv_run_command', { args }).catch((e) => console.error('[playback] runCommand failed', args, e))
+  }
+
   selectAudioTrack(index: number): void {
     void invoke('mpv_select_track', { kind: 'audio', sourceIndex: index }).catch((e) =>
       console.error('[playback] selectAudioTrack failed', index, e)
