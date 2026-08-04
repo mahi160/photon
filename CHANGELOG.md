@@ -1,3 +1,11 @@
+# [2.0.0-pre.7](https://github.com/mahi160/photon/compare/v2.0.0-pre.6...v2.0.0-pre.7) (2026-08-04)
+
+
+### Features
+
+* **mpv:** add wayland render backend for linux (issue [#27](https://github.com/mahi160/photon/issues/27)) ([5191488](https://github.com/mahi160/photon/commit/5191488ec6d5a657b5ba31df889021fce59d375a))
+* **player:** add run_command handler for generic mpv commands ([71186aa](https://github.com/mahi160/photon/commit/71186aaf13bb7fba6a6a78827535cf28d8dc6e56))
+
 # [2.0.0-pre.6](https://github.com/mahi160/photon/compare/v2.0.0-pre.5...v2.0.0-pre.6) (2026-07-26)
 
 
