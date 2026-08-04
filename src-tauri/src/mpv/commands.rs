@@ -85,6 +85,12 @@ pub fn mpv_set_rect(state: State<'_, MpvState>, x: f64, y: f64, w: f64, h: f64) 
     Ok(())
 }
 
+// Generic mpv command passthrough (screenshot, frame-step, cycle deinterlace, ...) -- see engine.rs's run_command doc.
+#[tauri::command]
+pub fn mpv_run_command(state: State<'_, MpvState>, args: Vec<String>) -> Result<(), String> {
+    with_engine(&state, |e| e.run_command(&args))
+}
+
 #[tauri::command]
 pub fn mpv_destroy(state: State<'_, MpvState>) -> Result<(), String> {
     state.0.lock().unwrap().take(); // drop() tears down observer thread + GL/mpv state
