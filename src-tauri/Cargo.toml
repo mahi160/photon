@@ -72,3 +72,10 @@ windows = { version = "0.61", features = [
 # GL calls, XVisualInfo's field layout is real struct-layout risk not worth
 # taking when a maintained crate already resolves in this same build).
 x11 = { version = "2", features = ["xlib", "glx"] }
+# Wayland half of the render backend (issue #27, mpv/linux/wayland.rs). "dlopen" (wayland-client's default)
+# and khronos-egl's "dynamic" both dlopen their system libs at runtime instead of linking against
+# libwayland-client.so/libEGL.so at build time -- no wayland-client/egl pkg-config needed in CI.
+wayland-client = "0.31"
+wayland-backend = { version = "0.3", features = ["client_system"] }
+wayland-egl = "0.32"
+khronos-egl = { version = "6", features = ["dynamic"] }
