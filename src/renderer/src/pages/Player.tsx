@@ -219,6 +219,14 @@ export function Player(): React.JSX.Element {
       c: (e) => {
         if (!e.repeat) cycleSubtitle()
       },
+      ',': () => engine.runCommand(['frame-back-step']),
+      '.': () => engine.runCommand(['frame-step']),
+      d: (e) => {
+        if (!e.repeat) engine.runCommand(['cycle', 'deinterlace'])
+      },
+      'shift+s': (e) => {
+        if (!e.repeat) engine.runCommand(['screenshot'])
+      },
       '?': () => setShortcutsOpen((v) => !v),
       'shift+?': () => setShortcutsOpen((v) => !v)
     },
