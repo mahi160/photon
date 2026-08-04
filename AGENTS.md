@@ -68,6 +68,9 @@ hides itself when no system `mpv` is on `PATH`.
 | F         | Fullscreen              |
 | P         | Picture-in-Picture      |
 | M         | Mute                    |
+| , / .     | Frame step back/forward |
+| D         | Toggle deinterlace      |
+| Shift+S   | Screenshot              |
 | Esc       | Exit fullscreen         |
 | Ctrl/⌘+F  | Search                  |
 
@@ -98,12 +101,15 @@ Platform builds/publishing (ticket #11): `release.yml` builds and publishes
 a macOS artifact (Tauri bundler, ad-hoc signed, updater-signed) once a
 release is cut, then undrafts it. Windows/Linux builds are wired up too
 (`build-windows`/`build-linux`, `continue-on-error: true` so they can never
-block the macOS release). `mpv/windows` (WGL) and `mpv/linux` (GLX, X11
-only — Wayland's EGL backend is a follow-up, issue #27) are real render
-surfaces now, not stubs; Linux is verified rendering an actual frame against
-a live X11/GLX session, Windows is compile/link-verified on CI's
-`windows-latest` runner only, not yet watched playing video on real
-hardware — `continue-on-error: true` stays until that happens. None of the
+block the macOS release). `mpv/windows` (WGL) and `mpv/linux` (GLX for X11, EGL/`wl_subsurface` for
+Wayland, issue #27) are real render surfaces now, not stubs; Linux's GLX
+path is verified rendering an actual frame against a live X11 session, the
+new Wayland path is a first cut written against documented crate APIs with
+no Wayland compositor available to smoke-test against (see `mpv/linux/
+wayland.rs`'s doc comment) — needs that smoke test before it's trusted.
+Windows is compile/link-verified on CI's `windows-latest` runner only, not
+yet watched playing video on real hardware — `continue-on-error: true`
+stays until both get real verification. None of the
 three platforms use ADR-0004's vendored LGPL libmpv build yet (macOS links
 Homebrew's GPL build, same as local dev; Windows/Linux similarly link a full
 GPL build in CI).
