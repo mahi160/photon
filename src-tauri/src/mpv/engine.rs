@@ -4,7 +4,7 @@
 use super::backend;
 use super::surface::{Backend, RenderSurface};
 use libmpv_sys::*;
-use raw_window_handle::HasWindowHandle;
+use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use std::collections::HashMap;
 use std::ffi::{c_void, CStr, CString};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -336,6 +336,8 @@ impl MpvEngine {
     ) -> Result<Self, String> {
         // Platform-agnostic handle -- this file never imports an AppKit/Win32/X11 type directly; `backend` does its own raw-handle unwrapping internally.
         let raw_handle = window.window_handle().map_err(|e| e.to_string())?.as_raw();
+        // Only linux/wayland.rs (issue #27) actually needs this (wl_display, alongside the window handle's wl_surface) -- mac/windows ignore it.
+        let raw_display_handle = window.display_handle().map_err(|e| e.to_string())?.as_raw();
 
         unsafe {
             let mpv = mpv_create();
@@ -377,8 +379,21 @@ impl MpvEngine {
 
             let waker = Arc::new(RenderWaker::default());
             // Owns picking/creating the render context, the GPU-vs-CPU fallback decision, and registering on_render_update -- see backend::attach's doc.
-            let (surface, backend) = backend::attach(mpv, raw_handle, &waker)?;
+            let (surface, backend) = backend::attach(mpv, raw_handle, raw_display_handle, &waker)?;
             let surface = Arc::new(Mutex::new(surface));
+
+            // Windows/Linux only, gated on Gpu: those two backends give mpv a real GL context (WGL/GLX,
+            // ADR-0009's Windows/Linux follow-up), so hwdec can interop straight into a GPU texture instead
+            // of paying the hwdec-copy round trip the option comment above was written for (that comment
+            // predates the GPU surfaces). mac stays on auto-copy -- not asked for here, and its IOSurface/Metal
+            // path already has a separate zero-copy story (ADR-0009).
+            // ponytail: direct (non-copy) hwdec on WGL/GLX is unverified against real Windows/Linux GPU drivers --
+            // smoke-test before relying on it; falls back to mpv's own auto-copy behavior if the interop fails.
+            if !cfg!(target_os = "macos") && backend == Backend::Gpu {
+                let name = CString::new("hwdec").unwrap();
+                let val = CString::new("auto").unwrap();
+                mpv_set_property_string(mpv, name.as_ptr(), val.as_ptr()); // post-init override, see comment above; best-effort, mpv keeps auto-copy if this fails
+            }
 
             observe(mpv, 1, "time-pos", mpv_format_MPV_FORMAT_DOUBLE);
             observe(mpv, 2, "pause", mpv_format_MPV_FORMAT_FLAG);
@@ -424,6 +439,14 @@ impl MpvEngine {
     fn command(&self, args: &[&str]) -> Result<(), String> {
         let (_cstrs, mut ptrs) = command_args(args);
         unsafe { check(mpv_command(self.mpv, ptrs.as_mut_ptr()), "mpv_command") }
+    }
+
+    // ponytail: generic passthrough (screenshot / frame-step / cycle deinterlace etc.) instead of one
+    // bespoke #[tauri::command] per mpv command -- these are plain mpv commands with no state Photon
+    // tracks, same shape as `command` above, just reachable from the frontend.
+    pub fn run_command(&self, args: &[String]) -> Result<(), String> {
+        let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+        self.command(&refs)
     }
 
     pub fn load(&self, url: &str, start_seconds: f64) -> Result<(), String> {

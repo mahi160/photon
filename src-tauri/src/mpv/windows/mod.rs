@@ -33,6 +33,7 @@ static REGISTER_CLASS: Once = Once::new();
 pub(crate) fn attach(
     mpv: *mut mpv_handle,
     handle: RawWindowHandle,
+    _display_handle: raw_window_handle::RawDisplayHandle, // unused here -- only linux/wayland.rs needs it, see engine.rs's attach
     waker: &Arc<RenderWaker>,
 ) -> Result<(Box<dyn RenderSurface>, Backend), String> {
     let RawWindowHandle::Win32(h) = handle else {
