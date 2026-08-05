@@ -285,14 +285,22 @@ fn raw_command(mpv: *mut mpv_handle, args: &[&str]) {
 
 const HDR_TONEMAP_LABEL: &str = "phtonemap";
 
-// SW render path has no tone-mapping of its own (8-bit RGB only) so unmapped PQ/HLG shows blown-out colors -- closes the gap via ffmpeg zscale+tonemap, gated on gamma pq/hlg so SDR pays nothing.
-// ponytail: verified against docs/recipe, not a real HDR display -- smoke-test with real HDR10/HLG before relying on this.
-fn apply_hdr_tonemap(mpv: *mut mpv_handle, gamma: &str, active: &mut bool) {
+// GPU render path (WGL/GLX/Metal) is mpv's normal gpu-next shader renderer, same as any vo=gpu build --
+// it tone-maps HDR->SDR on its own GPU shaders for free once told the display is SDR (see
+// target-trc/target-prim/tone-mapping options set in attach() below, once at init). Only the CPU/software render fallback
+// (mac/software.rs) is a raw 8-bit blit with no color management of its own -- *that* path is what this
+// manual ffmpeg zscale+tonemap CPU filter exists for. Confirmed by measurement (issue: HDR10 stutter on
+// Windows/Intel iGPU) that running this CPU filter unconditionally, even alongside a perfectly fine GPU
+// render backend, was the actual stutter source -- gated on `cpu_backend` below so the GPU path never pays it.
+fn apply_hdr_tonemap(mpv: *mut mpv_handle, gamma: &str, active: &mut bool, cpu_backend: bool) {
     let is_hdr = gamma == "pq" || gamma == "hlg";
     if is_hdr == *active {
         return;
     }
     *active = is_hdr;
+    if !cpu_backend {
+        return; // GPU renderer already tone-maps via attach()'s target-trc/tone-mapping properties
+    }
     if is_hdr {
         let filter = format!(
             "@{HDR_TONEMAP_LABEL}:lavfi=[zscale=transfer=linear:npl=100,format=gbrpf32le,zscale=primaries=bt709,tonemap=hable,zscale=transfer=bt709:matrix=bt709,format=yuv420p]"
@@ -389,6 +397,9 @@ impl MpvEngine {
             // path already has a separate zero-copy story (ADR-0009).
             // ponytail: direct (non-copy) hwdec on WGL/GLX is unverified against real Windows/Linux GPU drivers --
             // smoke-test before relying on it; falls back to mpv's own auto-copy behavior if the interop fails.
+            // Smoke-tested on real Windows hardware (Intel UHD 620): mpv falls back to "d3d11va-copy" on its
+            // own when the direct interop doesn't pan out, exactly as designed -- not the stutter source
+            // (that was the unconditional CPU HDR tonemap filter above, now gated on cpu_backend).
             if !cfg!(target_os = "macos") && backend == Backend::Gpu {
                 let name = CString::new("hwdec").unwrap();
                 let val = CString::new("auto").unwrap();
@@ -405,9 +416,19 @@ impl MpvEngine {
             // drives apply_hdr_tonemap -- actual transfer function only known once decoding starts, unlike track-list metadata available at FILE_LOADED.
             observe(mpv, 8, "video-params/gamma", mpv_format_MPV_FORMAT_STRING);
 
+            // GPU render path: tell mpv's own shader renderer the display is SDR so its built-in
+            // tone-mapping engages on HDR sources automatically, same algorithm (hable) as the CPU
+            // fallback below but done on GPU shaders mpv already has -- no manual filter needed.
+            if backend == Backend::Gpu {
+                set_option(mpv, "target-trc", "bt.1886");
+                set_option(mpv, "target-prim", "bt.709");
+                set_option(mpv, "tone-mapping", "hable");
+            }
+
             let stop = Arc::new(AtomicBool::new(false));
             let pending = Arc::new(Mutex::new(PendingState::default()));
-            let observer = spawn_observer(app.clone(), mpv, stop.clone(), pending.clone());
+            let observer =
+                spawn_observer(app.clone(), mpv, stop.clone(), pending.clone(), backend == Backend::Cpu);
 
             Ok(Self {
                 mpv,
@@ -585,6 +606,7 @@ fn spawn_observer<R: Runtime>(
     mpv: *mut mpv_handle,
     stop: Arc<AtomicBool>,
     pending: Arc<Mutex<PendingState>>,
+    cpu_backend: bool,
 ) -> JoinHandle<()> {
     // SAFETY: mpv outlives this thread -- MpvEngine::drop() signals `stop`, sends "quit", and joins this thread before freeing the render context/mpv handle.
     let mpv_addr = mpv as usize;
@@ -609,7 +631,7 @@ fn spawn_observer<R: Runtime>(
                         let ptr = unsafe { *(prop.data as *const *const std::os::raw::c_char) };
                         if !ptr.is_null() {
                             let gamma = unsafe { CStr::from_ptr(ptr).to_string_lossy() };
-                            apply_hdr_tonemap(mpv, &gamma, &mut hdr_tonemap_active);
+                            apply_hdr_tonemap(mpv, &gamma, &mut hdr_tonemap_active, cpu_backend);
                         }
                         continue; // not part of Tick, no UI event needed
                     }
