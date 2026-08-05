@@ -8,11 +8,13 @@ fn main() {
     pkg_config::probe_library("mpv")
         .expect("libmpv not found via pkg-config (macOS: brew install mpv, Linux: apt install libmpv-dev)");
 
-    // ADR-0010: we call epoxy_get_proc_address (GL entry points for mpv's render
-    // context + our FBO query) and GtkGLArea's context uses libepoxy anyway.
-    // GTK ships it; this makes the symbol linkable from our own FFI.
-    #[cfg(target_os = "linux")]
-    pkg_config::probe_library("epoxy").expect("libepoxy not found via pkg-config (ships with GTK3)");
+    // No epoxy probe: mpv's GL entry points now come from the display server's own
+    // resolver (eglGetProcAddress / glXGetProcAddressARB, dlopen'd at runtime in
+    // mpv/linux/mod.rs) because libepoxy's dispatch pointers are never NULL and
+    // libmpv needs NULL to detect a missing function. The old
+    // `cargo:rustc-link-lib=epoxy` line was dead weight anyway -- nothing
+    // referenced an epoxy symbol at link time, so --as-needed dropped it (no
+    // libepoxy NEEDED entry in the shipped binary).
 
     // Windows has no pkg-config/vcpkg story for libmpv (a vcpkg port was
     // proposed and closed unmerged: microsoft/vcpkg#40587, "very hard to
