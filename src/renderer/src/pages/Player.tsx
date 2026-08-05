@@ -323,7 +323,7 @@ export function Player(): React.JSX.Element {
           </button>
         </div>
       )}
-      {!player.error && !session && (
+      {!player.error && (!session || !engine.videoReady) && (
         <div className={styles.loadingLayer}>
           <div className={styles.loadingSpinner} />
         </div>
