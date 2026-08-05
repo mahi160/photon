@@ -100,17 +100,19 @@ Release.
 Platform builds/publishing (ticket #11): `release.yml` builds and publishes
 a macOS artifact (Tauri bundler, ad-hoc signed, updater-signed) once a
 release is cut, then undrafts it. Windows/Linux builds are wired up too
-(`build-windows`/`build-linux`, `continue-on-error: true` so they can never
-block the macOS release). `mpv/windows` (WGL) and `mpv/linux` (GLX for X11, EGL/`wl_subsurface` for
-Wayland, issue #27) are real render surfaces now, not stubs; Linux's GLX
-path is verified rendering an actual frame against a live X11 session, the
-new Wayland path is a first cut written against documented crate APIs with
-no Wayland compositor available to smoke-test against (see `mpv/linux/
+(`build-windows`/`build-linux`, both `continue-on-error: true` — that flag
+stays regardless of verification status, purely so a Windows/Linux build
+failure can never block publish-release/the macOS release; see
+`release.yml`'s comments). `mpv/windows` (WGL) and `mpv/linux` (GLX for
+X11, EGL/`wl_subsurface` for Wayland, issue #27) are real render surfaces
+now, not stubs. Windows has been watched playing video on real hardware (a
+release built by `build-windows` was tested end-to-end, not just
+compiled/linked on CI's `windows-latest` runner). Linux's GLX path is
+verified rendering an actual frame against a live X11 session; the new
+Wayland path is a first cut written against documented crate APIs with no
+Wayland compositor available to smoke-test against (see `mpv/linux/
 wayland.rs`'s doc comment) — needs that smoke test before it's trusted.
-Windows is compile/link-verified on CI's `windows-latest` runner only, not
-yet watched playing video on real hardware — `continue-on-error: true`
-stays until both get real verification. None of the
-three platforms use ADR-0004's vendored LGPL libmpv build yet (macOS links
+None of the three platforms use ADR-0004's vendored LGPL libmpv build yet (macOS links
 Homebrew's GPL build, same as local dev; Windows/Linux similarly link a full
 GPL build in CI).
 
