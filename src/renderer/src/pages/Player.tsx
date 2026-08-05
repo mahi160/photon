@@ -180,11 +180,16 @@ export function Player(): React.JSX.Element {
       space: (e) => {
         if (!e.repeat) engine.togglePlay()
       },
-      arrowleft: () => {
+      // repeat-guarded like space -- unguarded, a single tap's OS auto-repeat stacks multiple
+      // ±10s seeks back-to-back (confirmed via mpv_seek logging: intermittent duplicate seeks
+      // ~130ms apart from one keypress), which reads as "seeking lags/overshoots" to the user.
+      arrowleft: (e) => {
+        if (e.repeat) return
         engine.seekBy(-10)
         poke()
       },
-      arrowright: () => {
+      arrowright: (e) => {
+        if (e.repeat) return
         engine.seekBy(10)
         poke()
       },
