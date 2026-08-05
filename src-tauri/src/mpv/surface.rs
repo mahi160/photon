@@ -27,6 +27,9 @@ impl Backend {
 }
 
 /// GPU-vs-CPU fallback decision as a pure function of two closures, unit-testable without real GL/GPU calls (ADR-0009). Always logs one diagnostic line (issue #12).
+/// Only mac/mod.rs calls this today (Windows/Linux surfaces don't have a GPU/CPU split yet) -- dead on
+/// other targets' plain (non-test) build, hence the allow; the `#[cfg(test)]` block below still exercises it everywhere.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) fn try_or_fallback<T>(
     gpu: impl FnOnce() -> Result<T, String>,
     fallback: impl FnOnce() -> Result<T, String>,
