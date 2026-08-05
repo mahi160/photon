@@ -1,6 +1,7 @@
 //! mpv's software render API into a plain buffer, handed to a CALayer on a layer-backed NSView below the window's transparent WKWebView (ADR-0005/0009) -- permanent fallback when GpuSurface can't set up.
 //! ponytail: not OpenGL on purpose, plain NSOpenGLView doesn't work here (transparency/layer-backing) -- slower (CPU-bound, mpv docs call it "very slow"), buffers pooled since CoreGraphics's release callback decides when one's free.
 
+use super::super::surface::skip_frame;
 use super::RenderSurface;
 use crate::mpv::engine::{on_render_update, RenderWaker};
 use core_graphics::color_space::CGColorSpace;
@@ -127,6 +128,7 @@ self.view.setFrame(NSRect::new(NSPoint::new(x, y), NSSize::new(w, h)));
             return; // torn down (MpvEngine dropped)
         }
         if self.view.isHidden() {
+            unsafe { skip_frame(self.render_ctx) }; // consume it anyway, see skip_frame (SW backend: no GL context to make current)
             return;
         }
         // ponytail: point resolution, not 2x/HiDPI backing-store -- quarters per-frame cost on Retina,
@@ -134,6 +136,7 @@ self.view.setFrame(NSRect::new(NSPoint::new(x, y), NSSize::new(w, h)));
         let bounds = self.view.bounds();
         let (w, h) = (bounds.size.width as i32, bounds.size.height as i32);
         if w <= 0 || h <= 0 {
+            unsafe { skip_frame(self.render_ctx) };
             return;
         }
 

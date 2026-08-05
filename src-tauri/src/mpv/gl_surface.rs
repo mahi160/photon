@@ -2,13 +2,35 @@
 //! Each platform only implements [`DesktopGl`] (window/context creation, per-frame/per-resize ops); doesn't cover mac's backends since GpuSurface/SoftwareSurface don't share this file's shape.
 
 use super::engine::{on_render_update, RenderWaker};
-use super::surface::RenderSurface;
+use super::surface::{skip_frame, RenderSurface};
 use libmpv_sys::*;
 use std::ffi::{c_void, CStr};
 use std::os::raw::c_char;
 use std::sync::{Arc, Mutex};
 
+// Compiled (unused) on non-Windows too, so this file's tests can run everywhere -- see mpv/mod.rs.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 const MPV_RENDER_API_TYPE_OPENGL: &[u8] = b"opengl\0";
+
+/// What one render tick should do. Split out of `render` so the rules -- a torn-down surface touches
+/// nothing, a hidden one still *drains* mpv's queued frame -- are testable without a GL context or a
+/// live mpv handle.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum Tick {
+    Nothing,
+    Skip,
+    Draw { w: i32, h: i32 },
+}
+
+fn plan_tick(torn_down: bool, (w, h): (i32, i32)) -> Tick {
+    if torn_down {
+        Tick::Nothing
+    } else if w <= 0 || h <= 0 {
+        Tick::Skip
+    } else {
+        Tick::Draw { w, h }
+    }
+}
 
 /// What a platform must provide so [`GlRenderSurface`] can own the rest -- window/GL-context creation
 /// is each platform's own job (attach() builds one already current before touching this module).
@@ -27,6 +49,7 @@ pub(crate) trait DesktopGl: Send {
 }
 
 /// Creates the mpv GL render context against whatever GL context the caller already made current, wires up on_render_update -- never touches caller's window/context resources, on Err caller's own attach() tears those down.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 pub(crate) unsafe fn create_render_context(
     mpv: *mut mpv_handle,
     get_proc_address: unsafe extern "C" fn(*mut c_void, *const c_char) -> *mut c_void,
@@ -82,16 +105,20 @@ impl<P: DesktopGl> RenderSurface for GlRenderSurface<P> {
     }
 
     fn render(&self) {
-        if self.render_ctx.is_null() {
+        let size = *self.size.lock().unwrap();
+        let tick = plan_tick(self.render_ctx.is_null(), size);
+        if tick == Tick::Nothing {
             return; // torn down
-        }
-        let (w, h) = *self.size.lock().unwrap();
-        if w <= 0 || h <= 0 {
-            return;
         }
         if !self.platform.make_current() {
             return; // couldn't acquire the context this tick, try again next
         }
+        let Tick::Draw { w, h } = tick else {
+            // Hidden (or not yet placed): consume the frame instead of leaving it queued, see skip_frame.
+            unsafe { skip_frame(self.render_ctx) };
+            self.platform.release_current();
+            return;
+        };
         let mut fbo_param = mpv_opengl_fbo { fbo: 0, w, h, internal_format: 0 };
         let mut flip_y: i32 = 1;
         let mut params = [
@@ -102,6 +129,11 @@ impl<P: DesktopGl> RenderSurface for GlRenderSurface<P> {
         let rc = unsafe { mpv_render_context_render(self.render_ctx, params.as_mut_ptr()) };
         if rc >= 0 {
             self.platform.swap_buffers();
+            // Tell mpv when the frame actually hit the screen so it can estimate vsync -- without this it
+            // has no display timing at all and stays in the drop/dupe regime (24p on 60Hz judder).
+            // Called after the swap, context still current, and only for frames we really presented
+            // (render.h: reporting inconsistently is worse than not reporting).
+            unsafe { mpv_render_context_report_swap(self.render_ctx) };
         }
         self.platform.release_current(); // must happen even on the "no frame ready" path
     }
@@ -127,14 +159,22 @@ mod tests {
     #[derive(Default)]
     struct FakeGl {
         rects: StdMutex<Vec<(f64, f64, f64, f64)>>,
+        made_current: StdMutex<u32>,
+        released: StdMutex<u32>,
+        swaps: StdMutex<u32>,
     }
 
     impl DesktopGl for FakeGl {
         fn make_current(&self) -> bool {
+            *self.made_current.lock().unwrap() += 1;
             true
         }
-        fn release_current(&self) {}
-        fn swap_buffers(&self) {}
+        fn release_current(&self) {
+            *self.released.lock().unwrap() += 1;
+        }
+        fn swap_buffers(&self) {
+            *self.swaps.lock().unwrap() += 1;
+        }
         fn reposition_or_hide(&self, x: f64, y_top_left: f64, w: f64, h: f64) {
             self.rects.lock().unwrap().push((x, y_top_left, w, h));
         }
@@ -174,5 +214,23 @@ mod tests {
         let s = surface();
         s.set_rect(0.0, 0.0, 200.0, 100.0); // stores a real size...
         s.render(); // ...but this must still be a no-op, not a crash
+        assert_eq!(*s.platform.made_current.lock().unwrap(), 0);
+    }
+
+    #[test]
+    fn a_hidden_surface_drains_the_frame_instead_of_ignoring_it() {
+        // Hidden used to mean "return early", which leaves mpv's frame queued forever and makes the core
+        // log "mpv_render_context_render() not being called or stuck" -- audio keeps running, video
+        // timing rots. It must consume the frame (without presenting anything) instead.
+        assert_eq!(plan_tick(false, (0, 0)), Tick::Skip);
+        assert_eq!(plan_tick(false, (-1, 100)), Tick::Skip);
+        assert_eq!(plan_tick(false, (1280, 720)), Tick::Draw { w: 1280, h: 720 });
+    }
+
+    #[test]
+    fn a_torn_down_surface_outranks_everything_else() {
+        // Freed render context: no platform call, no mpv FFI, whatever the size says.
+        assert_eq!(plan_tick(true, (1280, 720)), Tick::Nothing);
+        assert_eq!(plan_tick(true, (0, 0)), Tick::Nothing);
     }
 }
