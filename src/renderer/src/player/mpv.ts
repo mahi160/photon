@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { EngineEvents, LoadRequest, PlaybackEngine, TextTrackSource } from './engine'
 import { guiSubtitleConfig, parseMpvConfig } from './mpvConfig'
+import { createSerialQueue } from '../lib/serialQueue'
 import { useSettings } from '../stores/settings'
 
 type Listeners = { [K in keyof EngineEvents]: Set<EngineEvents[K]> }
@@ -45,6 +46,11 @@ export class MpvEngine implements PlaybackEngine {
   private rate = 1
   private textTracks: TextTrackSource[] = []
   private activeTextIndex: number | null = null
+  // which text tracks have actually been sub-add'd to mpv -- lazy per-track, see setTextTrack
+  private addedTextTracks = new Set<number>()
+  // serializes add+select per text-track switch -- without this, rapidly switching subtitles (each an
+  // add-if-needed then a select, two awaited IPC round trips) could apply out of call order
+  private textTrackQueue = createSerialQueue()
   // set once `mpv_attach` resolves (ADR-0009) -- see `renderBackend()`
   private backend: 'gpu' | 'cpu' | null = null
 
@@ -111,17 +117,11 @@ export class MpvEngine implements PlaybackEngine {
     this.url = req.url
     this.textTracks = req.textTracks
     this.activeTextIndex = null
+    this.addedTextTracks = new Set()
     await invoke('mpv_load', { url: req.url, startSeconds: req.startSeconds })
-    // mpv fetches subtitle URLs itself (own HTTP stack, no CORS). Rust owns index -> mpv "sid" mapping (see engine.rs's add_subtitle) -- no map to sync here.
-    await Promise.all(
-      req.textTracks.map(async (t) => {
-        try {
-          await invoke('mpv_add_subtitle', { url: t.url, lang: t.language, index: t.index })
-        } catch (e) {
-          console.error('[playback] subtitle add failed', t.label, e)
-        }
-      })
-    )
+    // External subtitles are no longer added here for every track up front -- a file with many external
+    // subs (10+ languages) otherwise pays N HTTP fetches on load for tracks the user may never pick.
+    // setTextTrack below adds a track the first time it's actually selected instead.
   }
 
   play(): void {
@@ -161,9 +161,29 @@ export class MpvEngine implements PlaybackEngine {
   // Unlike setVolume/setMuted, these three can legitimately ask for track state that doesn't exist (sub-add never landed, source index absent) -- Rust rejects the promise, so log it instead of an invisible unhandled-rejection, keeping "subtitle doesn't show up" debuggable.
   setTextTrack(index: number | null): void {
     this.activeTextIndex = index
-    void invoke('mpv_set_text_track', { index }).catch((e) =>
+    // queued (not fired directly): lazy-adds the track first if this is the first time it's selected,
+    // and switching rapidly between two tracks must apply in call order, not response order
+    void this.textTrackQueue(() => this.applyTextTrack(index))
+  }
+
+  private async applyTextTrack(index: number | null): Promise<void> {
+    if (index !== null && !this.addedTextTracks.has(index)) {
+      const t = this.textTracks.find((t) => t.index === index)
+      if (t) {
+        this.addedTextTracks.add(index)
+        try {
+          await invoke('mpv_add_subtitle', { url: t.url, lang: t.language, index: t.index })
+        } catch (e) {
+          console.error('[playback] subtitle add failed', t.label, e)
+          this.addedTextTracks.delete(index)
+        }
+      }
+    }
+    try {
+      await invoke('mpv_set_text_track', { index })
+    } catch (e) {
       console.error('[playback] setTextTrack failed', index, e)
-    )
+    }
   }
 
   setSubtitleDelay(seconds: number): void {
@@ -173,7 +193,9 @@ export class MpvEngine implements PlaybackEngine {
   // Generic mpv command passthrough (screenshot, frame-step, cycle deinterlace, ...) -- one Rust command
   // instead of one #[tauri::command] per mpv command, see commands.rs's mpv_run_command doc.
   runCommand(args: string[]): void {
-    void invoke('mpv_run_command', { args }).catch((e) => console.error('[playback] runCommand failed', args, e))
+    void invoke('mpv_run_command', { args }).catch((e) =>
+      console.error('[playback] runCommand failed', args, e)
+    )
   }
 
   selectAudioTrack(index: number): void {
