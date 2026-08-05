@@ -5,13 +5,15 @@ name: Release
 # platform builds below only run once a release actually happens, and
 # undrafts it only once macOS's build succeeds (never publish a release
 # missing the one platform that's actually verified). build-windows/
-# build-linux keep `continue-on-error: true` even now that their render
-# surfaces are real (not stub) implementations, see mpv/windows and
-# mpv/linux -- neither has been observed cutting a release on real hardware
-# yet (CI's `windows-latest`/`ubuntu-latest` runners cover compile+link,
-# not a human watching real video), so they still must never be able to
-# block the macOS release that already works. See each job's own comment
-# for what's still unverified.
+# build-linux both keep `continue-on-error: true` -- not because their
+# builds are unverified (Windows has now been watched playing video on
+# real hardware, see that job's comment) but because `needs` in GitHub
+# Actions requires a listed job to *succeed* by default, and dropping the
+# flag would let a Windows/Linux build failure block publish-release from
+# ever running, taking the working macOS release down with it. The flag
+# doesn't hide a failure -- that job's own run still shows red -- it only
+# stops it from cascading. See each job's own comment for what's still
+# unverified.
 #
 # .releaserc.json marks `prod` as a prerelease channel ("pre") -- versions
 # come out as `2.0.0-pre.1`, `2.0.0-pre.2`, ... and the GitHub release is
@@ -102,12 +104,12 @@ jobs:
           tagName: ${{ needs.release.outputs.tag }}
           releaseDraft: true
 
-  # ticket #11: Windows build -- wired up per request. `continue-on-error:
-  # true` so a failure here can never block the macOS release (see
-  # publish-release's `needs`) -- kept even now that `mpv/windows` has a
-  # real WGL render surface (compiles/links/tests green on a real
-  # `windows-latest` runner, see rust-ci.yml), since no actual release has
-  # been cut and watched playing video on real Windows hardware yet.
+  # ticket #11: Windows build -- wired up per request. A release built by
+  # this job has been watched playing video on real Windows hardware, so
+  # the compile/link-only caveat is gone -- `continue-on-error: true`
+  # stays anyway, purely so a future Windows build failure still can't
+  # block publish-release/the macOS release (see top-of-file comment), not
+  # because Windows itself is still unverified.
   #
   # Same ADR-0004 gap as macOS: this isn't the vendored LGPL libmpv build
   # either. Bigger problem here: Windows has no pkg-config/vcpkg story for
@@ -119,9 +121,8 @@ jobs:
   # own docs describe for exactly this (DOCS/compile-windows.md > "Linking
   # libmpv with MSVC Programs"): `gendef` the dll's exports into a `.def`,
   # then MSVC's `lib.exe /def:...`. build.rs picks up the result via
-  # MPV_LIB_DIR. `mpv/windows/` now has a real WGL render surface (issue
-  # #27), so this installer's video should actually render -- just not yet
-  # confirmed on real Windows hardware outside CI.
+  # MPV_LIB_DIR. `mpv/windows/` has a real WGL render surface (issue #27),
+  # confirmed rendering video on real Windows hardware.
   build-windows:
     needs: [release]
     if: needs.release.outputs.published == 'true'
@@ -229,8 +230,10 @@ jobs:
     # listing them here only waits for them to finish (success or failure),
     # it never makes their outcome block this job -- lets whichever one
     # *does* succeed upload its artifacts (tauri-action's own behavior)
-    # before this undrafts the release, without the still-unverified two
-    # being able to hold the working macOS release back.
+    # before this undrafts the release, without either being able to hold
+    # the working macOS release back (Windows verified now, see its job's
+    # comment, but keeps the flag for that non-blocking guarantee, not
+    # because it's still unverified).
     needs: [release, build-macos, build-windows, build-linux]
     if: needs.release.outputs.published == 'true'
     runs-on: ubuntu-latest
