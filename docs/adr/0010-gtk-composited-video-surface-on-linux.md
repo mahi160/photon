@@ -72,16 +72,75 @@ on top. `set_rect` moves/resizes the GLArea within the `Fixed`.
   existing `RenderWaker`/`spawn_render_loop` is reused: the loop's
   `surface.render()` call, on Linux, just *posts* a repaint request to the main
   thread (`gl_area.queue_render()`), it does not touch GL itself.
-- **hwdec stays `auto-copy` on Linux.** Direct (zero-copy) hwdec interop through
-  a GtkGLArea context would need `MPV_RENDER_PARAM_X11_DISPLAY`/`WL_DISPLAY`
-  passed at render-context creation, which GtkGLArea does not expose cleanly;
-  the post-init `hwdec=auto` override (ADR-0009's Windows win) is gated to
-  Windows only. `auto-copy` always works.
+- **hwdec is direct on Linux too** (amended — the original text here claimed
+  otherwise and was wrong). `MPV_RENDER_PARAM_X11_DISPLAY`/`WL_DISPLAY` are
+  exactly what mpv needs for zero-copy interop (`render_gl.h`: "Intel/Linux: EGL
+  is required, and also the native display resource needs to be provided"), and
+  they are reachable: Tauri already hands us a `RawDisplayHandle` carrying the
+  `wl_display`/`Display*`, and Celluloid passes the same two params from GDK. So
+  the render context gets the native display and hwdec is set post-init to an
+  explicit `vaapi,nvdec,vaapi-copy,nvdec-copy,no` list. Not `auto`/`auto-safe`:
+  on libmpv 2.5 both probe vulkan and cuda on every load, which on a plain Mesa
+  box logs `VK_KHR_video_decode_queue` failures, `Cannot load libcuda.so.1` and
+  decode errors while falling back. Staying on `auto-copy` cost a full
+  GPU→RAM→GPU round trip per frame (~300 MB/s of VRAM readback for 4K HEVC
+  10-bit) on exactly the iGPU hardware that can least afford it.
+
+- **Rendering must not block the GTK main thread.**
+  `mpv_render_context_render()` blocks until the frame's target display time by
+  default (up to `video-timing-offset`, 50 ms). That is fine on mac/Windows,
+  where it runs on a dedicated render thread, but here it would stall the
+  webview's compositing and input handling. So: `BLOCK_FOR_TARGET_TIME = 0` per
+  render, plus `video-timing-offset=0` on Linux so mpv doesn't render ahead in
+  the first place (`render.h` names that as the way to keep A/V sync without
+  blocking).
+
+- **Frames are reported back.** `mpv_render_context_report_swap()` on the frame
+  clock's `after-paint`, gated on "we actually drew this cycle" (`render.h`:
+  reporting inconsistently is worse than not reporting). `ADVANCED_CONTROL` is
+  deliberately *not* enabled: it promises libmpv the render thread never waits
+  for the core, and on Linux that thread is the GTK main thread, which runs
+  arbitrary app/webview work — breaking that promise turns non-fatal timeouts
+  into a permanent core freeze.
+
+- **When GTK isn't painting, frames are drained.** A hidden/minimised/occluded
+  GLArea never emits `render`, and mpv then degrades
+  ("mpv_render_context_render() not being called or stuck"). If no paint has
+  happened for 250 ms, one frame is consumed with `SKIP_RENDERING` instead. Any
+  mpv GL call made outside the `render` signal needs `make_current()` *and*
+  `attach_buffers()` — without the latter mpv operates on an incomplete
+  framebuffer and logs `OpenGL error INVALID_FRAMEBUFFER_OPERATION` (observed).
+
+- **GL entry points come from the display server's resolver**
+  (`eglGetProcAddress` on Wayland, `glXGetProcAddressARB` on X11), dlopen'd at
+  runtime, with a plain-`dlsym` fallback. Not libepoxy: its `epoxy_gl*` dispatch
+  pointers are never NULL (verified — even `epoxy_glDrawMeshTasksNV` on a
+  non-NVIDIA GPU), and libmpv relies on NULL to detect a missing function, while
+  calling into an unsupported one hits epoxy's resolver-failure handler, which
+  `abort()`s the process. `build.rs` no longer probes/links epoxy (nothing
+  referenced an epoxy symbol at link time anyway, so `--as-needed` had already
+  dropped it from the binary).
 - **New Linux-only deps:** `gtk` 0.18, `gdk` 0.18, `glib` 0.18 (versions matched
-  to what Tauri already pulls), plus a `cargo:rustc-link-lib=epoxy` line — GTK
-  ships libepoxy, whose `epoxy_get_proc_address` resolves GL entry points for
-  both mpv and our FBO query. `webkit2gtk` type comes from Tauri's
+  to what Tauri already pulls) and `dbus` 0.9 (screensaver inhibit, see
+  `src/idle.rs` — WebKitGTK has no Screen Wake Lock API, so the renderer's hook
+  can't keep Linux screens awake). `webkit2gtk` type comes from Tauri's
   `with_webview`.
+
+- **Geometry is translated, not assumed.** The renderer sends the video rect in
+  CSS px (origin = web content top-left); a GTK allocation is in the toplevel
+  *widget's* space, which on a client-side-decorated window starts inside the
+  shadow/headerbar — measured on GTK 3.24: a 1280×753 client area sits at
+  (26, 70) in the toplevel window. The rect is therefore translated through the
+  container's own allocation (`PHOTON_DEBUG_RECT=1` prints both), and kept in CSS
+  space so it's re-translated on every relayout.
+
+- **The GLArea is positioned by `size_allocate`, never `set_size_request`.** A
+  size request is a *minimum* in GTK3 and propagates Fixed → Overlay → Window →
+  geometry hints: requesting the video's size made the toplevel un-shrinkable
+  during playback (measured: a 1600×900 rect pushed the window minimum to
+  1652×989, i.e. larger than the window). The request stays 1×1 forever and the
+  allocation is re-applied from the `Fixed`'s own `size-allocate`, since GTK
+  re-allocates children to their request on every relayout.
 - **GTK4 risk.** Tauri uses GTK3/webkit2gtk today. If it migrates to GTK4, the
   overlay approach still holds (GtkGLArea exists in GTK4), but the reparent and
   transparency plumbing would need revisiting.
@@ -129,7 +188,21 @@ Everything below is Linux-only (`#[cfg(target_os = "linux")]`).
 6. **`engine.rs`** — gate the post-init `hwdec=auto` override to
    `cfg!(target_os = "windows")` instead of `!cfg!(target_os = "macos")`.
 
-7. **Verify:** `cargo build`; run; confirm the app stays up and the UI still
-   renders after the reparent; then smoke-test playback (controls visible over
-   video, seek/resize/fullscreen) on both a Wayland session and an XWayland
-   (`GDK_BACKEND=x11`) session.
+## Linux smoke-test checklist
+
+`cargo build` proves nothing about this file. Before trusting a Linux release,
+on a real session (repeat on Wayland *and* `GDK_BACKEND=x11`):
+
+1. App starts, UI renders after the reparent, no `mpv:` lines on stderr.
+2. Video appears, aligned with the UI (`PHOTON_DEBUG_RECT=1` if not), controls
+   and menus composite *above* it.
+3. `mpv: hwdec-current=` shows `vaapi`/`nvdec` (not `no`, not `*-copy`) on
+   hardware that has it; 4K HEVC plays without dropped frames.
+4. Resize the window *smaller* during playback (the min-size regression), then
+   maximise, fullscreen, un-fullscreen.
+5. Minimise during playback, wait 10s, restore: audio keeps time, video resumes,
+   no "render not being called or stuck" in the log.
+6. Leave the player page and come back; quit while playing (no hang on exit).
+7. Screen doesn't blank during a long unattended play (screensaver inhibit).
+8. `dpkg -i` the built `.deb` on a machine *without* `libmpv-dev`: it must pull
+   `libmpv2` and start.
