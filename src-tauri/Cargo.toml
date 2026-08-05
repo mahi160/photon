@@ -72,3 +72,8 @@ windows = { version = "0.61", features = [
 gtk = "0.18"
 gdk = "0.18"
 glib = "0.18"
+# org.freedesktop.ScreenSaver.Inhibit during playback (src/idle.rs) -- WebKitGTK
+# has no Screen Wake Lock API, so the renderer's hook can't cover Linux. GDBus
+# (gio) rather than the `dbus` crate: gio is already linked via GTK, so this
+# needs no extra system library at build or run time.
+gio = "0.18"

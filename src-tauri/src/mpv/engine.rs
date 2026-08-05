@@ -193,6 +193,21 @@ unsafe fn set_option_checked(mpv: *mut mpv_handle, name: &str, value: &str) {
     }
 }
 
+/// Where `screenshot` should write. XDG user dir if it exists (no extra dependency to read
+/// user-dirs.dirs -- `~/Pictures` is the default in every distro that ships one), else the temp dir.
+fn screenshot_directory() -> String {
+    if let Some(home) = std::env::var_os("HOME") {
+        let pictures = std::path::Path::new(&home).join("Pictures");
+        if pictures.is_dir() {
+            return pictures.to_string_lossy().into_owned();
+        }
+        if !home.is_empty() {
+            return home.to_string_lossy().into_owned();
+        }
+    }
+    std::env::temp_dir().to_string_lossy().into_owned()
+}
+
 unsafe fn observe(mpv: *mut mpv_handle, id: u64, name: &str, format: mpv_format) {
     let cname = CString::new(name).unwrap();
     unsafe {
@@ -365,9 +380,11 @@ impl MpvEngine {
         let raw_display_handle = window.display_handle().map_err(|e| e.to_string())?.as_raw();
 
         unsafe {
-            // libmpv requires C locale for numeric operations
-            libc::setlocale(libc::LC_NUMERIC, "C\0".as_ptr() as *const i8);
-            
+            // LC_NUMERIC=C (libmpv's requirement) is set once from lib.rs's `run`, on the main thread
+            // before GTK/WebKit exist -- setlocale is process-global and not thread-safe, so doing it
+            // here (a Tauri worker thread, with the UI already running) raced every locale-dependent
+            // call in the toolkit. It also has to be spelled portably: `*const i8` doesn't compile on
+            // aarch64 Linux, where c_char is unsigned.
             let mpv = mpv_create();
             if mpv.is_null() {
                 return Err("mpv_create failed".into());
@@ -382,12 +399,35 @@ impl MpvEngine {
             // consume the CPU frame like any other. Real CPU/battery win, especially for 4K HEVC/AV1.
             set_option_checked(mpv, "hwdec", "auto-copy");
             set_option_checked(mpv, "terminal", "no");
+            // mpv's own warnings/errors are the only clue for "video is black" / "file won't play" bug
+            // reports; without this nothing from the core ever reaches us (terminal output is off, and a
+            // bundled app has no console anyway). Drained in spawn_observer -> stderr + `mpv://log`.
+            mpv_request_log_messages(mpv, c"warn".as_ptr());
+            // mpv writes screenshots to the *process* cwd by default -- `/` for a .desktop launch, and
+            // read-only inside a sandbox, so the screenshot hotkey silently did nothing on Linux.
+            set_option_checked(mpv, "screenshot-directory", &screenshot_directory());
             set_option_checked(mpv, "input-default-bindings", "no");
             set_option_checked(mpv, "input-vo-keyboard", "no");
             // mpv's default (auto-safe) forces stereo when the OS doesn't report an explicit layout -- not
             // guaranteed even over a real AVR/soundbar via HDMI. Explicit whitelist lets genuine 5.1/7.1/Atmos sources through instead of always downmixing.
-            set_option_checked(mpv, "audio-channels", "7.1,5.1,stereo");
+            // ... except on Linux, where PipeWire/PulseAudio accept a 7.1 stream on a stereo sink and
+            // then remix it themselves: mpv never downmixes, so `audio-normalize-downmix` below goes
+            // dead and dialogue ends up quiet/clipped. There the AO reports a real layout, which is
+            // exactly what mpv's own `auto-safe` default is for.
+            // Bitstream passthrough to an AVR (audio-spdif=ac3,eac3,dts-hd,truehd) is deliberately not
+            // forced on -- it breaks any sink that can't decode it. Set it through the raw mpv-config
+            // passthrough (issue #9) if you have the receiver for it.
+            let channels = if cfg!(target_os = "linux") { "auto-safe" } else { "7.1,5.1,stereo" };
+            set_option_checked(mpv, "audio-channels", channels);
             set_option_checked(mpv, "audio-normalize-downmix", "yes"); // avoids clipping on a downmix that still happens (e.g. stereo-only output)
+
+            // Linux renders on the GTK main thread (ADR-0010), and mpv_render_context_render blocks
+            // until the frame's target display time -- up to this offset (50ms by default). Blocking the
+            // main thread stalls the webview's own compositing and input handling, so don't render
+            // ahead at all; render.h names this as the sanctioned alternative to blocking ourselves.
+            if cfg!(target_os = "linux") {
+                set_option_checked(mpv, "video-timing-offset", "0");
+            }
 
             // Sane default subtitle appearance (issue #9): outlined text, no background box, legible without settings UI. PiP lands in #8.
             set_option_checked(mpv, "sub-font-size", "48");
@@ -423,9 +463,21 @@ impl MpvEngine {
             // Windows-only: mac has its own zero-copy story; Linux's GtkGLArea context (ADR-0010) doesn't
             // get MPV_RENDER_PARAM_X11_DISPLAY/WL_DISPLAY passed, which direct hwdec interop needs, so it
             // stays on auto-copy (always works) rather than making mpv try and fall back on every frame.
-            if cfg!(target_os = "windows") && backend == Backend::Gpu {
+            // Linux gets an explicit priority list rather than "auto"/"auto-safe": on libmpv 2.5 both of
+            // those probe vulkan and cuda on every load, which on a plain Mesa box means repeated
+            // "Device does not support the VK_KHR_video_decode_queue extension", "Cannot load
+            // libcuda.so.1" and decode errors ("no frame!", "Error parsing NAL unit") while falling back
+            // -- measured, not theorised. vaapi (Intel/AMD) then nvdec (NVIDIA) are the two that matter
+            // here, both zero-copy now that the render context gets the X11/Wayland display; the -copy
+            // variants keep working where interop can't be set up, and "no" ends in software decoding.
+            if cfg!(any(target_os = "windows", target_os = "linux")) && backend == Backend::Gpu {
                 let name = CString::new("hwdec").unwrap();
-                let val = CString::new("auto").unwrap();
+                let val = CString::new(if cfg!(target_os = "linux") {
+                    "vaapi,nvdec,vaapi-copy,nvdec-copy,no"
+                } else {
+                    "auto"
+                })
+                .unwrap();
                 mpv_set_property_string(mpv, name.as_ptr(), val.as_ptr()); // post-init override, see comment above; best-effort, mpv keeps auto-copy if this fails
             }
 
@@ -442,10 +494,17 @@ impl MpvEngine {
             // GPU render path: tell mpv's own shader renderer the display is SDR so its built-in
             // tone-mapping engages on HDR sources automatically, same algorithm (hable) as the CPU
             // fallback below but done on GPU shaders mpv already has -- no manual filter needed.
+            // Set as *properties*, not options: mpv_set_option_string after mpv_initialize isn't
+            // guaranteed to reconfigure the already-created renderer, mpv_set_property is.
             if backend == Backend::Gpu {
-                set_option_checked(mpv, "target-trc", "bt.1886");
-                set_option_checked(mpv, "target-prim", "bt.709");
-                set_option_checked(mpv, "tone-mapping", "hable");
+                for (name, value) in [("target-trc", "bt.1886"), ("target-prim", "bt.709"), ("tone-mapping", "hable")] {
+                    let (Ok(name), Ok(value)) = (CString::new(name), CString::new(value)) else { continue };
+                    let rc = mpv_set_property_string(mpv, name.as_ptr(), value.as_ptr());
+                    if rc < 0 {
+                        let msg = CStr::from_ptr(mpv_error_string(rc)).to_string_lossy();
+                        eprintln!("mpv: failed to set {}: {msg} ({rc})", name.to_string_lossy());
+                    }
+                }
             }
 
             let stop = Arc::new(AtomicBool::new(false));
@@ -671,6 +730,12 @@ fn spawn_observer<R: Runtime>(
                     let _ = app.emit("mpv://tick", tick.clone());
                 }
                 x if x == mpv_event_id_MPV_EVENT_FILE_LOADED => {
+                    // Which hwdec (if any) mpv actually landed on -- the one question every "playback is
+                    // stuttering / the fan is screaming" report needs answered, and it's only knowable
+                    // per-file, after the decoder is up.
+                    if let Ok(hwdec) = get_property_string(mpv, "hwdec-current") {
+                        eprintln!("mpv: hwdec-current={hwdec}");
+                    }
                     let drained = pending.lock().unwrap().drain();
                     if drained.start_seconds > 0.0 {
                         raw_command(mpv, &["seek", &drained.start_seconds.to_string(), "absolute"]);
@@ -692,6 +757,17 @@ fn spawn_observer<R: Runtime>(
                         };
                         let _ = apply_set_text_track(mpv, sid);
                     }
+                }
+                x if x == mpv_event_id_MPV_EVENT_LOG_MESSAGE => {
+                    // Requested at "warn" in attach(): the core's own diagnosis of a failed/black/stuttering
+                    // playback. stderr for a terminal launch, `mpv://log` so it also lands in the webview
+                    // console (and can be attached to a bug report) for a bundled one.
+                    let msg = unsafe { &*(ev.data as *const mpv_event_log_message) };
+                    let prefix = unsafe { CStr::from_ptr(msg.prefix).to_string_lossy() };
+                    let text = unsafe { CStr::from_ptr(msg.text).to_string_lossy() };
+                    let line = format!("[{prefix}] {}", text.trim_end());
+                    eprintln!("mpv {line}");
+                    let _ = app.emit("mpv://log", line);
                 }
                 x if x == mpv_event_id_MPV_EVENT_END_FILE => {
                     let end = unsafe { &*(ev.data as *const mpv_event_end_file) };
