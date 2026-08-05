@@ -103,7 +103,13 @@
 }
 
 /* shown while the session resolves / mpv attaches (ADR-0005: .stage stays
-   unpainted so this is the only thing visible over the black window) */
+   unpainted so this is the only thing visible over the black window).
+   Needs its own opaque backdrop -- macOS's NSWindow background (#0e0e10,
+   see tauri.conf.json) already fills this same gap natively, but Windows'
+   transparent window is real OS-level passthrough (wry forces WebView2 to
+   (0,0,0,0) whenever `transparent: true`, required for mpv's surface to
+   show through once attached) with nothing behind it to paint over an
+   empty spinner -- without this, Windows shows the desktop through here. */
 .loadingLayer {
   position: absolute;
   inset: 0;
@@ -111,6 +117,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+
+  background: #0e0e10;
 }
 
 .loadingSpinner {
