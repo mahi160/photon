@@ -50,7 +50,14 @@ custom transcoding logic or quality heuristics.
 Picture-in-Picture (ADR-0006) hands off to a spawned, standalone system `mpv`
 process (`--no-border --ontop`) rather than a real OS PiP panel — the only
 place Photon treats mpv as an optional, probed dependency; the PiP button
-hides itself when no system `mpv` is on `PATH`.
+hides itself when no system `mpv` is on `PATH`. On Wayland `--ontop` is a no-op
+(no protocol for it), so PiP there is just a separate window; the `.deb`/`.rpm`
+only *recommend* `mpv`, so most Linux installs have no PiP button at all.
+
+Screen blanking during playback is inhibited by the renderer's Screen Wake Lock
+API on macOS/Windows and by `org.freedesktop.ScreenSaver.Inhibit`
+(`src-tauri/src/idle.rs`) on Linux, where WebKitGTK has no `navigator.wakeLock`.
+`vo=libmpv` has no window, so mpv's own `stop-screensaver` can't help.
 
 ## Keyboard shortcuts
 
@@ -85,9 +92,17 @@ npx vitest run  # tests
 ```
 
 Requires Rust + a system `mpv` install (dev builds link it via pkg-config —
-`brew install mpv` on macOS). The shipped app will vendor its own LGPL libmpv
+`brew install mpv` on macOS, `apt install libmpv-dev libwebkit2gtk-4.1-dev
+libgtk-3-dev` on Debian/Ubuntu). The shipped app will vendor its own LGPL libmpv
 build (ADR-0004); that vendoring isn't wired up yet, so dev builds link
 whatever `mpv` pkg-config resolves to on the machine.
+
+Diagnostics (all platforms): mpv's own warnings/errors go to stderr and to the
+`mpv://log` event (devtools console), and the hwdec that actually engaged is
+logged per file as `mpv: hwdec-current=…`. `PHOTON_PROFILE_RENDER=1` times the
+real render call into a temp-dir log; `PHOTON_DEBUG_RECT=1` (Linux) prints the
+CSS rect, the translated GTK allocation and the scale factor on every geometry
+change.
 
 ## Releasing
 
@@ -103,18 +118,32 @@ release is cut, then undrafts it. Windows/Linux builds are wired up too
 (`build-windows`/`build-linux`, both `continue-on-error: true` — that flag
 stays regardless of verification status, purely so a Windows/Linux build
 failure can never block publish-release/the macOS release; see
-`release.yml`'s comments). `mpv/windows` (WGL) and `mpv/linux` (GLX for
-X11, EGL/`wl_subsurface` for Wayland, issue #27) are real render surfaces
-now, not stubs. Windows has been watched playing video on real hardware (a
-release built by `build-windows` was tested end-to-end, not just
-compiled/linked on CI's `windows-latest` runner). Linux's GLX path is
-verified rendering an actual frame against a live X11 session; the new
-Wayland path is a first cut written against documented crate APIs with no
-Wayland compositor available to smoke-test against (see `mpv/linux/
-wayland.rs`'s doc comment) — needs that smoke test before it's trusted.
+`release.yml`'s comments). `mpv/windows` (WGL) is a real render surface, and
+Linux is a `GtkGLArea` composited under the webview (ADR-0010) — the older
+raw X11 child-window and `wl_subsurface` backends are deleted, so there is
+no `GDK_BACKEND` pinning and one path serves X11/Wayland/XWayland. Windows
+has been watched playing video on real hardware (a release built by
+`build-windows` was tested end-to-end, not just compiled/linked on CI's
+`windows-latest` runner). Linux's GTK path has been run on a live Wayland
+session (window, reparent, GL context, mpv render, rect geometry, mpv log
+plumbing); hardware decode is still unverified there — the test box has no
+working VAAPI/NVDEC, so `hwdec-current=no` is all it can prove. See
+ADR-0010's smoke-test checklist before trusting a Linux release.
+
+Linux packaging: `deb`/`rpm` only (no AppImage — Tauri's AppImage bundler
+copies `libva*` into the AppDir, which then version-mismatches the host's
+VAAPI driver and silently kills hardware decode, and it offers no way to
+exclude a library). The binary hard-links `libmpv.so.2`, so
+`bundle.linux.deb.depends`/`rpm.depends` must name it — without that the
+package installs cleanly and then dies at startup on `libmpv.so.2: cannot
+open shared object file`. Consequence of dropping AppImage: no in-app
+auto-update on Linux (Tauri's updater only handles AppImage there);
+distro packages are updated by the distro/user.
+
 None of the three platforms use ADR-0004's vendored LGPL libmpv build yet (macOS links
 Homebrew's GPL build, same as local dev; Windows/Linux similarly link a full
-GPL build in CI).
+GPL build in CI) — which also means the shipped `.deb`/`.rpm` link a GPL
+libmpv into an MIT app. That's ADR-0004's job to fix and it is not done.
 
 ## macOS Gatekeeper note
 
