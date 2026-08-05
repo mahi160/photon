@@ -146,7 +146,7 @@ impl WaylandSurface {
         queue.roundtrip(&mut AppState).map_err(|e| format!("initial roundtrip: {e}"))?;
 
         // 1x1 placeholder, like X11Surface -- resized by the first real set_rect.
-        let egl_window = unsafe { WlEglSurface::new(child_surface.id(), 1, 1) }.map_err(|e| format!("WlEglSurface::new: {e}"))?;
+        let egl_window = WlEglSurface::new(child_surface.id(), 1, 1).map_err(|e| format!("WlEglSurface::new: {e}"))?;
 
         let egl = EGL.get_or_init(|| unsafe { egl::DynamicInstance::<egl::EGL1_2>::load_required() }.expect("libEGL.so.1 not found"));
         let egl_display = unsafe { egl.get_display(display_ptr) }.ok_or("eglGetDisplay returned null")?;
