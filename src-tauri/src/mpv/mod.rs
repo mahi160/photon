@@ -3,8 +3,9 @@ pub mod engine;
 pub(crate) mod profile;
 pub(crate) mod surface;
 
-// Shared GL-onto-plain-window backend for `windows`(WGL)/`linux`(GLX) -- see its own doc. `mac` renders into its own off-screen FBO instead, unused here.
-#[cfg(any(target_os = "windows", target_os = "linux"))]
+// Shared GL-onto-plain-window backend for `windows` (WGL) -- see its own doc. `mac` renders into its
+// own off-screen FBO; `linux` (ADR-0010) renders into a GtkGLArea, neither uses this.
+#[cfg(target_os = "windows")]
 pub(crate) mod gl_surface;
 
 // `backend` aliases the compiled-in platform module -- engine.rs only calls `backend::attach` (ADR-0009's RenderSurface seam). mac: OpenGL->IOSurface->Metal with CPU fallback (mac/software.rs); windows/linux: WGL/GLX onto a plain child window, no fallback.

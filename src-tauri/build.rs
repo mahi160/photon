@@ -8,6 +8,12 @@ fn main() {
     pkg_config::probe_library("mpv")
         .expect("libmpv not found via pkg-config (macOS: brew install mpv, Linux: apt install libmpv-dev)");
 
+    // ADR-0010: we call epoxy_get_proc_address (GL entry points for mpv's render
+    // context + our FBO query) and GtkGLArea's context uses libepoxy anyway.
+    // GTK ships it; this makes the symbol linkable from our own FFI.
+    #[cfg(target_os = "linux")]
+    pkg_config::probe_library("epoxy").expect("libepoxy not found via pkg-config (ships with GTK3)");
+
     // Windows has no pkg-config/vcpkg story for libmpv (a vcpkg port was
     // proposed and closed unmerged: microsoft/vcpkg#40587, "very hard to
     // build on windows with msvc or msys2 gcc") -- release.yml's
