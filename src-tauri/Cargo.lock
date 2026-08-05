@@ -2391,6 +2391,7 @@ dependencies = [
  "core-graphics 0.24.0",
  "foreign-types",
  "gdk",
+ "gio",
  "glib",
  "gtk",
  "keyring",

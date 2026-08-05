@@ -113,6 +113,8 @@ where
 
 /// Render tick, woken by mpv's own update callback (`RenderWaker`) instead of a blind fixed-rate poll.
 pub fn spawn_render_loop<R: Runtime>(app: AppHandle<R>) {
+    // `None` unless PHOTON_PROFILE_RENDER is set. On Linux `render()` is only a post to the GTK main
+    // thread, so the meaningful timing lives in linux/mod.rs's render signal, not here.
     let profiler = RenderProfiler::new();
     std::thread::spawn(move || loop {
         // render() runs here (not main thread): mac point-res render still beachballed main thread at 30fps; Windows/Linux WGL/GLX context needs one owning thread. set_rect stays main-thread.
@@ -128,6 +130,9 @@ pub fn spawn_render_loop<R: Runtime>(app: AppHandle<R>) {
         };
         // Blocks until mpv reports a new frame; timeout is a safety net, not the normal wakeup path.
         waker.wait(std::time::Duration::from_millis(250));
-        profiler.time(|| surface.lock().unwrap().render());
+        match &profiler {
+            Some(profiler) => profiler.time(|| surface.lock().unwrap().render()),
+            None => surface.lock().unwrap().render(),
+        }
     });
 }

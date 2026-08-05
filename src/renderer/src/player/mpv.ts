@@ -84,6 +84,11 @@ export class MpvEngine implements PlaybackEngine {
     }).then((un) => this.unlisten.push(un))
 
     void listen('mpv://ended', () => this.emit('ended')).then((un) => this.unlisten.push(un))
+    // mpv's own warnings/errors (requested at "warn" in engine.rs). Not surfaced to the user -- these are
+    // for a bug report / devtools when playback is black, stuttering or silently wrong.
+    void listen<string>('mpv://log', ({ payload }) => console.warn('[mpv]', payload)).then((un) =>
+      this.unlisten.push(un)
+    )
     void listen<string>('mpv://error', ({ payload }) => {
       console.error('[playback] mpv error', payload)
       this.emit('error', 'Playback failed.')
