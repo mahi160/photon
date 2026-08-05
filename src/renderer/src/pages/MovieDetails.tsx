@@ -4,6 +4,7 @@ import { Play } from 'reicon-react'
 import { useQuery } from '@tanstack/react-query'
 import { itemQuery } from '../lib/queries'
 import { backdropUrl, imageUrl, mediaBadges, ticksToSeconds } from '../lib/jellyfin'
+import { pickMediaSource } from '../player/session'
 import { WatchedButton } from '../components/WatchedButton'
 import {
   DetailsError,
@@ -51,7 +52,9 @@ export function MovieDetails(): React.JSX.Element {
   const poster = imageUrl(item, 480)
   const backdrop = backdropUrl(item, 1280)
   const position = ticksToSeconds(item.UserData?.PlaybackPositionTicks)
-  const streams = item.MediaSources?.[0]?.MediaStreams ?? []
+  // same source the player itself would pick (player/session.ts's pickMediaSource) -- keeps badges/track
+  // pickers here consistent with whichever version of a multi-version item actually plays
+  const streams = pickMediaSource(item.MediaSources ?? [])?.MediaStreams ?? []
   const audioStreams = streams.filter((s) => s.Type === 'Audio')
   const subtitleStreams = streams.filter((s) => s.Type === 'Subtitle')
 

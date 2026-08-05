@@ -16,6 +16,7 @@ import {
   reportStart,
   reportStopped,
   embeddedSubtitleSwitchNeedsReload,
+  pickMediaSource,
   resolveSubtitleSelection,
   startPlayback,
   stopActiveEncoding,
@@ -270,21 +271,22 @@ export function usePlayback(
         // remembered pick wins over language prefs/server default; explicit URL param (deep link) wins over that
         const remembered = useTrackMemory.getState().byItem[playable.Id]
         // track picking only sees stream info if playable item carries it (movies/episodes fetched with MediaSources)
+        const source = pickMediaSource(playable.MediaSources ?? [])
         const { audioStreamIndex, subtitleStreamIndex } = pickInitialTracks(
-          playable.MediaSources?.[0]?.MediaStreams ?? [],
+          source?.MediaStreams ?? [],
           useSettings.getState(),
           {
             audio: audio ?? remembered?.audioStreamIndex,
             sub: sub ?? remembered?.subtitleStreamIndex
           },
-          playable.MediaSources?.[0]?.DefaultSubtitleStreamIndex
+          source?.DefaultSubtitleStreamIndex
         )
         if (audioStreamIndex !== undefined) setAudioIndex(audioStreamIndex)
         return loadFor(playable, {
           startSeconds: start,
           audioStreamIndex,
           subtitleStreamIndex,
-          mediaSourceId: playable.MediaSources?.[0]?.Id
+          mediaSourceId: source?.Id
         })
       })
       .catch((e) => {

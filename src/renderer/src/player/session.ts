@@ -130,6 +130,25 @@ export function resolveSubtitleSelection(
   return defaultIndex !== undefined && defaultIndex >= 0 ? forIndex(defaultIndex) : SUBTITLES_OFF
 }
 
+// Which of possibly several MediaSources to play (multi-version items: extras, upgraded rips, different
+// quality encodes of the same title). A pinned id (track-switch/reload, already-negotiated source) always
+// wins; otherwise prefers a source the server itself says can skip transcoding, then the highest bitrate
+// among those, same weighted pick jellyfin-mpv-shim does instead of blindly taking array index 0.
+export function pickMediaSource(
+  sources: MediaSource[],
+  mediaSourceId?: string
+): MediaSource | undefined {
+  if (mediaSourceId) {
+    const pinned = sources.find((s) => s.Id === mediaSourceId)
+    if (pinned) return pinned
+  }
+  const isDirect = (s: MediaSource): boolean => !!(s.SupportsDirectPlay || s.SupportsDirectStream)
+  return [...sources].sort((a, b) => {
+    if (isDirect(a) !== isDirect(b)) return isDirect(a) ? -1 : 1
+    return (b.Bitrate ?? 0) - (a.Bitrate ?? 0)
+  })[0]
+}
+
 export async function startPlayback(
   item: BaseItem,
   opts: PlayOptions = {}
@@ -139,7 +158,7 @@ export async function startPlayback(
 
   const startSeconds = opts.startSeconds ?? ticksToSeconds(item.UserData?.PlaybackPositionTicks)
   const info = await fetchPlaybackInfo(item.Id, startSeconds, opts)
-  const ms = info.MediaSources?.[0]
+  const ms = pickMediaSource(info.MediaSources ?? [], opts.mediaSourceId)
   if (!ms) throw new Error('Playback failed.')
 
   const streams = ms.MediaStreams ?? []

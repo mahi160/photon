@@ -1,11 +1,46 @@
 import { describe, expect, it } from 'vitest'
 import {
   embeddedSubtitleSwitchNeedsReload,
+  pickMediaSource,
   resolveSubtitleSelection,
   toDemuxedIndex
 } from './session'
 import { pickInitialTracks } from './usePlayback'
-import type { MediaStream } from '../lib/jellyfin'
+import type { MediaSource, MediaStream } from '../lib/jellyfin'
+
+describe('pickMediaSource', () => {
+  const sources: MediaSource[] = [
+    {
+      Id: 'transcode-only',
+      SupportsDirectPlay: false,
+      SupportsDirectStream: false,
+      Bitrate: 40_000_000
+    },
+    { Id: 'direct-low', SupportsDirectPlay: true, Bitrate: 8_000_000 },
+    { Id: 'direct-high', SupportsDirectPlay: true, Bitrate: 20_000_000 }
+  ]
+
+  it('a pinned id always wins, even over a better direct-playable source', () => {
+    expect(pickMediaSource(sources, 'transcode-only')?.Id).toBe('transcode-only')
+  })
+
+  it('an unknown pinned id falls through to the normal pick', () => {
+    expect(pickMediaSource(sources, 'does-not-exist')?.Id).toBe('direct-high')
+  })
+
+  it('no pin: prefers a direct-playable source over a higher-bitrate transcode-only one', () => {
+    expect(pickMediaSource(sources)?.Id).toBe('direct-high')
+  })
+
+  it('no pin, no direct-playable source at all: falls back to highest bitrate', () => {
+    const transcodeOnly = sources.filter((s) => s.Id !== 'direct-low' && s.Id !== 'direct-high')
+    expect(pickMediaSource(transcodeOnly)?.Id).toBe('transcode-only')
+  })
+
+  it('empty array: undefined, not a throw', () => {
+    expect(pickMediaSource([])).toBeUndefined()
+  })
+})
 
 describe('embeddedSubtitleSwitchNeedsReload', () => {
   const textTracks = [{ index: 3, label: 'English', language: 'eng', url: '' }]
