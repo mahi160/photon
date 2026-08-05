@@ -116,8 +116,7 @@ impl WaylandSurface {
     fn new(display_ptr: *mut c_void, parent_surface_ptr: *mut c_void) -> Result<Self, String> {
         // Second connection onto WRY/GTK's existing wl_display -- see module doc. Safety: display_ptr comes
         // straight from Tauri's own HasDisplayHandle, so it outlives this call by construction.
-        let backend = unsafe { WlBackend::from_foreign_display(display_ptr.cast()) }
-            .map_err(|e| format!("Backend::from_foreign_display: {e}"))?;
+        let backend = unsafe { WlBackend::from_foreign_display(display_ptr.cast()) };
         let conn = Connection::from_backend(backend);
 
         let (globals, mut queue) = registry_queue_init::<AppState>(&conn).map_err(|e| format!("registry_queue_init: {e}"))?;

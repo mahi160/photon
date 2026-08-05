@@ -5,9 +5,9 @@
 //! Own dedicated Xlib Display connection (X window IDs are global, no GTK/WRY interop needed); XInitThreads guarded by Once since Xlib requires it called at most once before any other call.
 //! Installs a non-fatal XSetErrorHandler once -- Xlib's default handler calls exit() on any unhandled X protocol error (e.g. a stray BadWindow from a resize race), which would take down the app.
 
-use super::engine::RenderWaker;
-use super::gl_surface::{create_render_context, DesktopGl, GlRenderSurface};
-use super::surface::{Backend, RenderSurface};
+use super::super::engine::RenderWaker;
+use super::super::gl_surface::{create_render_context, DesktopGl, GlRenderSurface};
+use super::super::surface::{Backend, RenderSurface};
 use libmpv_sys::*;
 use raw_window_handle::RawWindowHandle;
 use std::ffi::c_void;
