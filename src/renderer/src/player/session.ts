@@ -10,6 +10,7 @@ import {
   type MediaSource,
   type MediaStream
 } from '../lib/jellyfin'
+import { createSerialQueue } from '../lib/serialQueue'
 import { AUTO_BITRATE, buildDeviceProfile } from './deviceProfile'
 import type { TextTrackSource } from './engine'
 
@@ -211,29 +212,41 @@ function reportBody(sess: PlaybackSession, positionSeconds: number, isPaused: bo
   }
 }
 
-export function reportStart(sess: PlaybackSession, positionSeconds: number): void {
-  void jf('/Sessions/Playing', {
-    method: 'POST',
-    body: reportBody(sess, positionSeconds, false)
-  }).catch(() => {})
+// Shared FIFO queue for every playback report -- a network round trip can complete out of order vs. the
+// order it was fired, so a fire-and-forget "stopped" (track switch, autoplay) could otherwise arrive at
+// the server after the next item's "start", or after that item's own progress ticks. Chaining every report
+// through one queue guarantees the server sees them in call order, not response order.
+const reportQueue = createSerialQueue()
+
+export function reportStart(sess: PlaybackSession, positionSeconds: number): Promise<void> {
+  return reportQueue(() =>
+    jf('/Sessions/Playing', {
+      method: 'POST',
+      body: reportBody(sess, positionSeconds, false)
+    }).catch(() => {})
+  )
 }
 
 export function reportProgress(
   sess: PlaybackSession,
   positionSeconds: number,
   isPaused: boolean
-): void {
-  void jf('/Sessions/Playing/Progress', {
-    method: 'POST',
-    body: reportBody(sess, positionSeconds, isPaused)
-  }).catch(() => {})
+): Promise<void> {
+  return reportQueue(() =>
+    jf('/Sessions/Playing/Progress', {
+      method: 'POST',
+      body: reportBody(sess, positionSeconds, isPaused)
+    }).catch(() => {})
+  )
 }
 
-export function reportStopped(sess: PlaybackSession, positionSeconds: number): void {
-  void jf('/Sessions/Playing/Stopped', {
-    method: 'POST',
-    body: reportBody(sess, positionSeconds, true)
-  }).catch(() => {})
+export function reportStopped(sess: PlaybackSession, positionSeconds: number): Promise<void> {
+  return reportQueue(() =>
+    jf('/Sessions/Playing/Stopped', {
+      method: 'POST',
+      body: reportBody(sess, positionSeconds, true)
+    }).catch(() => {})
+  )
 }
 
 // /Sessions/Playing/Stopped only updates progress tracking, doesn't kill the ffmpeg job -- without this, switching audio/subtitles mid-transcode leaves the old encode running (jellyfin-web calls this before every track-switch reload too).
