@@ -77,11 +77,12 @@ export function Player(): React.JSX.Element {
   }, [])
 
   const toggleFullscreen = useCallback(() => {
-    setFullscreen((prev) => {
-      const next = !prev
-      void invoke('app_set_fullscreen', { fullscreen: next })
-      return next
-    })
+    // side effect must live outside the updater -- StrictMode double-invokes state updater
+    // functions in dev specifically to catch impure ones like the old `invoke` inside `setFullscreen`
+    // used to have, which fired the native fullscreen call twice per toggle (visible flash).
+    const next = !fullscreenRef.current
+    void invoke('app_set_fullscreen', { fullscreen: next })
+    setFullscreen(next)
   }, [])
 
   // stable identities: feed the player's memoized track-select menus (base-ui popovers aren't cheap to reconcile every playback tick)
