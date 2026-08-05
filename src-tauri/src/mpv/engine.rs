@@ -165,14 +165,31 @@ fn check(rc: i32, what: &str) -> Result<(), String> {
     Ok(())
 }
 
-// Silently no-ops on a key/value with an embedded NUL (CString::new rejects it) -- the raw mpv-config
-// passthrough (#9) is arbitrary user input and must never crash playback.
+// Silently no-ops on a key/value with an embedded NUL (CString::new rejects it) and on any mpv rejection --
+// the raw mpv-config passthrough (#9) is arbitrary user input (typo'd key, bad value for this mpv build)
+// and must never crash or spam logs over it. Built-in, playback-critical options use set_option_checked
+// below instead -- those are Photon's own hardcoded values, a failure there is a real bug worth seeing.
 unsafe fn set_option(mpv: *mut mpv_handle, name: &str, value: &str) {
     let (Ok(name), Ok(value)) = (CString::new(name), CString::new(value)) else {
         return;
     };
     unsafe {
         mpv_set_option_string(mpv, name.as_ptr(), value.as_ptr());
+    }
+}
+
+// Same as `set_option`, but logs any failure instead of swallowing it -- for Photon's own built-in options
+// (vo, hwdec, subtitle defaults, ...) where a rejection means a real bug (typo, an option renamed/removed
+// in a newer mpv), not user-supplied config that's expected to sometimes be wrong.
+unsafe fn set_option_checked(mpv: *mut mpv_handle, name: &str, value: &str) {
+    let (Ok(cname), Ok(cvalue)) = (CString::new(name), CString::new(value)) else {
+        eprintln!("mpv: built-in option {name}={value} has an embedded NUL, skipped");
+        return;
+    };
+    let rc = unsafe { mpv_set_option_string(mpv, cname.as_ptr(), cvalue.as_ptr()) };
+    if rc < 0 {
+        let msg = unsafe { CStr::from_ptr(mpv_error_string(rc)).to_string_lossy() };
+        eprintln!("mpv: failed to set built-in option {name}={value}: {msg} ({rc})");
     }
 }
 
@@ -353,29 +370,29 @@ impl MpvEngine {
                 return Err("mpv_create failed".into());
             }
 
-            set_option(mpv, "vo", "libmpv");
-            set_option(mpv, "osc", "no");
-            set_option(mpv, "osd-level", "0");
-            set_option(mpv, "keep-open", "yes");
+            set_option_checked(mpv, "vo", "libmpv");
+            set_option_checked(mpv, "osc", "no");
+            set_option_checked(mpv, "osd-level", "0");
+            set_option_checked(mpv, "keep-open", "yes");
             // "-copy" hwdec modes decode on hardware then copy back to system RAM -- unlike plain videotoolbox
             // (requires --vo=gpu/gpu-next), copy variants don't need a GPU vo, so the sw render API can
             // consume the CPU frame like any other. Real CPU/battery win, especially for 4K HEVC/AV1.
-            set_option(mpv, "hwdec", "auto-copy");
-            set_option(mpv, "terminal", "no");
-            set_option(mpv, "input-default-bindings", "no");
-            set_option(mpv, "input-vo-keyboard", "no");
+            set_option_checked(mpv, "hwdec", "auto-copy");
+            set_option_checked(mpv, "terminal", "no");
+            set_option_checked(mpv, "input-default-bindings", "no");
+            set_option_checked(mpv, "input-vo-keyboard", "no");
             // mpv's default (auto-safe) forces stereo when the OS doesn't report an explicit layout -- not
             // guaranteed even over a real AVR/soundbar via HDMI. Explicit whitelist lets genuine 5.1/7.1/Atmos sources through instead of always downmixing.
-            set_option(mpv, "audio-channels", "7.1,5.1,stereo");
-            set_option(mpv, "audio-normalize-downmix", "yes"); // avoids clipping on a downmix that still happens (e.g. stereo-only output)
+            set_option_checked(mpv, "audio-channels", "7.1,5.1,stereo");
+            set_option_checked(mpv, "audio-normalize-downmix", "yes"); // avoids clipping on a downmix that still happens (e.g. stereo-only output)
 
             // Sane default subtitle appearance (issue #9): outlined text, no background box, legible without settings UI. PiP lands in #8.
-            set_option(mpv, "sub-font-size", "48");
-            set_option(mpv, "sub-color", "#FFFFFFFF");
-            set_option(mpv, "sub-border-color", "#FF000000");
-            set_option(mpv, "sub-border-size", "2.5");
-            set_option(mpv, "sub-back-color", "#00000000");
-            set_option(mpv, "sub-shadow-offset", "0");
+            set_option_checked(mpv, "sub-font-size", "48");
+            set_option_checked(mpv, "sub-color", "#FFFFFFFF");
+            set_option_checked(mpv, "sub-border-color", "#FF000000");
+            set_option_checked(mpv, "sub-border-size", "2.5");
+            set_option_checked(mpv, "sub-back-color", "#00000000");
+            set_option_checked(mpv, "sub-shadow-offset", "0");
 
             // Raw mpv-config passthrough (issue #9): applied after defaults so user values win. Deliberately
             // unsandboxed, power-user field -- e.g. pasting `osc=yes` reintroducing mpv's OSC is accepted risk.
@@ -420,9 +437,9 @@ impl MpvEngine {
             // tone-mapping engages on HDR sources automatically, same algorithm (hable) as the CPU
             // fallback below but done on GPU shaders mpv already has -- no manual filter needed.
             if backend == Backend::Gpu {
-                set_option(mpv, "target-trc", "bt.1886");
-                set_option(mpv, "target-prim", "bt.709");
-                set_option(mpv, "tone-mapping", "hable");
+                set_option_checked(mpv, "target-trc", "bt.1886");
+                set_option_checked(mpv, "target-prim", "bt.709");
+                set_option_checked(mpv, "tone-mapping", "hable");
             }
 
             let stop = Arc::new(AtomicBool::new(false));
