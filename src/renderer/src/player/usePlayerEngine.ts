@@ -48,6 +48,7 @@ export interface PlayerEngineApi {
   selectAudioTrack: (index: number) => void
   selectEmbeddedSubtitleTrack: (index: number | null) => void
   togglePiP: () => void
+  runCommand: (args: string[]) => void
 }
 
 export function usePlayerEngine(
@@ -206,6 +207,10 @@ export function usePlayerEngine(
     void (pip ? e.exitPiP() : e.enterPiP())
   }, [pip, pipAvailable])
 
+  const runCommand = useCallback((args: string[]) => {
+    engineRef.current?.runCommand(args)
+  }, [])
+
   return {
     state,
     videoReady,
@@ -233,6 +238,7 @@ export function usePlayerEngine(
     setSubtitleDelay,
     selectAudioTrack,
     selectEmbeddedSubtitleTrack,
-    togglePiP
+    togglePiP,
+    runCommand
   }
 }
