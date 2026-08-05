@@ -66,16 +66,9 @@ windows = { version = "0.61", features = [
 ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-# Already in the dependency graph transitively (tao/gdkx11-sys pull in
-# x11-dl; `x11` is its xlib+glx sibling) -- reused directly here instead of
-# hand-declaring XVisualInfo/GLX FFI by hand (unlike mac/gpu.rs's ~10 frozen
-# GL calls, XVisualInfo's field layout is real struct-layout risk not worth
-# taking when a maintained crate already resolves in this same build).
-x11 = { version = "2", features = ["xlib", "glx"] }
-# Wayland half of the render backend (issue #27, mpv/linux/wayland.rs). "dlopen" (wayland-client's default)
-# and khronos-egl's "dynamic" both dlopen their system libs at runtime instead of linking against
-# libwayland-client.so/libEGL.so at build time -- no wayland-client/egl pkg-config needed in CI.
-wayland-client = "0.31"
-wayland-backend = { version = "0.3", features = ["client_system"] }
-wayland-egl = "0.32"
-khronos-egl = { version = "6", features = ["dynamic"] }
+# ADR-0010: mpv renders into a GtkGLArea composited under the transparent
+# WebKitWebView. GTK does the display-server work (X11/Wayland/XWayland), so no
+# raw X11/Wayland crates any more. Versions pinned to what Tauri already pulls.
+gtk = "0.18"
+gdk = "0.18"
+glib = "0.18"

@@ -365,6 +365,9 @@ impl MpvEngine {
         let raw_display_handle = window.display_handle().map_err(|e| e.to_string())?.as_raw();
 
         unsafe {
+            // libmpv requires C locale for numeric operations
+            libc::setlocale(libc::LC_NUMERIC, "C\0".as_ptr() as *const i8);
+            
             let mpv = mpv_create();
             if mpv.is_null() {
                 return Err("mpv_create failed".into());
@@ -417,7 +420,10 @@ impl MpvEngine {
             // Smoke-tested on real Windows hardware (Intel UHD 620): mpv falls back to "d3d11va-copy" on its
             // own when the direct interop doesn't pan out, exactly as designed -- not the stutter source
             // (that was the unconditional CPU HDR tonemap filter above, now gated on cpu_backend).
-            if !cfg!(target_os = "macos") && backend == Backend::Gpu {
+            // Windows-only: mac has its own zero-copy story; Linux's GtkGLArea context (ADR-0010) doesn't
+            // get MPV_RENDER_PARAM_X11_DISPLAY/WL_DISPLAY passed, which direct hwdec interop needs, so it
+            // stays on auto-copy (always works) rather than making mpv try and fall back on every frame.
+            if cfg!(target_os = "windows") && backend == Backend::Gpu {
                 let name = CString::new("hwdec").unwrap();
                 let val = CString::new("auto").unwrap();
                 mpv_set_property_string(mpv, name.as_ptr(), val.as_ptr()); // post-init override, see comment above; best-effort, mpv keeps auto-copy if this fails

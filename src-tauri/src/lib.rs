@@ -4,6 +4,8 @@ mod pip;
 mod updater;
 
 use mpv::commands::MpvState;
+#[cfg(target_os = "linux")]
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -49,6 +51,13 @@ pub fn run() {
             mpv::commands::mpv_destroy
         ])
         .setup(|app| {
+            // ADR-0010: reparent the webview over a GtkGLArea so mpv composites under it. Runs on the
+            // GTK main thread via with_webview; the Sender is stored synchronously inside, so an mpv
+            // attach that races ahead just buffers on the glib channel until the receiver attaches.
+            #[cfg(target_os = "linux")]
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.with_webview(|w| mpv::linux::setup(&w.inner()));
+            }
             mpv::commands::spawn_render_loop(app.handle().clone());
             updater::spawn_check(app.handle().clone());
             Ok(())
