@@ -673,7 +673,9 @@
       </div>
 
       <p class="platform-note">
-        macOS: built and verified. Windows/Linux install, but playback rendering isn't finished —
+        macOS: built and verified. Windows: builds and plays video, tested on real hardware. Linux:
+        builds and plays video (X11, Wayland, XWayland); hardware decode is still unverified on real
+        GPU drivers —
         <a href="https://github.com/mahi160/photon/issues/27">help wanted</a>.
       </p>
     </header>
@@ -728,9 +730,9 @@
 
       <section class="frame" data-frame="005">
         <p class="eyebrow">Frame 005 — install</p>
-        <h2>macOS, verified</h2>
+        <h2>macOS, Windows, Linux</h2>
         <div class="install-block">
-          <h3>Homebrew (recommended)</h3>
+          <h3>macOS — Homebrew (recommended)</h3>
           <pre>brew install --cask mahi160/photon/photon</pre>
         </div>
         <div class="install-block">
@@ -744,11 +746,13 @@
         <div class="install-block">
           <h3>Windows / Linux</h3>
           <p>
-            <code>.exe</code>/<code>.deb</code>/<code>.rpm</code>/<code>.AppImage</code> builds are
-            on <a href="https://github.com/mahi160/photon/releases">Releases</a> — they install and
-            run, but video doesn't render yet (<a href="https://github.com/mahi160/photon/issues/27"
-              >#27</a
-            >, help wanted). Releases are flagged pre-release on GitHub until that's fixed.
+            <code>.exe</code> (Windows) and <code>.deb</code>/<code>.rpm</code> (Linux) builds are
+            on <a href="https://github.com/mahi160/photon/releases">Releases</a> — both play video.
+            Windows has been tested on real hardware; Linux's render path has been run on a live
+            Wayland session but not yet on real VAAPI/NVDEC hardware decode —
+            <a href="https://github.com/mahi160/photon/issues/27">help verifying it</a> is welcome.
+            No AppImage (a packaging choice, not a limitation — it silently breaks hardware decode
+            by shadowing the host's VAAPI driver).
           </p>
         </div>
       </section>
