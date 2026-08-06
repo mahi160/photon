@@ -23,6 +23,8 @@ export function buildDeviceProfile(maxBitrate: number): object {
   }))
 
   return {
+    // cosmetic: server's StreamBuilder logs "Anonymous/Unknown Profile" instead of this in its debug traces
+    Name: 'Photon',
     MaxStreamingBitrate: maxBitrate,
     CodecProfiles: codecProfiles,
     // Wildcard (no Container/VideoCodec/AudioCodec) — Jellyfin treats a profile with no codec/container list

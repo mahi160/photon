@@ -28,10 +28,19 @@ export function setClientVersion(v: string): void {
   clientVersion = v
 }
 
+// set once at startup from the OS hostname (main.tsx) -- fallback if the IPC round trip hasn't resolved yet.
+// Jellyfin writes this straight into the Dashboard > Devices display name (server's AuthorizationContext),
+// so it needs to be an actual per-machine name -- navigator.platform ('MacIntel'/'Win32'/...) is the same
+// string for every install on that OS and made every session indistinguishable there.
+let deviceName = 'Desktop'
+export function setDeviceName(v: string): void {
+  if (v) deviceName = v
+}
+
 function authHeader(token?: string): string {
   const parts = [
     'MediaBrowser Client="Photon"',
-    `Device="${encodeURIComponent(navigator.platform || 'Desktop')}"`,
+    `Device="${encodeURIComponent(deviceName)}"`,
     `DeviceId="${deviceId()}"`,
     `Version="${clientVersion}"`
   ]
@@ -372,20 +381,25 @@ export function trickplayUrl(
   mediaSourceId: string
 ): string | null {
   if (!session) return null
-  return `${session.server}/Videos/${itemId}/Trickplay/${width}/${tileIndex}.jpg?mediaSourceId=${mediaSourceId}&api_key=${session.token}`
+  return `${session.server}/Videos/${itemId}/Trickplay/${width}/${tileIndex}.jpg?mediaSourceId=${mediaSourceId}&ApiKey=${session.token}`
 }
 
 // untranscoded stream — used for direct play and for external players (mpv)
+// `ApiKey` (not `api_key`) -- Jellyfin's AuthorizationContext reads the query string case exactly: `ApiKey` is
+// checked unconditionally, `api_key` only if the server's EnableLegacyAuthorization is on, which Jellyfin 12
+// defaults off (and force-migrates existing servers to). mpv/PiP get no Authorization header (no http-header-fields
+// path, see pip.rs), so this query param is the only credential on the wire -- the old casing 401s outright on a
+// default Jellyfin 12 server.
 export function directStreamUrl(itemId: string, mediaSourceId: string): string {
   if (!session) throw new JellyfinError(0, 'Not signed in')
-  return `${session.server}/Videos/${itemId}/stream?static=true&mediaSourceId=${mediaSourceId}&api_key=${session.token}`
+  return `${session.server}/Videos/${itemId}/stream?static=true&mediaSourceId=${mediaSourceId}&ApiKey=${session.token}`
 }
 
 // Text-subtitle delivery URL, built ourselves instead of trusting server's MediaStream.DeliveryUrl -- that field bakes in a nonzero startPositionTicks (from PlaybackInfo's StartTimeTicks), which rebases every cue's start/end to count from 0 for the transcode case (SubtitleController/StreamInfo.GetSubtitleStreamInfo, no copyTimestamps=true). mpv (direct play, ADR-0008) seeks the real file and keeps its true absolute timeline, so rebased cues desync by the resume offset -- for Continue Watching items every cue ends up in mpv's past, nothing renders. Omitting startPositionTicks here (older GetSubtitle route, defaults to 0) sidesteps the rebase entirely.
 // .srt not .vtt: see deviceProfile.ts's SubtitleProfiles doc -- Jellyfin's vtt conversion emits a malformed Region: header, mpv's webvtt decoder silently drops every cue past it. Format must match the SubtitleProfiles entry that marked this stream External.
 export function subtitleStreamUrl(itemId: string, mediaSourceId: string, index: number): string {
   if (!session) throw new JellyfinError(0, 'Not signed in')
-  return `${session.server}/Videos/${itemId}/${mediaSourceId}/Subtitles/${index}/Stream.srt?api_key=${session.token}`
+  return `${session.server}/Videos/${itemId}/${mediaSourceId}/Subtitles/${index}/Stream.srt?ApiKey=${session.token}`
 }
 
 export function serverUrl(): string {

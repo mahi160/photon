@@ -7,7 +7,7 @@ import { RouterProvider } from '@tanstack/react-router'
 import { router } from './router'
 import { useSession } from './stores/session'
 import { useSettings } from './stores/settings'
-import { setClientVersion } from './lib/jellyfin'
+import { setClientVersion, setDeviceName } from './lib/jellyfin'
 import { applyCustomColors } from './lib/theme'
 import { invoke } from '@tauri-apps/api/core'
 
@@ -44,4 +44,9 @@ useSession
 // fire-and-forget: version string is cosmetic, fetched in parallel
 invoke<string>('app_version')
   .then(setClientVersion)
+  .catch(() => {})
+
+// same deal -- hostname is only used for the auth header's Device= field, not worth blocking first render on
+invoke<string>('device_name')
+  .then(setDeviceName)
   .catch(() => {})

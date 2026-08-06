@@ -35,6 +35,19 @@ pub fn app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
 }
 
+/// The machine's hostname, for Jellyfin's auth header `Device=` field -- the server persists that
+/// verbatim as the device's display name in Dashboard > Devices (Jellyfin's AuthorizationContext),
+/// so every install needs a real, distinguishing name rather than a generic platform string.
+/// Falls back to a fixed name on the rare host where the OS call itself fails.
+#[tauri::command]
+pub fn device_name() -> String {
+    hostname::get()
+        .ok()
+        .and_then(|s| s.into_string().ok())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "Photon".to_string())
+}
+
 #[tauri::command]
 pub fn app_set_fullscreen(window: tauri::Window, fullscreen: bool) {
     // was silently swallowed (`let _ =`) -- surfaced while chasing a fullscreen-flash report (root
