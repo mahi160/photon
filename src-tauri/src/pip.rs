@@ -80,7 +80,7 @@ pub fn pip_start(
     let socket_path = ipc_path();
     let _ = std::fs::remove_file(&socket_path); // stale socket from a crashed previous run
 
-    // No `url`/`sub_url` in argv (jellyfin.ts's directStreamUrl/subtitleStreamUrl embed `api_key=<token>`
+    // No `url`/`sub_url` in argv (jellyfin.ts's directStreamUrl/subtitleStreamUrl embed `ApiKey=<token>`
     // in the query string) -- a spawned process's argv is world-readable via `ps`/`/proc/*/cmdline`. mpv
     // starts idle instead and gets both handed over `loadfile`/`sub-add` on its own IPC socket once
     // connected (spawn_poller). Everything else here (position/volume/mute/rate/pause) carries no secret.

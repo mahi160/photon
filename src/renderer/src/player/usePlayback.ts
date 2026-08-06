@@ -133,13 +133,21 @@ export function usePlayback(
         void (async () => {
           // await the server actually processing "stopped" before asking it for NextUp -- otherwise NextUp
           // can still see this episode as in-progress and hand it right back (autoplay-next race)
-          if (sess) await reportStopped(sess, pos)
+          if (sess)
+            await reportStopped(sess, pos, {
+              audioStreamIndex: audioIndexRef.current,
+              subtitleStreamIndex: subtitleIndexRef.current
+            })
           await handleEnded(sess?.item)
         })()
       },
       onBeforeDestroy: (pos) => {
         const sess = sessionRef.current
-        if (sess) void reportStopped(sess, pos)
+        if (sess)
+          void reportStopped(sess, pos, {
+            audioStreamIndex: audioIndexRef.current,
+            subtitleStreamIndex: subtitleIndexRef.current
+          })
       }
     }
   )
@@ -173,7 +181,10 @@ export function usePlayback(
         sessionRef.current = null
         // Not awaited here -- reportStart below queues after it regardless (session.ts's shared FIFO report
         // queue), so the server still sees stop-then-start in order without stalling this reload on it.
-        void reportStopped(prev, engineCurrentTime())
+        void reportStopped(prev, engineCurrentTime(), {
+          audioStreamIndex: audioIndexRef.current,
+          subtitleStreamIndex: subtitleIndexRef.current
+        })
         // Stopped only updates progress tracking, not the ffmpeg job — must await, or new session can race the still-running old encode
         if (prev.playMethod === 'Transcode') await stopActiveEncoding(prev)
       }
@@ -189,7 +200,13 @@ export function usePlayback(
           startSeconds: sess.startSeconds,
           textTracks: sess.textTracks
         })
-        void reportStart(sess, sess.startSeconds)
+        // best-effort: opts' indices are only the explicit request for *this* load -- a no-override play
+        // (autoplay-next, first open) leaves these undefined until the settings/server-default resolution
+        // below picks a concrete index, which the next progress tick (<=10s, or the pause-edge report) carries.
+        void reportStart(sess, sess.startSeconds, {
+          audioStreamIndex: opts.audioStreamIndex,
+          subtitleStreamIndex: opts.subtitleStreamIndex
+        })
 
         // toDemuxedIndex/selectAudioTrack/selectEmbeddedSubtitleTrack resolve against mpv's own track-list — only meaningful under direct play (ADR-0008); Transcode fallback keeps whatever PlaybackInfo negotiated
         const directPlay = sess.playMethod === 'DirectPlay'
@@ -309,7 +326,11 @@ export function usePlayback(
     navigator.mediaSession.playbackState = engineState === 'paused' ? 'paused' : 'playing'
     if (engineState === 'paused' && was === 'playing') {
       const sess = sessionRef.current
-      if (sess) void reportProgress(sess, currentTime(), true)
+      if (sess)
+        void reportProgress(sess, currentTime(), true, {
+          audioStreamIndex: audioIndexRef.current,
+          subtitleStreamIndex: subtitleIndexRef.current
+        })
     }
   }, [engineState, currentTime])
 
@@ -319,7 +340,10 @@ export function usePlayback(
       const sess = sessionRef.current
       if (!sess) return
       const paused = engineStateRef.current === 'paused'
-      void reportProgress(sess, currentTime(), paused)
+      void reportProgress(sess, currentTime(), paused, {
+        audioStreamIndex: audioIndexRef.current,
+        subtitleStreamIndex: subtitleIndexRef.current
+      })
       // local watch stats — only actually-playing time counts
       if (engineStateRef.current === 'playing') useWatchStats.getState().record(sess.item, 10)
       // keep OS media overlay's progress bar roughly honest

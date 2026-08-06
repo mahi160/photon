@@ -200,7 +200,19 @@ export async function startPlayback(
   }
 }
 
-function reportBody(sess: PlaybackSession, positionSeconds: number, isPaused: boolean): object {
+// track indices are optional -- callers that haven't resolved them yet (or are reporting a stop after
+// the session already tore down) can omit them, matching PlaybackProgressInfo's nullable fields.
+interface ReportTracks {
+  audioStreamIndex?: number
+  subtitleStreamIndex?: number | null // -1/null both mean "off"; server only cares that it's present
+}
+
+function reportBody(
+  sess: PlaybackSession,
+  positionSeconds: number,
+  isPaused: boolean,
+  tracks: ReportTracks = {}
+): object {
   return {
     ItemId: sess.item.Id,
     MediaSourceId: sess.mediaSource.Id,
@@ -208,7 +220,16 @@ function reportBody(sess: PlaybackSession, positionSeconds: number, isPaused: bo
     PositionTicks: secondsToTicks(positionSeconds),
     IsPaused: isPaused,
     PlayMethod: sess.playMethod,
-    CanSeek: true
+    CanSeek: true,
+    // Server persists these into UserData.AudioStreamIndex/SubtitleStreamIndex when the user's Jellyfin
+    // profile has "Remember audio/subtitle selections" on (SessionManager.cs's UpdatePlaybackSettings) --
+    // and always mirrors them into the live PlayState other clients/the dashboard see. Photon has its own
+    // local track-memory store too, but leaving these off means the server-side preference (and any other
+    // Jellyfin client reading it) never sees what's actually playing.
+    ...(tracks.audioStreamIndex !== undefined ? { AudioStreamIndex: tracks.audioStreamIndex } : {}),
+    ...(tracks.subtitleStreamIndex !== undefined && tracks.subtitleStreamIndex !== null
+      ? { SubtitleStreamIndex: tracks.subtitleStreamIndex }
+      : {})
   }
 }
 
@@ -218,11 +239,15 @@ function reportBody(sess: PlaybackSession, positionSeconds: number, isPaused: bo
 // through one queue guarantees the server sees them in call order, not response order.
 const reportQueue = createSerialQueue()
 
-export function reportStart(sess: PlaybackSession, positionSeconds: number): Promise<void> {
+export function reportStart(
+  sess: PlaybackSession,
+  positionSeconds: number,
+  tracks?: ReportTracks
+): Promise<void> {
   return reportQueue(() =>
     jf('/Sessions/Playing', {
       method: 'POST',
-      body: reportBody(sess, positionSeconds, false)
+      body: reportBody(sess, positionSeconds, false, tracks)
     }).catch(() => {})
   )
 }
@@ -230,21 +255,26 @@ export function reportStart(sess: PlaybackSession, positionSeconds: number): Pro
 export function reportProgress(
   sess: PlaybackSession,
   positionSeconds: number,
-  isPaused: boolean
+  isPaused: boolean,
+  tracks?: ReportTracks
 ): Promise<void> {
   return reportQueue(() =>
     jf('/Sessions/Playing/Progress', {
       method: 'POST',
-      body: reportBody(sess, positionSeconds, isPaused)
+      body: reportBody(sess, positionSeconds, isPaused, tracks)
     }).catch(() => {})
   )
 }
 
-export function reportStopped(sess: PlaybackSession, positionSeconds: number): Promise<void> {
+export function reportStopped(
+  sess: PlaybackSession,
+  positionSeconds: number,
+  tracks?: ReportTracks
+): Promise<void> {
   return reportQueue(() =>
     jf('/Sessions/Playing/Stopped', {
       method: 'POST',
-      body: reportBody(sess, positionSeconds, true)
+      body: reportBody(sess, positionSeconds, true, tracks)
     }).catch(() => {})
   )
 }

@@ -25,6 +25,7 @@ pub fn run() {
             commands::session_set,
             commands::session_clear,
             commands::app_version,
+            commands::device_name,
             commands::app_set_fullscreen,
             commands::app_set_traffic_lights_visible,
             pip::pip_available,
