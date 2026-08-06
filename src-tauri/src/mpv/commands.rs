@@ -97,17 +97,18 @@ pub fn mpv_destroy(state: State<'_, MpvState>) -> Result<(), String> {
     Ok(())
 }
 
+// Was `Ok(T::default())` on a missing engine -- every mpv_* command sent in the (small but real)
+// window between a fresh MpvEngine's construction and its `mpv_attach` IPC round trip actually
+// landing here silently vanished with no error, no log, nothing. Surface it as a real error instead --
+// callers already `.catch()` and log the other track/PiP commands the same way (mpv.ts).
 fn with_engine<T>(
     state: &State<'_, MpvState>,
     f: impl FnOnce(&MpvEngine) -> Result<T, String>,
-) -> Result<T, String>
-where
-    T: Default,
-{
+) -> Result<T, String> {
     let slot = state.0.lock().unwrap();
     match slot.as_ref() {
         Some(e) => f(e),
-        None => Ok(T::default()),
+        None => Err("mpv not attached yet".to_string()),
     }
 }
 

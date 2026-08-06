@@ -129,30 +129,41 @@ export class MpvEngine implements PlaybackEngine {
     // setTextTrack below adds a track the first time it's actually selected instead.
   }
 
+  // Not chained on `ready` (only applyInitialVolume needs that) -- needless .then() per call was the
+  // "mute reacts slower than other buttons" bug. In the narrow window before mpv_attach resolves,
+  // Rust rejects these instead of silently dropping them (commands.rs's with_engine) -- log rather
+  // than an invisible unhandled rejection, same as the track-selection calls below.
   play(): void {
-    void invoke('mpv_play')
+    void invoke('mpv_play').catch((e) => console.error('[playback] play failed', e))
   }
 
   pause(): void {
-    void invoke('mpv_pause')
+    void invoke('mpv_pause').catch((e) => console.error('[playback] pause failed', e))
   }
 
   seek(seconds: number): void {
-    void invoke('mpv_seek', { seconds: Math.max(0, seconds) })
+    void invoke('mpv_seek', { seconds: Math.max(0, seconds) }).catch((e) =>
+      console.error('[playback] seek failed', e)
+    )
   }
 
   setRate(rate: number): void {
     this.rate = rate
-    void invoke('mpv_set_rate', { rate })
+    void invoke('mpv_set_rate', { rate }).catch((e) =>
+      console.error('[playback] setRate failed', e)
+    )
   }
 
-  // Fires directly like play/pause/seek/setRate, not chained on `ready` (only applyInitialVolume needs that) -- needless .then() per call was the "mute reacts slower than other buttons" bug.
   setVolume(volume: number): void {
-    void invoke('mpv_set_volume', { volume: Math.max(0, Math.min(1, volume)) })
+    void invoke('mpv_set_volume', { volume: Math.max(0, Math.min(1, volume)) }).catch((e) =>
+      console.error('[playback] setVolume failed', e)
+    )
   }
 
   setMuted(muted: boolean): void {
-    void invoke('mpv_set_muted', { muted })
+    void invoke('mpv_set_muted', { muted }).catch((e) =>
+      console.error('[playback] setMuted failed', e)
+    )
   }
 
   // Chained on `ready`, not fire-and-forget: applied before mpv_attach resolves — a bare invoke can win the non-FIFO MpvState lock race and silently drop the initial value for the whole session.
