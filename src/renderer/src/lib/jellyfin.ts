@@ -9,6 +9,11 @@ export interface Session {
 
 let session: Session | null = null
 
+// Deliberately no `/Sessions/Capabilities` POST here (what jellyfin-web/jellyfin-mpv-shim/Kodi all do
+// at login to announce PlayableMediaTypes/SupportsMediaControl) and no persistent WebSocket connection
+// to the server -- see AGENTS.md's "not building" list. Without both, Photon's session is real (shows
+// up in /Sessions, reports progress) but not remote-controllable from another Jellyfin client or the
+// server dashboard. Casting/remote-control is out of scope by design, not an oversight.
 export function configure(s: Session | null): void {
   session = s
 }

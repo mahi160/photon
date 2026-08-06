@@ -450,26 +450,20 @@ impl MpvEngine {
             let (surface, backend) = backend::attach(mpv, raw_handle, raw_display_handle, &waker)?;
             let surface = Arc::new(Mutex::new(surface));
 
-            // Windows/Linux only, gated on Gpu: those two backends give mpv a real GL context (WGL/GLX,
-            // ADR-0009's Windows/Linux follow-up), so hwdec can interop straight into a GPU texture instead
-            // of paying the hwdec-copy round trip the option comment above was written for (that comment
-            // predates the GPU surfaces). mac stays on auto-copy -- not asked for here, and its IOSurface/Metal
-            // path already has a separate zero-copy story (ADR-0009).
-            // ponytail: direct (non-copy) hwdec on WGL/GLX is unverified against real Windows/Linux GPU drivers --
-            // smoke-test before relying on it; falls back to mpv's own auto-copy behavior if the interop fails.
-            // Smoke-tested on real Windows hardware (Intel UHD 620): mpv falls back to "d3d11va-copy" on its
-            // own when the direct interop doesn't pan out, exactly as designed -- not the stutter source
-            // (that was the unconditional CPU HDR tonemap filter above, now gated on cpu_backend).
-            // Windows-only: mac has its own zero-copy story; Linux's GtkGLArea context (ADR-0010) doesn't
-            // get MPV_RENDER_PARAM_X11_DISPLAY/WL_DISPLAY passed, which direct hwdec interop needs, so it
-            // stays on auto-copy (always works) rather than making mpv try and fall back on every frame.
-            // Linux gets an explicit priority list rather than "auto"/"auto-safe": on libmpv 2.5 both of
-            // those probe vulkan and cuda on every load, which on a plain Mesa box means repeated
-            // "Device does not support the VK_KHR_video_decode_queue extension", "Cannot load
-            // libcuda.so.1" and decode errors ("no frame!", "Error parsing NAL unit") while falling back
-            // -- measured, not theorised. vaapi (Intel/AMD) then nvdec (NVIDIA) are the two that matter
-            // here, both zero-copy now that the render context gets the X11/Wayland display; the -copy
-            // variants keep working where interop can't be set up, and "no" ends in software decoding.
+            // Windows/Linux only, gated on Gpu: those two backends give mpv a real GL context (WGL/GLX),
+            // so hwdec can interop straight into a GPU texture instead of the copy round trip the option
+            // above defaults to. mac stays on auto-copy -- its IOSurface/Metal path has its own zero-copy
+            // story (ADR-0009) and wasn't asked for here.
+            // Windows: plain "auto". Smoke-tested on real hardware (Intel UHD 620) -- mpv falls back to
+            // "d3d11va-copy" on its own when direct interop doesn't pan out, not a stutter source (that was
+            // the unconditional CPU HDR tonemap filter above, now gated on cpu_backend). Direct hwdec on
+            // GLX is comparatively less exercised; falls back the same way if the interop fails.
+            // Linux: an explicit priority list, not "auto"/"auto-safe" -- those probe vulkan/cuda on every
+            // load first, which on a plain Mesa box means repeated "Device does not support the
+            // VK_KHR_video_decode_queue extension"/"Cannot load libcuda.so.1" and decode errors while
+            // falling back (measured, not theorised). vaapi (Intel/AMD) then nvdec (NVIDIA) are the two
+            // that matter, both zero-copy now that linux/mod.rs's render context passes mpv the X11/Wayland
+            // display; the -copy variants still work where interop can't be set up, "no" is software decode.
             if cfg!(any(target_os = "windows", target_os = "linux")) && backend == Backend::Gpu {
                 let name = CString::new("hwdec").unwrap();
                 let val = CString::new(if cfg!(target_os = "linux") {

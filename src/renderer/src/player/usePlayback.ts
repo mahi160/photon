@@ -70,13 +70,19 @@ export function pickInitialTracks(
     subtitlesEnabled: boolean
   },
   params: StartParams,
-  defaultSubtitleIndex?: number
+  defaultSubtitleIndex?: number,
+  // server's own resolved default (MediaSource.DefaultAudioStreamIndex) -- also where Jellyfin's
+  // per-user "remember audio selections" preference round-trips (see session.ts's reportBody comment).
+  // Checked before the 'eng' guess below so a remembered/server pick outranks a blind language guess,
+  // same priority the subtitle side of this function already gives defaultSubtitleIndex.
+  defaultAudioIndex?: number
 ): { audioStreamIndex?: number; subtitleStreamIndex?: number } {
   const audioStreams = streams.filter((s) => s.Type === 'Audio')
   const defaultAudio =
     audioStreams.find(
       (s) => !!settings.preferredAudioLanguage && s.Language === settings.preferredAudioLanguage
     ) ??
+    audioStreams.find((s) => s.Index === defaultAudioIndex) ??
     audioStreams.find((s) => s.Language === 'eng') ??
     audioStreams.find((s) => s.IsDefault) ??
     audioStreams[0]
@@ -119,6 +125,27 @@ export function usePlayback(
   }, [subtitleIndex, audioIndex])
 
   const initial = useSettings.getState()
+  // mirrors, same reason as subtitleIndexRef/audioIndexRef above -- report* calls read the engine's
+  // current volume/mute without needing them in their own dependency arrays. Seeded from settings
+  // (not the engine, which doesn't exist yet) -- the sync effect below overwrites these as soon as
+  // the engine has its own first tick.
+  const volumeRef = useRef(initial.lastVolume)
+  const mutedRef = useRef(initial.lastMuted)
+
+  // shared shape every reportStart/Progress/Stopped call (bar the initial load, which reports the
+  // explicit request instead of these mirrors -- see loadFor) sends: current track picks + volume/mute,
+  // so the dashboard's "Now Playing" panel and any client polling /Sessions sees a real value for both
+  // instead of an indeterminate default (session.ts's reportBody maps these to VolumeLevel/IsMuted).
+  const currentTracks = useCallback(
+    () => ({
+      audioStreamIndex: audioIndexRef.current,
+      subtitleStreamIndex: subtitleIndexRef.current,
+      volume: volumeRef.current,
+      muted: mutedRef.current
+    }),
+    []
+  )
+
   const engine = usePlayerEngine(
     videoRef,
     {
@@ -133,24 +160,21 @@ export function usePlayback(
         void (async () => {
           // await the server actually processing "stopped" before asking it for NextUp -- otherwise NextUp
           // can still see this episode as in-progress and hand it right back (autoplay-next race)
-          if (sess)
-            await reportStopped(sess, pos, {
-              audioStreamIndex: audioIndexRef.current,
-              subtitleStreamIndex: subtitleIndexRef.current
-            })
+          if (sess) await reportStopped(sess, pos, currentTracks())
           await handleEnded(sess?.item)
         })()
       },
       onBeforeDestroy: (pos) => {
         const sess = sessionRef.current
-        if (sess)
-          void reportStopped(sess, pos, {
-            audioStreamIndex: audioIndexRef.current,
-            subtitleStreamIndex: subtitleIndexRef.current
-          })
+        if (sess) void reportStopped(sess, pos, currentTracks())
       }
     }
   )
+
+  useEffect(() => {
+    volumeRef.current = engine.volume
+    mutedRef.current = engine.muted
+  }, [engine.volume, engine.muted])
 
   // stable engine commands so loadFor (and the initial-load effect) stay stable
   const {
@@ -181,10 +205,7 @@ export function usePlayback(
         sessionRef.current = null
         // Not awaited here -- reportStart below queues after it regardless (session.ts's shared FIFO report
         // queue), so the server still sees stop-then-start in order without stalling this reload on it.
-        void reportStopped(prev, engineCurrentTime(), {
-          audioStreamIndex: audioIndexRef.current,
-          subtitleStreamIndex: subtitleIndexRef.current
-        })
+        void reportStopped(prev, engineCurrentTime(), currentTracks())
         // Stopped only updates progress tracking, not the ffmpeg job — must await, or new session can race the still-running old encode
         if (prev.playMethod === 'Transcode') await stopActiveEncoding(prev)
       }
@@ -205,7 +226,9 @@ export function usePlayback(
         // below picks a concrete index, which the next progress tick (<=10s, or the pause-edge report) carries.
         void reportStart(sess, sess.startSeconds, {
           audioStreamIndex: opts.audioStreamIndex,
-          subtitleStreamIndex: opts.subtitleStreamIndex
+          subtitleStreamIndex: opts.subtitleStreamIndex,
+          volume: volumeRef.current,
+          muted: mutedRef.current
         })
 
         // toDemuxedIndex/selectAudioTrack/selectEmbeddedSubtitleTrack resolve against mpv's own track-list — only meaningful under direct play (ADR-0008); Transcode fallback keeps whatever PlaybackInfo negotiated
@@ -219,8 +242,8 @@ export function usePlayback(
         if (sel.textTrack !== null) setTextTrack(sel.textTrack)
         else if (directPlay && sel.embeddedTrack !== null)
           selectEmbeddedSubtitleTrack(toDemuxedIndex(sess, sel.embeddedTrack))
-        // mpv auto-selects container's default subtitle track on load — explicitly turn off rather than let it override "subtitles off"
-        else if (sel.embeddedTrack === null) selectEmbeddedSubtitleTrack(null)
+        // mpv auto-selects container's default subtitle track on load — explicitly turn off rather than let it override "subtitles off". Transcode fallback: same directPlay guard as the branch above -- mpv has no embedded track of its own to deselect there, this would be a no-op IPC round trip.
+        else if (directPlay && sel.embeddedTrack === null) selectEmbeddedSubtitleTrack(null)
 
         // restore last subtitle sync offset, text tracks only
         const delay = sel.textTrack !== null ? settings.lastSubtitleDelay : 0
@@ -244,7 +267,8 @@ export function usePlayback(
       selectAudioTrack,
       selectEmbeddedSubtitleTrack,
       engineSetDelay,
-      engineCurrentTime
+      engineCurrentTime,
+      currentTracks
     ]
   )
 
@@ -300,7 +324,8 @@ export function usePlayback(
             audio: audio ?? remembered?.audioStreamIndex,
             sub: sub ?? remembered?.subtitleStreamIndex
           },
-          source?.DefaultSubtitleStreamIndex
+          source?.DefaultSubtitleStreamIndex,
+          source?.DefaultAudioStreamIndex
         )
         if (audioStreamIndex !== undefined) setAudioIndex(audioStreamIndex)
         return loadFor(playable, {
@@ -326,13 +351,9 @@ export function usePlayback(
     navigator.mediaSession.playbackState = engineState === 'paused' ? 'paused' : 'playing'
     if (engineState === 'paused' && was === 'playing') {
       const sess = sessionRef.current
-      if (sess)
-        void reportProgress(sess, currentTime(), true, {
-          audioStreamIndex: audioIndexRef.current,
-          subtitleStreamIndex: subtitleIndexRef.current
-        })
+      if (sess) void reportProgress(sess, currentTime(), true, currentTracks())
     }
-  }, [engineState, currentTime])
+  }, [engineState, currentTime, currentTracks])
 
   // progress reporting every 10s. Reads engine state via ref so interval survives play/pause/buffer flaps without resetting cadence.
   useEffect(() => {
@@ -340,10 +361,7 @@ export function usePlayback(
       const sess = sessionRef.current
       if (!sess) return
       const paused = engineStateRef.current === 'paused'
-      void reportProgress(sess, currentTime(), paused, {
-        audioStreamIndex: audioIndexRef.current,
-        subtitleStreamIndex: subtitleIndexRef.current
-      })
+      void reportProgress(sess, currentTime(), paused, currentTracks())
       // local watch stats — only actually-playing time counts
       if (engineStateRef.current === 'playing') useWatchStats.getState().record(sess.item, 10)
       // keep OS media overlay's progress bar roughly honest
@@ -360,7 +378,7 @@ export function usePlayback(
       }
     }, 10_000)
     return () => clearInterval(id)
-  }, [currentTime])
+  }, [currentTime, currentTracks])
 
   // OS media keys registered by useMediaSession (Player page); this hook only sets metadata/position
 

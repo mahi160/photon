@@ -261,4 +261,15 @@ describe('pickInitialTracks', () => {
         .subtitleStreamIndex
     ).toBe(4)
   })
+
+  it("no preference → the server's remembered/resolved default beats the English guess", () => {
+    expect(pickInitialTracks(withLangs, subsOn, {}, undefined, 1).audioStreamIndex).toBe(1)
+  })
+
+  it('preferred audio language still beats the server default', () => {
+    expect(
+      pickInitialTracks(withLangs, { ...subsOn, preferredAudioLanguage: 'jpn' }, {}, undefined, 2)
+        .audioStreamIndex
+    ).toBe(1)
+  })
 })
