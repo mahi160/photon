@@ -32,6 +32,12 @@ export function isTextTrack(sess: Pick<PlaybackSession, 'textTracks'>, index: nu
 }
 
 // Jellyfin's MediaStream.Index numbers streams in the original file's raw layout, but mpv's demuxed track-list drops every externally-delivered subtitle (DeliveryMethod === 'External'), shifting later indexes down by one each -- confirmed via raw mpv IPC. engine.selectAudioTrack/selectEmbeddedSubtitleTrack resolve against mpv's own track-list (engine.rs's select_track), so this correction is required first or they silently pick the wrong track.
+// Also used (usePlayback.ts) to correct an *audio* index for the same reason, relying on an invariant
+// this function doesn't itself check: Jellyfin's scanner always numbers externally-delivered subtitles
+// after every embedded stream (video/audio/embedded-sub) in the item, so no audio index is ever actually
+// shifted by an external-subtitle count in practice. If that numbering ever didn't hold, this would
+// silently resolve to the wrong mpv audio track with no error -- same failure shape as a stale
+// select_track queued before FILE_LOADED, just one layer further from any log line.
 export function toDemuxedIndex(
   sess: Pick<PlaybackSession, 'subtitleStreams'>,
   index: number
@@ -205,6 +211,8 @@ export async function startPlayback(
 interface ReportTracks {
   audioStreamIndex?: number
   subtitleStreamIndex?: number | null // -1/null both mean "off"; server only cares that it's present
+  volume?: number // 0..1, engine's own mirror -- mapped to Jellyfin's 0..100 VolumeLevel below
+  muted?: boolean
 }
 
 function reportBody(
@@ -229,7 +237,11 @@ function reportBody(
     ...(tracks.audioStreamIndex !== undefined ? { AudioStreamIndex: tracks.audioStreamIndex } : {}),
     ...(tracks.subtitleStreamIndex !== undefined && tracks.subtitleStreamIndex !== null
       ? { SubtitleStreamIndex: tracks.subtitleStreamIndex }
-      : {})
+      : {}),
+    // Same as above: the dashboard's "Now Playing" panel and any client polling /Sessions otherwise
+    // shows a Photon session at an indeterminate volume -- Photon already has both on hand every tick.
+    ...(tracks.volume !== undefined ? { VolumeLevel: Math.round(tracks.volume * 100) } : {}),
+    ...(tracks.muted !== undefined ? { IsMuted: tracks.muted } : {})
   }
 }
 

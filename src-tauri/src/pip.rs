@@ -126,12 +126,18 @@ enum CmdOutcome {
     Reply(Option<Value>), // got a reply this round (possibly with no "data")
 }
 
+// How many unprompted event lines (seek, track-list, ...) we'll skip past while looking for this
+// command's reply before giving up on it for this round. Generous relative to the observed handful of
+// events mpv emits per 500ms poll tick in practice; not a hard guarantee under a genuine event burst
+// (falls through to `Reply(None)`, treated as "still alive, try again next tick", not an error).
+const MAX_EVENT_LINES_SKIPPED: u32 = 10;
+
 fn send_command(writer: &mut impl Write, reader: &mut impl BufRead, args: Value) -> CmdOutcome {
     let request = format!("{}\n", json!({ "command": args }));
     if writer.write_all(request.as_bytes()).is_err() {
         return CmdOutcome::Closed;
     }
-    for _ in 0..10 {
+    for _ in 0..MAX_EVENT_LINES_SKIPPED {
         let mut line = String::new();
         match reader.read_line(&mut line) {
             Ok(0) | Err(_) => return CmdOutcome::Closed,

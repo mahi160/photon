@@ -519,12 +519,13 @@ fn create_render_context(
             return Err(format!("mpv_render_context_create (opengl): {msg} ({rc})"));
         }
         // Wake the render loop on each new frame -> Msg::Render -> queue_render. Ctx is the waker's addr.
+        // No `mem::forget` needed: `waker` here is a clone, and `RenderState.waker` (set right before
+        // this runs, in the `Msg::SetMpv` handler above) already holds a strong ref for as long as this
+        // render context is alive -- `Msg::Teardown` unregisters the callback before freeing the context
+        // and before any next `Msg::SetMpv` could replace/drop that ref. Forgetting this clone used to
+        // leak one `Arc<RenderWaker>` per attach (every Player-page mount), unbounded over a long session.
         if let Some(waker) = waker {
             mpv_render_context_set_update_callback(ctx, Some(on_render_update), Arc::as_ptr(&waker) as *mut c_void);
-            // Leak one Arc ref so the waker outlives the callback registration; reclaimed at teardown
-            // implicitly (process teardown). ponytail: the engine's own Arc keeps it alive in practice;
-            // this forget is belt-and-suspenders so the callback ctx never dangles.
-            std::mem::forget(waker);
         }
     }
     Ok(ctx)
