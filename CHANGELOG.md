@@ -1,3 +1,10 @@
+# [2.0.0-pre.9](https://github.com/mahi160/photon/compare/v2.0.0-pre.8...v2.0.0-pre.9) (2026-08-06)
+
+
+### Features
+
+* **api:** jellyfin v12 auth compat – apikey casing, device= hostname ([cf4f06e](https://github.com/mahi160/photon/commit/cf4f06e602ef895ad02cac7b056f744785f315f9))
+
 # [2.0.0-pre.8](https://github.com/mahi160/photon/compare/v2.0.0-pre.7...v2.0.0-pre.8) (2026-08-06)
 
 
