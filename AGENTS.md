@@ -6,7 +6,9 @@ A calm, minimal desktop media player built exclusively for Jellyfin.
 
 Every feature must answer yes to: does this make watching media better? If no, it
 doesn't belong here. Not building: live TV, music, photos, books, server admin,
-metadata/user/plugin management, casting, mobile/browser support.
+metadata/user/plugin management, casting, mobile/browser support, remote control from other
+Jellyfin clients (no `/Sessions/Capabilities` registration, no persistent WebSocket connection to
+the server -- a deliberate omission, not a gap; see `jellyfin.ts`'s `configure`).
 
 ## Stack
 
