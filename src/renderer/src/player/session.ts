@@ -10,6 +10,7 @@ import {
   type MediaSource,
   type MediaStream
 } from '../lib/jellyfin'
+import { createSerialQueue } from '../lib/serialQueue'
 import { AUTO_BITRATE, buildDeviceProfile } from './deviceProfile'
 import type { TextTrackSource } from './engine'
 
@@ -130,6 +131,25 @@ export function resolveSubtitleSelection(
   return defaultIndex !== undefined && defaultIndex >= 0 ? forIndex(defaultIndex) : SUBTITLES_OFF
 }
 
+// Which of possibly several MediaSources to play (multi-version items: extras, upgraded rips, different
+// quality encodes of the same title). A pinned id (track-switch/reload, already-negotiated source) always
+// wins; otherwise prefers a source the server itself says can skip transcoding, then the highest bitrate
+// among those, same weighted pick jellyfin-mpv-shim does instead of blindly taking array index 0.
+export function pickMediaSource(
+  sources: MediaSource[],
+  mediaSourceId?: string
+): MediaSource | undefined {
+  if (mediaSourceId) {
+    const pinned = sources.find((s) => s.Id === mediaSourceId)
+    if (pinned) return pinned
+  }
+  const isDirect = (s: MediaSource): boolean => !!(s.SupportsDirectPlay || s.SupportsDirectStream)
+  return [...sources].sort((a, b) => {
+    if (isDirect(a) !== isDirect(b)) return isDirect(a) ? -1 : 1
+    return (b.Bitrate ?? 0) - (a.Bitrate ?? 0)
+  })[0]
+}
+
 export async function startPlayback(
   item: BaseItem,
   opts: PlayOptions = {}
@@ -139,7 +159,7 @@ export async function startPlayback(
 
   const startSeconds = opts.startSeconds ?? ticksToSeconds(item.UserData?.PlaybackPositionTicks)
   const info = await fetchPlaybackInfo(item.Id, startSeconds, opts)
-  const ms = info.MediaSources?.[0]
+  const ms = pickMediaSource(info.MediaSources ?? [], opts.mediaSourceId)
   if (!ms) throw new Error('Playback failed.')
 
   const streams = ms.MediaStreams ?? []
@@ -192,29 +212,41 @@ function reportBody(sess: PlaybackSession, positionSeconds: number, isPaused: bo
   }
 }
 
-export function reportStart(sess: PlaybackSession, positionSeconds: number): void {
-  void jf('/Sessions/Playing', {
-    method: 'POST',
-    body: reportBody(sess, positionSeconds, false)
-  }).catch(() => {})
+// Shared FIFO queue for every playback report -- a network round trip can complete out of order vs. the
+// order it was fired, so a fire-and-forget "stopped" (track switch, autoplay) could otherwise arrive at
+// the server after the next item's "start", or after that item's own progress ticks. Chaining every report
+// through one queue guarantees the server sees them in call order, not response order.
+const reportQueue = createSerialQueue()
+
+export function reportStart(sess: PlaybackSession, positionSeconds: number): Promise<void> {
+  return reportQueue(() =>
+    jf('/Sessions/Playing', {
+      method: 'POST',
+      body: reportBody(sess, positionSeconds, false)
+    }).catch(() => {})
+  )
 }
 
 export function reportProgress(
   sess: PlaybackSession,
   positionSeconds: number,
   isPaused: boolean
-): void {
-  void jf('/Sessions/Playing/Progress', {
-    method: 'POST',
-    body: reportBody(sess, positionSeconds, isPaused)
-  }).catch(() => {})
+): Promise<void> {
+  return reportQueue(() =>
+    jf('/Sessions/Playing/Progress', {
+      method: 'POST',
+      body: reportBody(sess, positionSeconds, isPaused)
+    }).catch(() => {})
+  )
 }
 
-export function reportStopped(sess: PlaybackSession, positionSeconds: number): void {
-  void jf('/Sessions/Playing/Stopped', {
-    method: 'POST',
-    body: reportBody(sess, positionSeconds, true)
-  }).catch(() => {})
+export function reportStopped(sess: PlaybackSession, positionSeconds: number): Promise<void> {
+  return reportQueue(() =>
+    jf('/Sessions/Playing/Stopped', {
+      method: 'POST',
+      body: reportBody(sess, positionSeconds, true)
+    }).catch(() => {})
+  )
 }
 
 // /Sessions/Playing/Stopped only updates progress tracking, doesn't kill the ffmpeg job -- without this, switching audio/subtitles mid-transcode leaves the old encode running (jellyfin-web calls this before every track-switch reload too).

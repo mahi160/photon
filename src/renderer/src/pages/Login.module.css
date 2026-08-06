@@ -131,6 +131,12 @@
   color: var(--accent);
 }
 
+.insecureHint {
+  margin-block: -0.6rem 1rem;
+  font-size: 0.75rem;
+  color: var(--warning);
+}
+
 .submit {
   inline-size: 100%;
   margin-block-start: 0.5rem;

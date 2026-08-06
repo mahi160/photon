@@ -26,6 +26,14 @@ The spawned mpv also gets `--on-all-workspaces` (X11/macOS), so unlike the
 previous window-resize revision, it does follow across Spaces/virtual
 desktops — one of the two things ADR-0006's original ceiling named.
 
+Linux ceiling: on Wayland `--ontop` (and `--on-all-workspaces`) are no-ops —
+the protocol has no always-on-top for regular toplevels — so PiP there is a
+plain floating window that other windows can cover. And since Photon's
+`.deb`/`.rpm` only *recommend* `mpv` (a hard dependency for one optional
+feature would be wrong), most Linux installs won't show the PiP button until
+the user installs mpv themselves. Both accepted; a real fix needs
+compositor-specific protocols Photon isn't going to ship.
+
 ponytail: still not real OS PiP — no Dock/taskbar thumbnail the way real
 AVKit/Compact Overlay PiP gets, and it's a plain floating window rather than a
 dedicated PiP panel. An earlier revision of this ADR instead shrank Photon's

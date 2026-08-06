@@ -4,6 +4,7 @@
 // mpv has no Metal render API -- NSOpenGLContext/NSOpenGLPixelFormat is the only way to a real GL context on macOS, deprecated or not (ADR-0009). Silenced, not worked around.
 #![allow(deprecated)]
 
+use super::super::surface::skip_frame;
 use super::RenderSurface;
 use crate::mpv::engine::{on_render_update, RenderWaker};
 use libmpv_sys::*;
@@ -291,13 +292,14 @@ impl RenderSurface for GpuSurface {
         if self.render_ctx.is_null() {
             return; // torn down
         }
-        if self.view.isHidden() {
-            return;
-        }
         // ponytail: point resolution, not Retina backing-store -- real upgrade work, not done for either backend.
         let bounds = self.view.bounds();
         let (w, h) = (bounds.size.width as i32, bounds.size.height as i32);
-        if w <= 0 || h <= 0 {
+        if self.view.isHidden() || w <= 0 || h <= 0 {
+            // Hidden: consume the queued frame anyway (see skip_frame) -- GL context current, as the
+            // OpenGL backend requires for any mpv_render_* call.
+            self.gl_context.makeCurrentContext();
+            unsafe { skip_frame(self.render_ctx) };
             return;
         }
 
@@ -333,6 +335,10 @@ impl RenderSurface for GpuSurface {
         encoder.endEncoding();
         cmd_buf.presentDrawable(drawable.as_ref());
         cmd_buf.commit();
+        // Frame is on its way to the screen -- give mpv the timing so it can estimate vsync instead of
+        // guessing (render.h: optional, "can help the player to achieve better timing"). GL context is
+        // still current from above, and this only runs for frames actually presented.
+        unsafe { mpv_render_context_report_swap(self.render_ctx) };
     }
 
     fn teardown(&mut self) {

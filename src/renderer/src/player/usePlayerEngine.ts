@@ -18,6 +18,11 @@ export interface EngineInitial {
 
 export interface PlayerEngineApi {
   state: 'playing' | 'paused' | 'buffering'
+  // true once mpv has emitted at least one tick for the current load -- session going
+  // truthy only means Jellyfin's PlaybackInfo resolved, not that mpv has decoded/painted
+  // a frame yet (usePlayback.ts sets session before awaiting engineLoad); Player.tsx
+  // keeps its black loading backdrop up until this flips, covering that gap too.
+  videoReady: boolean
   time: number
   duration: number
   bufferedEnd: number
@@ -43,6 +48,7 @@ export interface PlayerEngineApi {
   selectAudioTrack: (index: number) => void
   selectEmbeddedSubtitleTrack: (index: number | null) => void
   togglePiP: () => void
+  runCommand: (args: string[]) => void
 }
 
 export function usePlayerEngine(
@@ -67,6 +73,7 @@ export function usePlayerEngine(
   const [pip, setPip] = useState(false)
   const [pipAvailable, setPipAvailable] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [videoReady, setVideoReady] = useState(false)
 
   // system mpv is genuinely optional (unlike in-process playback) -- PiP just hides itself when there's nothing to spawn
   useEffect(() => {
@@ -84,6 +91,7 @@ export function usePlayerEngine(
         setTime(t)
         setDuration(e.duration())
         setBufferedEnd(e.buffered())
+        setVideoReady(true)
       })
       e.on('state', setState)
       e.on('error', setError)
@@ -117,6 +125,7 @@ export function usePlayerEngine(
     async (req: LoadRequest): Promise<void> => {
       const e = ensureEngine()
       if (!e) return
+      setVideoReady(false) // new item -- covered again until its own first tick
       await e.load(req)
       e.setRate(rateRef.current) // rate survives reloads (audio switch, burn-in)
     },
@@ -198,8 +207,13 @@ export function usePlayerEngine(
     void (pip ? e.exitPiP() : e.enterPiP())
   }, [pip, pipAvailable])
 
+  const runCommand = useCallback((args: string[]) => {
+    engineRef.current?.runCommand(args)
+  }, [])
+
   return {
     state,
+    videoReady,
     time,
     duration,
     bufferedEnd,
@@ -224,6 +238,7 @@ export function usePlayerEngine(
     setSubtitleDelay,
     selectAudioTrack,
     selectEmbeddedSubtitleTrack,
-    togglePiP
+    togglePiP,
+    runCommand
   }
 }

@@ -16,6 +16,7 @@ import {
   reportStart,
   reportStopped,
   embeddedSubtitleSwitchNeedsReload,
+  pickMediaSource,
   resolveSubtitleSelection,
   startPlayback,
   stopActiveEncoding,
@@ -128,15 +129,17 @@ export function usePlayback(
     {
       onEnded: (pos) => {
         const sess = sessionRef.current
-        if (sess) {
-          reportStopped(sess, pos)
-          sessionRef.current = null // handled — loadFor must not re-report it
-        }
-        void handleEnded(sess?.item)
+        sessionRef.current = null // handled — loadFor must not re-report it
+        void (async () => {
+          // await the server actually processing "stopped" before asking it for NextUp -- otherwise NextUp
+          // can still see this episode as in-progress and hand it right back (autoplay-next race)
+          if (sess) await reportStopped(sess, pos)
+          await handleEnded(sess?.item)
+        })()
       },
       onBeforeDestroy: (pos) => {
         const sess = sessionRef.current
-        if (sess) reportStopped(sess, pos)
+        if (sess) void reportStopped(sess, pos)
       }
     }
   )
@@ -168,7 +171,9 @@ export function usePlayback(
       const prev = sessionRef.current
       if (prev) {
         sessionRef.current = null
-        reportStopped(prev, engineCurrentTime())
+        // Not awaited here -- reportStart below queues after it regardless (session.ts's shared FIFO report
+        // queue), so the server still sees stop-then-start in order without stalling this reload on it.
+        void reportStopped(prev, engineCurrentTime())
         // Stopped only updates progress tracking, not the ffmpeg job — must await, or new session can race the still-running old encode
         if (prev.playMethod === 'Transcode') await stopActiveEncoding(prev)
       }
@@ -184,7 +189,7 @@ export function usePlayback(
           startSeconds: sess.startSeconds,
           textTracks: sess.textTracks
         })
-        reportStart(sess, sess.startSeconds)
+        void reportStart(sess, sess.startSeconds)
 
         // toDemuxedIndex/selectAudioTrack/selectEmbeddedSubtitleTrack resolve against mpv's own track-list — only meaningful under direct play (ADR-0008); Transcode fallback keeps whatever PlaybackInfo negotiated
         const directPlay = sess.playMethod === 'DirectPlay'
@@ -270,21 +275,22 @@ export function usePlayback(
         // remembered pick wins over language prefs/server default; explicit URL param (deep link) wins over that
         const remembered = useTrackMemory.getState().byItem[playable.Id]
         // track picking only sees stream info if playable item carries it (movies/episodes fetched with MediaSources)
+        const source = pickMediaSource(playable.MediaSources ?? [])
         const { audioStreamIndex, subtitleStreamIndex } = pickInitialTracks(
-          playable.MediaSources?.[0]?.MediaStreams ?? [],
+          source?.MediaStreams ?? [],
           useSettings.getState(),
           {
             audio: audio ?? remembered?.audioStreamIndex,
             sub: sub ?? remembered?.subtitleStreamIndex
           },
-          playable.MediaSources?.[0]?.DefaultSubtitleStreamIndex
+          source?.DefaultSubtitleStreamIndex
         )
         if (audioStreamIndex !== undefined) setAudioIndex(audioStreamIndex)
         return loadFor(playable, {
           startSeconds: start,
           audioStreamIndex,
           subtitleStreamIndex,
-          mediaSourceId: playable.MediaSources?.[0]?.Id
+          mediaSourceId: source?.Id
         })
       })
       .catch((e) => {
@@ -303,7 +309,7 @@ export function usePlayback(
     navigator.mediaSession.playbackState = engineState === 'paused' ? 'paused' : 'playing'
     if (engineState === 'paused' && was === 'playing') {
       const sess = sessionRef.current
-      if (sess) reportProgress(sess, currentTime(), true)
+      if (sess) void reportProgress(sess, currentTime(), true)
     }
   }, [engineState, currentTime])
 
@@ -313,7 +319,7 @@ export function usePlayback(
       const sess = sessionRef.current
       if (!sess) return
       const paused = engineStateRef.current === 'paused'
-      reportProgress(sess, currentTime(), paused)
+      void reportProgress(sess, currentTime(), paused)
       // local watch stats — only actually-playing time counts
       if (engineStateRef.current === 'playing') useWatchStats.getState().record(sess.item, 10)
       // keep OS media overlay's progress bar roughly honest

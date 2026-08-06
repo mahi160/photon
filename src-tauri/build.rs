@@ -8,6 +8,14 @@ fn main() {
     pkg_config::probe_library("mpv")
         .expect("libmpv not found via pkg-config (macOS: brew install mpv, Linux: apt install libmpv-dev)");
 
+    // No epoxy probe: mpv's GL entry points now come from the display server's own
+    // resolver (eglGetProcAddress / glXGetProcAddressARB, dlopen'd at runtime in
+    // mpv/linux/mod.rs) because libepoxy's dispatch pointers are never NULL and
+    // libmpv needs NULL to detect a missing function. The old
+    // `cargo:rustc-link-lib=epoxy` line was dead weight anyway -- nothing
+    // referenced an epoxy symbol at link time, so --as-needed dropped it (no
+    // libepoxy NEEDED entry in the shipped binary).
+
     // Windows has no pkg-config/vcpkg story for libmpv (a vcpkg port was
     // proposed and closed unmerged: microsoft/vcpkg#40587, "very hard to
     // build on windows with msvc or msys2 gcc") -- release.yml's

@@ -5,13 +5,15 @@ name: Release
 # platform builds below only run once a release actually happens, and
 # undrafts it only once macOS's build succeeds (never publish a release
 # missing the one platform that's actually verified). build-windows/
-# build-linux keep `continue-on-error: true` even now that their render
-# surfaces are real (not stub) implementations, see mpv/windows and
-# mpv/linux -- neither has been observed cutting a release on real hardware
-# yet (CI's `windows-latest`/`ubuntu-latest` runners cover compile+link,
-# not a human watching real video), so they still must never be able to
-# block the macOS release that already works. See each job's own comment
-# for what's still unverified.
+# build-linux both keep `continue-on-error: true` -- not because their
+# builds are unverified (Windows has now been watched playing video on
+# real hardware, see that job's comment) but because `needs` in GitHub
+# Actions requires a listed job to *succeed* by default, and dropping the
+# flag would let a Windows/Linux build failure block publish-release from
+# ever running, taking the working macOS release down with it. The flag
+# doesn't hide a failure -- that job's own run still shows red -- it only
+# stops it from cascading. See each job's own comment for what's still
+# unverified.
 #
 # .releaserc.json marks `prod` as a prerelease channel ("pre") -- versions
 # come out as `2.0.0-pre.1`, `2.0.0-pre.2`, ... and the GitHub release is
@@ -24,10 +26,13 @@ name: Release
 # with ERELEASEBRANCHES, "a minimum of 1 ... release branches are required"),
 # `main` is just there to satisfy that. Reflects where this actually stands:
 # v2 (the Electron -> Tauri replatform) is verified end-to-end on macOS only;
-# Windows/Linux now have real GLX/WGL render surfaces (mpv/windows,
-# mpv/linux -- no longer stubs) but haven't shipped in an actual release yet.
-# Drop the `prerelease` flag once a Windows/Linux release has actually been
-# run and watched playing video on real hardware, not just compiled in CI.
+# Windows has a real WGL render surface (mpv/windows) watched playing video on
+# real hardware, and Linux composites mpv into a GtkGLArea under the webview
+# (mpv/linux, ADR-0010) and has been run on a live Wayland session -- but
+# neither has shipped in an actual release yet, and Linux hardware decode is
+# still unproven. Drop the `prerelease` flag once a Windows/Linux release has
+# actually been run and watched playing video on real hardware, not just
+# compiled in CI.
 on:
   push:
     branches: [prod]
@@ -101,13 +106,15 @@ jobs:
         with:
           tagName: ${{ needs.release.outputs.tag }}
           releaseDraft: true
+          # `.app` (what the updater artifact is packed from) + the `.dmg` users download.
+          args: --bundles app,dmg
 
-  # ticket #11: Windows build -- wired up per request. `continue-on-error:
-  # true` so a failure here can never block the macOS release (see
-  # publish-release's `needs`) -- kept even now that `mpv/windows` has a
-  # real WGL render surface (compiles/links/tests green on a real
-  # `windows-latest` runner, see rust-ci.yml), since no actual release has
-  # been cut and watched playing video on real Windows hardware yet.
+  # ticket #11: Windows build -- wired up per request. A release built by
+  # this job has been watched playing video on real Windows hardware, so
+  # the compile/link-only caveat is gone -- `continue-on-error: true`
+  # stays anyway, purely so a future Windows build failure still can't
+  # block publish-release/the macOS release (see top-of-file comment), not
+  # because Windows itself is still unverified.
   #
   # Same ADR-0004 gap as macOS: this isn't the vendored LGPL libmpv build
   # either. Bigger problem here: Windows has no pkg-config/vcpkg story for
@@ -119,9 +126,8 @@ jobs:
   # own docs describe for exactly this (DOCS/compile-windows.md > "Linking
   # libmpv with MSVC Programs"): `gendef` the dll's exports into a `.def`,
   # then MSVC's `lib.exe /def:...`. build.rs picks up the result via
-  # MPV_LIB_DIR. `mpv/windows/` now has a real WGL render surface (issue
-  # #27), so this installer's video should actually render -- just not yet
-  # confirmed on real Windows hardware outside CI.
+  # MPV_LIB_DIR. `mpv/windows/` has a real WGL render surface (issue #27),
+  # confirmed rendering video on real Windows hardware.
   build-windows:
     needs: [release]
     if: needs.release.outputs.published == 'true'
@@ -174,22 +180,34 @@ jobs:
         with:
           tagName: ${{ needs.release.outputs.tag }}
           releaseDraft: true
+          # NSIS only: it produces the `.exe` installer users actually want, and
+          # it's what the updater artifact is built from. MSI is deliberately not
+          # built -- a WiX hiccup would fail the whole job and take the `.exe`
+          # down with it, for a second installer format nobody asked for.
+          args: --bundles nsis
 
   # ticket #11: Linux build -- far lower-risk than Windows: Ubuntu ships a
   # real `libmpv-dev` package with a working .pc file, so build.rs's
   # existing pkg-config probe (same code path as macOS's brew mpv) just
   # works, no Linux-specific build.rs branch needed. One job covers *both*
-  # X11 and Wayland -- mpv's render API and WRY's WebKitGTK backend both
-  # pick their windowing backend (GLX/EGL, X11/Wayland) at runtime from the
-  # same binary, same as any GTK app; there's no separate "X11 build" vs
-  # "Wayland build" to wire up. `mpv/linux/`'s `RenderSurface` now has a
-  # real GLX backend (issue #27, X11 only -- Wayland's EGL/wl_egl_window
-  # backend is a follow-up, see its own doc), verified rendering an actual
-  # frame against a live X11/GLX session, not just compiled in CI -- this
-  # produces installable deb/rpm/AppImage packages with working X11 video;
-  # Wayland sessions still get the same "not implemented" error the whole
-  # module used to give until that follow-up lands.
+  # X11 and Wayland: `mpv/linux/` renders into a GtkGLArea composited under
+  # the webview (ADR-0010), so GTK picks the display server and GL flavour
+  # at runtime from the same binary, same as any GTK app -- the old
+  # X11-child-window/wl_subsurface split (and its GDK_BACKEND pinning) is
+  # gone. Run on a live Wayland session end to end (window, GL context,
+  # mpv render, geometry, logs); hardware decode is the piece still
+  # unverified -- see ADR-0010's smoke-test checklist.
   build-linux:
+    # Ships `.deb` + `.rpm` only (bundle.targets in tauri.conf.json): Tauri's
+    # AppImage bundler copies libva* into the AppDir, where it then
+    # version-mismatches the host's VAAPI driver and silently kills hardware
+    # decode, and it offers no way to exclude a library. Consequence: no in-app
+    # auto-update on Linux (Tauri's updater only supports AppImage there), so
+    # Linux updates come from the distro package. The updater signing env below
+    # is still required -- the bundler asks for it whenever
+    # createUpdaterArtifacts is on, even with nothing updatable to sign.
+    # Both platform builds are verified to the level AGENTS.md states; hardware
+    # decode on Linux is still unproven (see ADR-0010's smoke-test checklist).
     needs: [release]
     if: needs.release.outputs.published == 'true'
     continue-on-error: true
@@ -223,14 +241,19 @@ jobs:
         with:
           tagName: ${{ needs.release.outputs.tag }}
           releaseDraft: true
+          # deb + rpm, no AppImage (see this job's comment). Both are pure-Rust
+          # bundlers in Tauri, so no extra system tooling beyond the apt line above.
+          args: --bundles deb,rpm
 
   publish-release:
     # build-windows/build-linux are `continue-on-error: true` above, so
     # listing them here only waits for them to finish (success or failure),
     # it never makes their outcome block this job -- lets whichever one
     # *does* succeed upload its artifacts (tauri-action's own behavior)
-    # before this undrafts the release, without the still-unverified two
-    # being able to hold the working macOS release back.
+    # before this undrafts the release, without either being able to hold
+    # the working macOS release back (Windows verified now, see its job's
+    # comment, but keeps the flag for that non-blocking guarantee, not
+    # because it's still unverified).
     needs: [release, build-macos, build-windows, build-linux]
     if: needs.release.outputs.published == 'true'
     runs-on: ubuntu-latest

@@ -263,6 +263,7 @@ export interface MediaSource {
   RunTimeTicks?: number
   DefaultAudioStreamIndex?: number
   DefaultSubtitleStreamIndex?: number
+  Bitrate?: number // used to rank multiple versions of the same item, see player/session.ts's pickMediaSource
 }
 
 export interface ChapterInfo {

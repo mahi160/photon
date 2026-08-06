@@ -88,6 +88,15 @@ export function Login(): React.JSX.Element {
             autoFocus
             required
           />
+          {/* plain http:// carries sign-in credentials and the Jellyfin access token (used as a URL query
+              param for direct-stream/subtitle/trickplay requests) unencrypted -- flag it, don't block it,
+              plenty of self-hosted servers are LAN-only HTTP with no TLS in front */}
+          {server.trim() !== '' && normalizeServer(server).startsWith('http://') && (
+            <p className={styles.insecureHint}>
+              Insecure connection — traffic to this server, including your sign-in token, won’t be
+              encrypted. Use https:// if your server supports it.
+            </p>
+          )}
           <label className={styles.label} htmlFor="login-username">
             Username
           </label>

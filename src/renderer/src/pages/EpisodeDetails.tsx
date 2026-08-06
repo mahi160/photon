@@ -4,6 +4,7 @@ import { Play, Clapperboard } from 'reicon-react'
 import { useQuery } from '@tanstack/react-query'
 import { episodesQuery, itemQuery, seasonsQuery } from '../lib/queries'
 import { backdropUrl, imageUrl, mediaBadges, ticksToSeconds } from '../lib/jellyfin'
+import { pickMediaSource } from '../player/session'
 import { WatchedButton } from '../components/WatchedButton'
 import { Card } from '../components/Card'
 import {
@@ -68,7 +69,9 @@ export function EpisodeDetails(): React.JSX.Element {
   const hero = backdropUrl(item, 1280) ?? imageUrl(item, 1280)
   const thumb = imageUrl(item, 640)
   const position = ticksToSeconds(item.UserData?.PlaybackPositionTicks)
-  const streams = item.MediaSources?.[0]?.MediaStreams ?? []
+  // same source the player itself would pick (player/session.ts's pickMediaSource) -- keeps badges/track
+  // pickers here consistent with whichever version of a multi-version item actually plays
+  const streams = pickMediaSource(item.MediaSources ?? [])?.MediaStreams ?? []
   const audioStreams = streams.filter((s) => s.Type === 'Audio')
   const subtitleStreams = streams.filter((s) => s.Type === 'Subtitle')
 

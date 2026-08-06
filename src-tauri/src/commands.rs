@@ -37,7 +37,12 @@ pub fn app_version(app: AppHandle) -> String {
 
 #[tauri::command]
 pub fn app_set_fullscreen(window: tauri::Window, fullscreen: bool) {
-    let _ = window.set_fullscreen(fullscreen);
+    // was silently swallowed (`let _ =`) -- surfaced while chasing a fullscreen-flash report (root
+    // cause was Player.tsx's toggleFullscreen calling this from inside a setFullscreen updater,
+    // double-invoked by StrictMode in dev); kept logging since eating a real failure here is bad regardless.
+    if let Err(e) = window.set_fullscreen(fullscreen) {
+        eprintln!("[photon] set_fullscreen({fullscreen}) failed: {e}");
+    }
 }
 
 /// Shows/hides the native traffic-light buttons (Overlay style has no separate title bar, just these drawn over content) -- player only, synced to auto-hide `visible` so they fade with the controls.
