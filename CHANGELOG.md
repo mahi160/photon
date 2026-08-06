@@ -1,3 +1,10 @@
+# [2.0.0-pre.10](https://github.com/mahi160/photon/compare/v2.0.0-pre.9...v2.0.0-pre.10) (2026-08-06)
+
+
+### Bug Fixes
+
+* **playback:** close mpv/jellyfin audit findings ([0d39ed7](https://github.com/mahi160/photon/commit/0d39ed7712e3b5b332abc41228f69f240ede8be0))
+
 # [2.0.0-pre.9](https://github.com/mahi160/photon/compare/v2.0.0-pre.8...v2.0.0-pre.9) (2026-08-06)
 
 
