@@ -1,9 +1,11 @@
 fn main() {
     // ponytail: pkg-config probe against whatever `mpv` dev headers/libs are
     // on this machine (Homebrew mpv on macOS, apt's libmpv-dev on Linux --
-    // both full GPL builds). Ticket #3's real release build needs a vendored
-    // --enable-lgpl libmpv instead (ADR-0004) — this is fine for local dev,
-    // not for a distributed binary.
+    // both full GPL builds, which is deliberate: ADR-0011 keeps Photon's
+    // source MIT and accepts GPL binaries rather than building an LGPL
+    // libmpv+ffmpeg in CI). On macOS the release bundle then vendors this
+    // exact tree into Photon.app (scripts/bundle-macos-dylibs.sh); on Linux
+    // nothing is bundled and the package depends on the distro's libmpv.
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     pkg_config::probe_library("mpv")
         .expect("libmpv not found via pkg-config (macOS: brew install mpv, Linux: apt install libmpv-dev)");

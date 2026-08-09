@@ -6,3 +6,5 @@ out
 .eslintcache
 *.log*
 *.tsbuildinfo
+src-tauri/frameworks/*.dylib
+src-tauri/libmpv-2.dll
