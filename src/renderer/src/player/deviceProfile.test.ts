@@ -60,21 +60,19 @@ describe('buildDeviceProfile TranscodingProfiles', () => {
   })
 })
 
-// Regression guard: any subtitle format missing a matching profile falls through to Encode and silently forces a transcode -- once regressed for pgssub/dvdsub/dvbsub with no test catching it.
+// Regression guard: any subtitle format missing a matching profile falls through to Encode and silently forces a transcode -- once regressed for pgssub/dvdsub/dvbsub with no test catching it, then again for ass/ssa (Jellyfin can't convert those at all, so a missing profile forced a full burn-in transcode on any file whose default sub was styled ASS).
 describe('buildDeviceProfile subtitle profiles', () => {
   const profiles = (
     buildDeviceProfile(0) as { SubtitleProfiles: { Format: string; Method: string }[] }
   ).SubtitleProfiles
 
-  it('declares Embed for every image-based format mpv selects natively', () => {
-    for (const format of ['pgssub', 'dvdsub', 'dvbsub']) {
+  it('declares Embed for every non-convertible format mpv selects natively', () => {
+    for (const format of ['pgssub', 'dvdsub', 'dvbsub', 'ass', 'ssa']) {
       expect(profiles).toContainEqual({ Format: format, Method: 'Embed' })
     }
   })
 
-  it('keeps text formats on the External srt path (delay/styling support)', () => {
+  it('keeps convertible text formats on the External srt path (delay/styling support)', () => {
     expect(profiles).toContainEqual({ Format: 'srt', Method: 'External' })
-    expect(profiles.some((p) => p.Format === 'ass')).toBe(false)
-    expect(profiles.some((p) => p.Format === 'ssa')).toBe(false)
   })
 })

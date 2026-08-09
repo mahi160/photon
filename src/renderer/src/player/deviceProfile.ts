@@ -55,10 +55,18 @@ export function buildDeviceProfile(maxBitrate: number): object {
     SubtitleProfiles: [
       // srt (not vtt) External for text formats -- keeps delay/styling working (text-only, see engine.setTextTrack). vtt was tried first, but Jellyfin's ASS/SSA->vtt conversion emits a malformed `Region:` header when source has cue positioning, and mpv's webvtt decoder silently drops every cue past it. Plain srt has no region/style block, sidesteps this -- no loss, Photon ships one fixed subtitle style anyway (ADR-0007).
       { Format: 'srt', Method: 'External' },
-      // Embed for image-based formats mpv selects as embedded track (ADR-0008, engine.selectEmbeddedSubtitleTrack) -- tells server not to burn these in. ass/ssa excluded, stay on srt path above.
+      // Embed for image-based formats mpv selects as embedded track (ADR-0008, engine.selectEmbeddedSubtitleTrack) -- tells server not to burn these in.
       { Format: 'pgssub', Method: 'Embed' },
       { Format: 'dvdsub', Method: 'Embed' },
-      { Format: 'dvbsub', Method: 'Embed' }
+      { Format: 'dvbsub', Method: 'Embed' },
+      // ass/ssa can't go through the srt path above -- Jellyfin's MediaStream.SupportsSubtitleConversionTo
+      // hard-refuses to convert *from* ass/ssa at all (upstream MediaStream.cs), so with no matching
+      // profile the server fell back to Encode (full burn-in transcode) any time a file's default sub
+      // was styled ASS. mpv/libass renders these as an embedded track itself, same as pgssub above --
+      // no server-side conversion needed, just tell it not to try. Same tradeoff as pgssub: no delay/
+      // styling controls for this track (ADR-0007's one fixed style doesn't apply, libass owns rendering).
+      { Format: 'ass', Method: 'Embed' },
+      { Format: 'ssa', Method: 'Embed' }
     ]
   }
 }

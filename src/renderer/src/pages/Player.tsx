@@ -402,6 +402,7 @@ export function Player(): React.JSX.Element {
           audioStream={session.audioStreams.find(
             (s) => s.Index === (player.audioIndex ?? session.mediaSource.DefaultAudioStreamIndex)
           )}
+          subtitleStream={session.subtitleStreams.find((s) => s.Index === player.subtitleIndex)}
           playMethod={session.playMethod}
           getStats={engine.getStats}
         />
