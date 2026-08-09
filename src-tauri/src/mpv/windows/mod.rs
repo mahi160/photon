@@ -20,6 +20,7 @@ use windows::Win32::Graphics::OpenGL::{
     HGLRC, PFD_DOUBLEBUFFER, PFD_DRAW_TO_WINDOW, PFD_SUPPORT_OPENGL, PFD_TYPE_RGBA, PIXELFORMATDESCRIPTOR,
 };
 use windows::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
+use windows::Win32::UI::HiDpi::GetDpiForWindow;
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, RegisterClassExW, SetWindowPos, ShowWindow, CS_HREDRAW, CS_OWNDC,
     CS_VREDRAW, HWND_BOTTOM, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE, WINDOW_EX_STYLE, WNDCLASSEXW,
@@ -185,7 +186,12 @@ impl DesktopGl for WglSurface {
             }
             return;
         }
-        let (xi, yi, wi, hi) = (x as i32, y_top_left as i32, w as i32, h as i32);
+        // Rect arrives in the webview's CSS/logical px (mpv.ts's syncRect). Win32 child-window
+        // coords are physical px and, unlike GTK's widget allocation, are never auto-scaled by
+        // the platform -- without this the child window (and the video in it) ends up sized/
+        // positioned at 1/scale on any HiDPI display. GetDpiForWindow's baseline is 96 (USER_DEFAULT_SCREEN_DPI).
+        let scale = unsafe { GetDpiForWindow(self.hwnd) } as f64 / 96.0;
+        let (xi, yi, wi, hi) = ((x * scale) as i32, (y_top_left * scale) as i32, (w * scale) as i32, (h * scale) as i32);
         unsafe {
             let _ = SetWindowPos(self.hwnd, Some(HWND_BOTTOM), xi, yi, wi, hi, SWP_SHOWWINDOW);
         }
