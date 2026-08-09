@@ -24,11 +24,13 @@ writeFileSync(confPath, JSON.stringify(conf, null, 2) + '\n')
 // `version = "..."`. [package] is always the first table in this file.
 const cargoPath = 'src-tauri/Cargo.toml'
 const cargo = readFileSync(cargoPath, 'utf8')
-const updated = cargo.replace(/(\[package\][^[]*?\nversion = )"[^"]*"/, `$1"${version}"`)
-if (updated === cargo) {
+const versionLine = /(\[package\][^[]*?\nversion = )"[^"]*"/
+// Match presence, not a before/after diff -- re-running with the version Cargo.toml already has
+// (e.g. a manually-recovered release re-cutting the same pre.N) is a legitimate no-op, not a failure.
+if (!versionLine.test(cargo)) {
   console.error(`could not find [package] version in ${cargoPath}`)
   process.exit(1)
 }
-writeFileSync(cargoPath, updated)
+writeFileSync(cargoPath, cargo.replace(versionLine, `$1"${version}"`))
 
 console.log(`synced ${confPath} and ${cargoPath} to ${version}`)
