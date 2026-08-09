@@ -85,6 +85,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.release.outputs.tag }}
+      # Needed twice over: build.rs links against it, and
+      # scripts/bundle-macos-dylibs.sh then copies this exact Cellar tree into
+      # Photon.app so the shipped .dmg needs no mpv of its own (ADR-0011).
       - run: brew install mpv
       - uses: pnpm/action-setup@v4
         with:
@@ -116,8 +119,9 @@ jobs:
   # block publish-release/the macOS release (see top-of-file comment), not
   # because Windows itself is still unverified.
   #
-  # Same ADR-0004 gap as macOS: this isn't the vendored LGPL libmpv build
-  # either. Bigger problem here: Windows has no pkg-config/vcpkg story for
+  # Ships the GPL libmpv build, like macOS -- ADR-0004's LGPL vendoring is
+  # superseded by ADR-0011 (source stays MIT, this download is GPLv2+).
+  # Bigger problem here: Windows has no pkg-config/vcpkg story for
   # libmpv at all -- a vcpkg port was proposed and closed unmerged
   # (microsoft/vcpkg#40587: "libmpv is very hard to build on windows with
   # msvc or with msys2 gcc"). So: download shinchiro/mpv-winbuild-cmake's
@@ -159,6 +163,11 @@ jobs:
       - name: lib.exe /def -> mpv.lib (MSVC import lib)
         shell: pwsh
         run: lib /def:libmpv-2.def /name:libmpv-2.dll /out:mpv-dev/mpv.lib /machine:x64
+      # No dll-staging step here on purpose: build.rs copies libmpv-2.dll out
+      # of MPV_LIB_DIR itself, because tauri_build::build() validates the
+      # bundle resource path at compile time and would fail before any CI step
+      # could place it. tauri.windows.conf.json then has NSIS install it next
+      # to photon.exe, which is the first place Windows looks for a dll.
       - uses: pnpm/action-setup@v4
         with:
           version: 11
