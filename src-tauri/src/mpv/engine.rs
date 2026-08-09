@@ -31,6 +31,23 @@ impl Default for Tick {
     }
 }
 
+/// The Playback Info panel's genuinely-dynamic fields (ADR-0011) -- everything else in that panel
+/// (codec, resolution, container, file size...) reads the `MediaSource`/`MediaStream` Photon already
+/// fetched from Jellyfin, since direct play (ADR-0008) guarantees mpv demuxes that exact file. These six
+/// are only knowable from mpv itself, and only meaningfully once a file is loaded and playing -- polled
+/// on demand (`stats()`/`mpv_stats`) rather than observed, since the panel is opened rarely and doesn't
+/// need per-tick updates like time/duration do.
+#[derive(Clone, Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")] // frontend's PlaybackStats (engine.ts) reads these camelCase, unlike Tick's fields above
+pub struct MpvStats {
+    pub hwdec_current: String,
+    pub decoder_dropped_frames: i64,
+    pub display_dropped_frames: i64,
+    pub demuxer_cache_duration: f64, // seconds
+    pub cache_speed: f64,            // bytes/sec
+    pub av_sync: f64,                // seconds, +audio ahead of video
+}
+
 #[derive(Default)]
 struct PendingState {
     loaded: bool, // has MPV_EVENT_FILE_LOADED fired for the current load() yet
@@ -242,6 +259,18 @@ fn get_property_string(mpv: *mut mpv_handle, name: &str) -> Result<String, Strin
         mpv_free(ptr as *mut c_void);
         Ok(s)
     }
+}
+
+fn get_property_double(mpv: *mut mpv_handle, name: &str) -> Result<f64, String> {
+    let cname = CString::new(name).map_err(|e| e.to_string())?;
+    let mut v: f64 = 0.0;
+    unsafe {
+        check(
+            mpv_get_property(mpv, cname.as_ptr(), mpv_format_MPV_FORMAT_DOUBLE, &mut v as *mut _ as *mut c_void),
+            "mpv_get_property (double)",
+        )?;
+    }
+    Ok(v)
 }
 
 // Resolves a (already static-stream-shift-corrected, see TS's `toDemuxedIndex`) source stream index to
@@ -531,6 +560,20 @@ impl MpvEngine {
     /// "gpu" or "cpu" -- which backend `attach` landed on (ADR-0009), surfaced via `mpv_attach`'s return value.
     pub fn render_backend(&self) -> &'static str {
         self.backend.as_str()
+    }
+
+    /// Snapshot of mpv-only stats for the Playback Info panel (ADR-0011). Each property is read
+    /// best-effort (`unwrap_or_default`/`unwrap_or(0.0)`) -- e.g. `avsync`/`cache-speed` are unavailable
+    /// before playback truly starts, and a panel opened at that moment should show zeros, not an error.
+    pub fn stats(&self) -> MpvStats {
+        MpvStats {
+            hwdec_current: get_property_string(self.mpv, "hwdec-current").unwrap_or_default(),
+            decoder_dropped_frames: get_property_int(self.mpv, "decoder-frame-drop-count").unwrap_or(0),
+            display_dropped_frames: get_property_int(self.mpv, "frame-drop-count").unwrap_or(0),
+            demuxer_cache_duration: get_property_double(self.mpv, "demuxer-cache-duration").unwrap_or(0.0),
+            cache_speed: get_property_double(self.mpv, "cache-speed").unwrap_or(0.0),
+            av_sync: get_property_double(self.mpv, "avsync").unwrap_or(0.0),
+        }
     }
 
     fn command(&self, args: &[&str]) -> Result<(), String> {

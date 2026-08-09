@@ -17,6 +17,18 @@ export interface LoadRequest {
   textTracks: TextTrackSource[]
 }
 
+// mpv-only Playback Info panel fields (ADR-0011) -- everything else in that panel reads Jellyfin's own
+// MediaSource/MediaStream, already in hand from PlaybackInfo, since direct play (ADR-0008) guarantees
+// they describe the exact same file mpv demuxes.
+export interface PlaybackStats {
+  hwdecCurrent: string
+  decoderDroppedFrames: number
+  displayDroppedFrames: number
+  demuxerCacheDuration: number // seconds
+  cacheSpeed: number // bytes/sec
+  avSync: number // seconds, +audio ahead of video
+}
+
 export interface EngineEvents {
   time: (seconds: number) => void
   state: (state: 'playing' | 'paused' | 'buffering') => void
@@ -45,6 +57,8 @@ export interface PlaybackEngine {
   exitPiP(): Promise<void>
   // Generic mpv command passthrough (screenshot, frame-step, cycle deinterlace, ...) -- see MpvEngine's doc.
   runCommand(args: string[]): void
+  // Playback Info panel's dynamic fields (ADR-0011) -- polled on open/refresh, not part of the tick stream
+  getStats(): Promise<PlaybackStats>
   // Render backend attach() landed on (ADR-0009, macOS only) -- null until attach resolves, or on an engine with no such concept. Drives player overlay's CPU-fallback badge only, never gates behavior.
   renderBackend(): 'gpu' | 'cpu' | null
   currentTime(): number
