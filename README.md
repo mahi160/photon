@@ -30,33 +30,34 @@ media player.
 
 ## Install
 
-**macOS** (verified, working):
+**macOS**:
 
 ```bash
 brew install --cask mahi160/photon/photon
 ```
 
-(the cask depends on Homebrew's `mpv` formula and installs it for you —
-Photon dynamically links `mpv` at build time and doesn't bundle it yet,
-ADR-0004's vendored build isn't wired up)
-
-or download the `.dmg` from [Releases](https://github.com/mahi160/photon/releases)
-— in that case run `brew install mpv` yourself first, since the `.dmg` skips
-the cask's dependency handling — ad-hoc signed, not notarized, so Gatekeeper
-needs a one-time fix (the cask does this automatically):
+or download the `.dmg` from [Releases](https://github.com/mahi160/photon/releases).
+It bundles its own `mpv` — nothing to install first. It is ad-hoc signed but
+not notarized, so Gatekeeper needs a one-time fix after moving it to
+Applications (the cask does this for you):
 
 ```bash
 xattr -cr /Applications/Photon.app
 ```
 
-**Windows / Linux** (installers build and run, but video playback doesn't
-render yet — [#27](https://github.com/mahi160/photon/issues/27) tracks the
-remaining work): `.exe`/`.deb`/`.rpm`/`.AppImage` builds are on
-[Releases](https://github.com/mahi160/photon/releases) for anyone who wants
-to help finish that.
+**Windows**: `.exe` installer from
+[Releases](https://github.com/mahi160/photon/releases). Bundles its own
+`mpv`.
 
-Current releases are flagged **pre-release** on GitHub until Windows/Linux
-playback is verified.
+**Linux**: `.deb` / `.rpm` from
+[Releases](https://github.com/mahi160/photon/releases). These depend on your
+distribution's libmpv (`libmpv2` / `mpv-libs`) rather than bundling one, so
+hardware decode keeps working with your own GPU drivers; your package manager
+pulls it in. No AppImage, and therefore no in-app auto-update on Linux —
+update through the package.
+
+Current releases are flagged **pre-release** on GitHub. Hardware decode on
+Linux is the last thing still unverified.
 
 ## Keyboard shortcuts
 
@@ -94,4 +95,9 @@ Contributor and architecture notes live in [AGENTS.md](AGENTS.md).
 
 ## License
 
-MIT
+Photon's source is **MIT** — see [LICENSE](LICENSE).
+
+The macOS and Windows downloads bundle [libmpv](https://mpv.io), which is
+GPLv2-or-later, so those builds are conveyed as GPLv2-or-later as a whole.
+The Linux packages contain no mpv code and are MIT. Details and corresponding
+source in [NOTICE.md](NOTICE.md).
