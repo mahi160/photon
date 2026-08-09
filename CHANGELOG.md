@@ -1,3 +1,10 @@
+# [2.0.0-pre.11](https://github.com/mahi160/photon/compare/v2.0.0-pre.10...v2.0.0-pre.11) (2026-08-09)
+
+
+### Bug Fixes
+
+* **mpv:** scale child-window rect to physical px on HiDPI Windows ([e14627c](https://github.com/mahi160/photon/commit/e14627c1a6a2e9e98a849f2d36c96823712cb4a8)), closes [#45](https://github.com/mahi160/photon/issues/45)
+
 # [2.0.0-pre.10](https://github.com/mahi160/photon/compare/v2.0.0-pre.9...v2.0.0-pre.10) (2026-08-06)
 
 
