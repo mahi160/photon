@@ -1,6 +1,12 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import type { EngineEvents, LoadRequest, PlaybackEngine, TextTrackSource } from './engine'
+import type {
+  EngineEvents,
+  LoadRequest,
+  PlaybackEngine,
+  PlaybackStats,
+  TextTrackSource
+} from './engine'
 import { guiSubtitleConfig, parseMpvConfig } from './mpvConfig'
 import { createSerialQueue } from '../lib/serialQueue'
 import { useSettings } from '../stores/settings'
@@ -212,6 +218,12 @@ export class MpvEngine implements PlaybackEngine {
     void invoke('mpv_run_command', { args }).catch((e) =>
       console.error('[playback] runCommand failed', args, e)
     )
+  }
+
+  // Playback Info panel's dynamic fields (ADR-0011) -- a plain round trip, not part of the tick stream:
+  // the panel is opened rarely and doesn't need per-tick updates the way time/duration do.
+  getStats(): Promise<PlaybackStats> {
+    return invoke<PlaybackStats>('mpv_stats')
   }
 
   selectAudioTrack(index: number): void {

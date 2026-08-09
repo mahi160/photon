@@ -270,6 +270,8 @@ export function playerSpecialBadges(streams: MediaStream[]): string[] {
 export interface MediaSource {
   Id: string
   Name?: string
+  Container?: string // General section of the Playback Info panel (ADR-0011)
+  Size?: number // bytes -- General section of the Playback Info panel (ADR-0011)
   MediaStreams?: MediaStream[]
   TranscodingUrl?: string
   SupportsDirectPlay?: boolean
