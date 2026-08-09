@@ -36,9 +36,14 @@ media player.
 brew install --cask mahi160/photon/photon
 ```
 
+(the cask depends on Homebrew's `mpv` formula and installs it for you —
+Photon dynamically links `mpv` at build time and doesn't bundle it yet,
+ADR-0004's vendored build isn't wired up)
+
 or download the `.dmg` from [Releases](https://github.com/mahi160/photon/releases)
-— ad-hoc signed, not notarized, so Gatekeeper needs a one-time fix (the cask
-does this automatically):
+— in that case run `brew install mpv` yourself first, since the `.dmg` skips
+the cask's dependency handling — ad-hoc signed, not notarized, so Gatekeeper
+needs a one-time fix (the cask does this automatically):
 
 ```bash
 xattr -cr /Applications/Photon.app
