@@ -80,6 +80,7 @@ API on macOS/Windows and by `org.freedesktop.ScreenSaver.Inhibit`
 | , / .     | Frame step back/forward |
 | D         | Toggle deinterlace      |
 | Shift+S   | Screenshot              |
+| I         | Playback info           |
 | Esc       | Exit fullscreen         |
 | Ctrl/⌘+F  | Search                  |
 
