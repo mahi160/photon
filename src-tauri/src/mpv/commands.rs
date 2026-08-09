@@ -1,4 +1,4 @@
-use super::engine::MpvEngine;
+use super::engine::{MpvEngine, MpvStats};
 use super::profile::RenderProfiler;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager, Runtime, State};
@@ -89,6 +89,13 @@ pub fn mpv_set_rect(state: State<'_, MpvState>, x: f64, y: f64, w: f64, h: f64) 
 #[tauri::command]
 pub fn mpv_run_command(state: State<'_, MpvState>, args: Vec<String>) -> Result<(), String> {
     with_engine(&state, |e| e.run_command(&args))
+}
+
+/// Playback Info panel's dynamic fields (ADR-0011) -- hwdec-current, dropped-frame counts, demuxer cache
+/// duration/speed, A/V sync. Polled on open/refresh, not observed -- see engine.rs's `stats` doc.
+#[tauri::command]
+pub fn mpv_stats(state: State<'_, MpvState>) -> Result<MpvStats, String> {
+    with_engine(&state, |e| Ok(e.stats()))
 }
 
 #[tauri::command]
