@@ -1,6 +1,6 @@
 # Embed mpv via the in-process libmpv render API, not a spawned/embedded process
 
-With libmpv vendored (ADR-0003/0004), Photon links it directly (Rust FFI, e.g.
+With libmpv vendored (ADR-0003/0011), Photon links it directly (Rust FFI, e.g.
 `libmpv-rs`) and drives an `mpv_render_context`, compositing its output frames into
 a native surface beneath a transparent region of the Tauri webview. This was
 chosen over spawning the bundled mpv binary and embedding it via `--wid` (a native

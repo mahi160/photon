@@ -96,9 +96,11 @@ npx vitest run  # tests
 
 Requires Rust + a system `mpv` install (dev builds link it via pkg-config —
 `brew install mpv` on macOS, `apt install libmpv-dev libwebkit2gtk-4.1-dev
-libgtk-3-dev` on Debian/Ubuntu). The shipped app will vendor its own LGPL libmpv
-build (ADR-0004); that vendoring isn't wired up yet, so dev builds link
-whatever `mpv` pkg-config resolves to on the machine.
+libgtk-3-dev` on Debian/Ubuntu). Dev builds link whatever `mpv` pkg-config
+resolves to on the machine. On macOS a release build additionally copies that
+libmpv and its whole dylib tree into the `.app` — see ADR-0011 and Releasing
+below — so a `tauri build` on macOS needs `mpv` present at bundle time too,
+not just at link time.
 
 Diagnostics (all platforms): mpv's own warnings/errors go to stderr and to the
 `mpv://log` event (devtools console), and the hwdec that actually engaged is
@@ -143,21 +145,33 @@ open shared object file`. Consequence of dropping AppImage: no in-app
 auto-update on Linux (Tauri's updater only handles AppImage there);
 distro packages are updated by the distro/user.
 
-None of the three platforms use ADR-0004's vendored LGPL libmpv build yet (macOS links
-Homebrew's GPL build, same as local dev; Windows/Linux similarly link a full
-GPL build in CI) — which also means the shipped `.deb`/`.rpm` link a GPL
-libmpv into an MIT app. That's ADR-0004's job to fix and it is not done.
+Licensing of what ships (ADR-0011, and `NOTICE.md` is the user-facing
+version): Photon's source is MIT and stays MIT. macOS and Windows bundle a
+GPL libmpv, so *those downloads* are GPLv2-or-later as a whole; Linux ships
+no mpv code at all (the `.deb`/`.rpm` depend on the distro's), so those
+packages are MIT on their own. ADR-0004's vendored LGPL build is superseded,
+not pending — it needed an LGPL ffmpeg built in CI on three platforms to buy
+back a permissiveness nothing here needs. The one thing that would actually
+cost us MIT on the source is copying code out of jellyfin-web (GPLv2) or
+Jellyfin Kodi (GPLv3); describing their wire behaviour in a comment, as
+`jellyfin.ts`/`session.ts` do, is fine.
 
-Until that vendoring lands, macOS also doesn't bundle `libmpv` into
-`Photon.app` — the shipped binary's dyld load command is an absolute path
-into whatever Homebrew Cellar built it on CI, so a Mac without a matching
-`brew install mpv` fails at launch with `Library not loaded:
+macOS bundles libmpv via `scripts/bundle-macos-dylibs.sh`, run from
+`beforeBundleCommand` in `src-tauri/tauri.macos.conf.json`. It copies libmpv
+plus its transitive Homebrew tree (48 dylibs, ~60 MB — the `.dmg` goes 4.6 MB
+→ 29 MB) into `Contents/Resources/frameworks/`, rewrites every load command to
+`@executable_path`, and ad-hoc re-signs each one (`install_name_tool`
+invalidates signatures; arm64 won't load unsigned code). `beforeBundleCommand`
+is the only usable hook — patching the finished `.app` is pointless because
+`tauri bundle --bundles dmg` regenerates and then deletes it before cutting
+the image. The dylibs arrive via a `resources` **glob**, not
+`bundle.macOS.frameworks`' fixed list, because the filenames carry sonames
+(`libavcodec.62`, `libplacebo.360`) that move whenever Homebrew bumps ffmpeg.
+This replaced a real crash: the shipped binary used to carry an absolute CI
+Cellar path and died on any other Mac with `Library not loaded:
 .../libmpv.2.dylib` (`Termination Reason: DYLD ... Library missing`). The
-`mahi160/homebrew-photon` cask has `depends_on formula: "mpv"` so `brew
-install --cask` pulls it in automatically; the `.dmg` on Releases has no such
-mechanism, so README's Install section tells `.dmg` users to `brew install
-mpv` themselves. Both go away once ADR-0004's vendored build is bundled with
-its own `@rpath`.
+`.dmg` is now standalone and `mahi160/homebrew-photon`'s `depends_on formula:
+"mpv"` is no longer needed.
 
 ## macOS Gatekeeper note
 
@@ -194,4 +208,5 @@ Single-context: root `CONTEXT.md` (created lazily) + `docs/adr/`. See `docs/agen
 
 ## License
 
-MIT
+MIT. Note that the macOS/Windows *downloads* are GPLv2-or-later because they
+bundle libmpv — see `NOTICE.md` and ADR-0011.
