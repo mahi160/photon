@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { MpvEngine } from './mpv'
-import type { LoadRequest, PlaybackEngine } from './engine'
+import type { LoadRequest, PlaybackEngine, PlaybackStats } from './engine'
+
+// getStats()'s fallback before the engine exists (e.g. panel opened in the sliver before mpv_attach resolves) -- all-zero/empty reads as "nothing to report yet", not an error
+const emptyStats: PlaybackStats = {
+  hwdecCurrent: '',
+  decoderDroppedFrames: 0,
+  displayDroppedFrames: 0,
+  demuxerCacheDuration: 0,
+  cacheSpeed: 0,
+  avSync: 0
+}
 
 // Mirrors engine state into React, funnels every engine write through one place so component code never holds a second copy of playback state.
 
@@ -49,6 +59,7 @@ export interface PlayerEngineApi {
   selectEmbeddedSubtitleTrack: (index: number | null) => void
   togglePiP: () => void
   runCommand: (args: string[]) => void
+  getStats: () => Promise<PlaybackStats>
 }
 
 export function usePlayerEngine(
@@ -211,6 +222,11 @@ export function usePlayerEngine(
     engineRef.current?.runCommand(args)
   }, [])
 
+  // Playback Info panel's dynamic fields (ADR-0011) -- no local state, panel polls this itself while open
+  const getStats = useCallback((): Promise<PlaybackStats> => {
+    return engineRef.current?.getStats() ?? Promise.resolve(emptyStats)
+  }, [])
+
   return {
     state,
     videoReady,
@@ -239,6 +255,7 @@ export function usePlayerEngine(
     selectAudioTrack,
     selectEmbeddedSubtitleTrack,
     togglePiP,
-    runCommand
+    runCommand,
+    getStats
   }
 }

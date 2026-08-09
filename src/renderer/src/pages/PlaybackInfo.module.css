@@ -1,0 +1,126 @@
+/* Same shape as Shortcuts.module.css's overlay/card — kept as a separate module since this panel's
+   rows are label/value, not label/keys. */
+.overlay {
+  position: fixed;
+  z-index: var(--z-overlay);
+  inset: 0;
+
+  background: var(--scrim);
+
+  animation: overlay-in var(--dur-med) var(--ease);
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.card {
+  position: fixed;
+  z-index: var(--z-overlay);
+  inset-block-start: 50%;
+  inset-inline-start: 50%;
+  translate: -50% -50%;
+
+  overflow-y: auto;
+
+  inline-size: min(34rem, calc(100% - 2rem));
+  max-block-size: calc(100vh - 4rem);
+  padding: 2rem 2.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+
+  background: oklch(from var(--surface-1) l c h / 0.75);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-2);
+
+  animation: card-in var(--dur-med) var(--ease-out);
+}
+
+@keyframes card-in {
+  from {
+    translate: -50% calc(-50% + 0.75rem);
+    opacity: 0;
+  }
+}
+
+.title {
+  margin-block-end: 1.5rem;
+  font-size: 1.25rem;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 1.5rem 2.5rem;
+}
+
+.section {
+  min-inline-size: 0;
+}
+
+.sectionTitle {
+  margin-block-end: 0.5rem;
+
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+
+  padding-block: 0.4rem;
+  border-block-end: 1px solid var(--border);
+}
+
+.row:last-child {
+  border-block-end: none;
+}
+
+.label {
+  font-size: 0.8125rem;
+  color: var(--fg-faint);
+}
+
+.value {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--fg);
+  text-align: end;
+}
+
+.footer {
+  margin-block-start: 1.5rem;
+  font-size: 0.8125rem;
+  color: var(--fg-faint);
+}
+
+.key {
+  display: inline-grid;
+  place-items: center;
+
+  min-inline-size: 1.6rem;
+  block-size: 1.6rem;
+  padding-inline: 0.4rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-s);
+
+  font-size: 0.6875rem;
+  vertical-align: middle;
+
+  background: var(--surface-2);
+  box-shadow: var(--shadow-1);
+}

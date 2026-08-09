@@ -52,6 +52,7 @@ pub fn run() {
             mpv::commands::mpv_select_track,
             mpv::commands::mpv_set_rect,
             mpv::commands::mpv_run_command,
+            mpv::commands::mpv_stats,
             mpv::commands::mpv_destroy
         ])
         .setup(|app| {

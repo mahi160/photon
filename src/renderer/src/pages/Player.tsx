@@ -22,6 +22,7 @@ import { useAutoHideControls } from '../hooks/useAutoHideControls'
 import { useWakeLock } from '../hooks/useWakeLock'
 import { queryKeys } from '../lib/queryKeys'
 import { ShortcutsOverlay } from './Shortcuts'
+import { PlaybackInfoOverlay } from './PlaybackInfo'
 import { PipOverlay } from '../components/PipOverlay'
 import styles from './Player.module.css'
 
@@ -62,6 +63,7 @@ export function Player(): React.JSX.Element {
   }, [])
   // AppLayout owns '?' + overlay elsewhere, but player route is chrome-free (outside AppLayout) -- needs its own copy to discover shortcuts while watching
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  const [infoOpen, setInfoOpen] = useState(false)
 
   // Native OS window fullscreen (Tauri's set_fullscreen), not DOM Fullscreen API -- WebKit presents the fullscreen element in a separate window/layer the mpv NSView (composited under the original window, engine.rs) never gets carried into, showing no video and desyncing clicks. Native window fullscreen keeps everything in the same NSWindow so mpv keeps compositing correctly.
   const [fullscreen, setFullscreen] = useState(false)
@@ -234,7 +236,10 @@ export function Player(): React.JSX.Element {
         if (!e.repeat) engine.runCommand(['screenshot'])
       },
       '?': () => setShortcutsOpen((v) => !v),
-      'shift+?': () => setShortcutsOpen((v) => !v)
+      'shift+?': () => setShortcutsOpen((v) => !v),
+      i: (e) => {
+        if (!e.repeat) setInfoOpen((v) => !v)
+      }
     },
     { ignoreFocusGuard: true }
   )
@@ -389,6 +394,19 @@ export function Player(): React.JSX.Element {
       )}
       {toast && <div className={styles.toast}>{toast}</div>}
       <ShortcutsOverlay open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      {session && (
+        <PlaybackInfoOverlay
+          open={infoOpen}
+          onClose={() => setInfoOpen(false)}
+          mediaSource={session.mediaSource}
+          audioStream={session.audioStreams.find(
+            (s) => s.Index === (player.audioIndex ?? session.mediaSource.DefaultAudioStreamIndex)
+          )}
+          subtitleStream={session.subtitleStreams.find((s) => s.Index === player.subtitleIndex)}
+          playMethod={session.playMethod}
+          getStats={engine.getStats}
+        />
+      )}
     </div>
   )
 }
