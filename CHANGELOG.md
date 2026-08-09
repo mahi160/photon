@@ -1,3 +1,10 @@
+# [2.0.0-pre.12](https://github.com/mahi160/photon/compare/v2.0.0-pre.11...v2.0.0-pre.12) (2026-08-09)
+
+
+### Features
+
+* **playback-info:** add Playback Info overlay panel with live mpv stats ([ea5e157](https://github.com/mahi160/photon/commit/ea5e157a831b092a367d0a2f09229fcfc07f8ccf)), closes [#49](https://github.com/mahi160/photon/issues/49)
+
 # [2.0.0-pre.11](https://github.com/mahi160/photon/compare/v2.0.0-pre.10...v2.0.0-pre.11) (2026-08-09)
 
 
