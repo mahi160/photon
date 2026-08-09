@@ -1,3 +1,30 @@
+# [2.0.0-pre.12](https://github.com/mahi160/photon/compare/v2.0.0-pre.11...v2.0.0-pre.12) (2026-08-09)
+
+
+### Bug Fixes
+
+* **release:** disable semantic-release's github issue/PR success comments ([a87976b](https://github.com/mahi160/photon/commit/a87976bbf93ff84b9570452d0575759432ef5af2))
+* **release:** sync-tauri-version no-op when target version already matches ([cae512d](https://github.com/mahi160/photon/commit/cae512d476c60f1041918da2941300f1ac3fc357))
+
+
+### Features
+
+* **playback-info:** add Playback Info overlay panel with live mpv stats ([ea5e157](https://github.com/mahi160/photon/commit/ea5e157a831b092a367d0a2f09229fcfc07f8ccf)), closes [#49](https://github.com/mahi160/photon/issues/49)
+
+# [2.0.0-pre.12](https://github.com/mahi160/photon/compare/v2.0.0-pre.11...v2.0.0-pre.12) (2026-08-09)
+
+
+### Features
+
+* **playback-info:** add Playback Info overlay panel with live mpv stats ([ea5e157](https://github.com/mahi160/photon/commit/ea5e157a831b092a367d0a2f09229fcfc07f8ccf)), closes [#49](https://github.com/mahi160/photon/issues/49)
+
+# [2.0.0-pre.11](https://github.com/mahi160/photon/compare/v2.0.0-pre.10...v2.0.0-pre.11) (2026-08-09)
+
+
+### Bug Fixes
+
+* **mpv:** scale child-window rect to physical px on HiDPI Windows ([e14627c](https://github.com/mahi160/photon/commit/e14627c1a6a2e9e98a849f2d36c96823712cb4a8)), closes [#45](https://github.com/mahi160/photon/issues/45)
+
 # [2.0.0-pre.10](https://github.com/mahi160/photon/compare/v2.0.0-pre.9...v2.0.0-pre.10) (2026-08-06)
 
 
