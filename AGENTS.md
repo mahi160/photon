@@ -147,6 +147,17 @@ Homebrew's GPL build, same as local dev; Windows/Linux similarly link a full
 GPL build in CI) — which also means the shipped `.deb`/`.rpm` link a GPL
 libmpv into an MIT app. That's ADR-0004's job to fix and it is not done.
 
+Until that vendoring lands, macOS also doesn't bundle `libmpv` into
+`Photon.app` — the shipped binary's dyld load command is an absolute path
+into whatever Homebrew Cellar built it on CI, so a Mac without a matching
+`brew install mpv` fails at launch with `Library not loaded:
+.../libmpv.2.dylib` (`Termination Reason: DYLD ... Library missing`). The
+`mahi160/homebrew-photon` cask has `depends_on formula: "mpv"` so `brew
+install --cask` pulls it in automatically; the `.dmg` on Releases has no such
+mechanism, so README's Install section tells `.dmg` users to `brew install
+mpv` themselves. Both go away once ADR-0004's vendored build is bundled with
+its own `@rpath`.
+
 ## macOS Gatekeeper note
 
 Photon's macOS build is ad-hoc signed, not notarized (requires paid Apple

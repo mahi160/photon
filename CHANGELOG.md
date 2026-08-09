@@ -1,3 +1,52 @@
+# [2.0.0-pre.10](https://github.com/mahi160/photon/compare/v2.0.0-pre.9...v2.0.0-pre.10) (2026-08-06)
+
+
+### Bug Fixes
+
+* **playback:** close mpv/jellyfin audit findings ([0d39ed7](https://github.com/mahi160/photon/commit/0d39ed7712e3b5b332abc41228f69f240ede8be0))
+
+# [2.0.0-pre.9](https://github.com/mahi160/photon/compare/v2.0.0-pre.8...v2.0.0-pre.9) (2026-08-06)
+
+
+### Features
+
+* **api:** jellyfin v12 auth compat – apikey casing, device= hostname ([cf4f06e](https://github.com/mahi160/photon/commit/cf4f06e602ef895ad02cac7b056f744785f315f9))
+
+# [2.0.0-pre.8](https://github.com/mahi160/photon/compare/v2.0.0-pre.7...v2.0.0-pre.8) (2026-08-06)
+
+
+### Bug Fixes
+
+* **auth:** warn when the entered Jellyfin server is plain HTTP ([cd547b6](https://github.com/mahi160/photon/commit/cd547b650fda0467cddd40fc08e719247318cda3))
+* **commands:** surface fullscreen toggle failures instead of swallowing them ([b896c6a](https://github.com/mahi160/photon/commit/b896c6a099524ff04afe14d484028c87ed39d6b1))
+* **linux:** composite mpv into a GtkGLArea under the webview ([6c468b1](https://github.com/mahi160/photon/commit/6c468b19f35cefb3e13eefcc1ab4bd353d0a817d))
+* **linux:** make the GtkGLArea video surface correct under real GTK ([5027e68](https://github.com/mahi160/photon/commit/5027e680ed2fe21f75d82179c3cbbb3c41d629bf))
+* **mpv:** clean up clippy warnings-as-errors failures ([a0b3fee](https://github.com/mahi160/photon/commit/a0b3fee95755b8e7c785b6cce62842542a4af5e7))
+* **mpv:** consume frames while hidden and report swaps back to mpv ([3900fa1](https://github.com/mahi160/photon/commit/3900fa1c351487021e443ba6a69a7768e2444986))
+* **mpv:** fix x11 and wayland display handling ([66402a9](https://github.com/mahi160/photon/commit/66402a9dfc05a074eff7e175e3f55ba0d07913da))
+* **mpv:** keep the screen awake and surface mpv's own diagnostics ([8b7b065](https://github.com/mahi160/photon/commit/8b7b065769ef2ea1006db1d24c8a0495082c7c33))
+* **mpv:** log failures setting built-in mpv options ([3748505](https://github.com/mahi160/photon/commit/37485052f58bcac62943ff713f01f41080eaadee))
+* **mpv:** stop CPU HDR tonemap from running on the GPU render path ([91e34c6](https://github.com/mahi160/photon/commit/91e34c6475ca53de5edb1bde25450d3f67829112))
+* **pip:** stop leaking Jellyfin token via spawned mpv argv ([6f92010](https://github.com/mahi160/photon/commit/6f92010da66ac0a19bcee7ad426741d8102fad57))
+* **player:** guard arrow-key seek against OS key-repeat ([bc09eb1](https://github.com/mahi160/photon/commit/bc09eb1de147644872fcb980b8cb57e5bff4ed10))
+* **player:** keep loading backdrop opaque until first mpv frame ([3ab229d](https://github.com/mahi160/photon/commit/3ab229de02b0933141c67545f1589b04a2276a37)), closes [#0e0e10](https://github.com/mahi160/photon/issues/0e0e10) [#0e0e10](https://github.com/mahi160/photon/issues/0e0e10)
+* **player:** loosen DeviceProfile to match what mpv can actually decode ([d0c4bce](https://github.com/mahi160/photon/commit/d0c4bce7398240aded767d30e8cfc177549b32a5))
+* **player:** restore missing PlayerEngineApi.runCommand ([a3b4c34](https://github.com/mahi160/photon/commit/a3b4c340a483fbd86d2bd192171993c381614c8c))
+* **player:** serialize playback reporting, await stop before autoplay-next ([743c782](https://github.com/mahi160/photon/commit/743c782249dc313bb7a36651d4856b8ac4dbd62d))
+* **player:** stop fullscreen toggle from double-firing the native call ([c7410c2](https://github.com/mahi160/photon/commit/c7410c2ada588861c6045c0e1f2aff920878ae0e))
+
+
+### Features
+
+* **mpv:** add wayland render backend for linux (issue [#27](https://github.com/mahi160/photon/issues/27)) ([a363244](https://github.com/mahi160/photon/commit/a36324464bace2ae6531d42b828935a4888a0c32))
+* **player:** add run_command handler for generic mpv commands ([f471efe](https://github.com/mahi160/photon/commit/f471efea7c57393ecdd19cfa91db338cd5ef2ff5))
+* **player:** pick the best MediaSource instead of always the first ([bd829e1](https://github.com/mahi160/photon/commit/bd829e13b8171c13be0ed7f9c54d397aedc6458d))
+
+
+### Performance Improvements
+
+* **player:** lazy-load external subtitles on selection, not all at load ([699d943](https://github.com/mahi160/photon/commit/699d943755e1635b4355825c68011ba4f588d146))
+
 # [2.0.0-pre.7](https://github.com/mahi160/photon/compare/v2.0.0-pre.6...v2.0.0-pre.7) (2026-08-04)
 
 
