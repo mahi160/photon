@@ -1,3 +1,13 @@
+# [2.0.0-pre.13](https://github.com/mahi160/photon/compare/v2.0.0-pre.12...v2.0.0-pre.13) (2026-08-09)
+
+
+### Bug Fixes
+
+* **macos:** bundle libmpv into Photon.app instead of linking Homebrew's ([dab73b4](https://github.com/mahi160/photon/commit/dab73b4c997c928d71cb0395024231e59b84d208))
+* **release:** disable semantic-release's github issue/PR success comments ([2b87c37](https://github.com/mahi160/photon/commit/2b87c379fe20730c6620d5cae9b36b2eca7d61ab))
+* **release:** sync-tauri-version no-op when target version already matches ([b38ee19](https://github.com/mahi160/photon/commit/b38ee191ced3ff886c3cde2ce7698fdbd6527784))
+* **windows:** ship libmpv-2.dll alongside the installed exe ([df92384](https://github.com/mahi160/photon/commit/df92384b815ba2f7edffe4b0d001e83efdb9d1fb))
+
 # [2.0.0-pre.12](https://github.com/mahi160/photon/compare/v2.0.0-pre.11...v2.0.0-pre.12) (2026-08-09)
 
 
