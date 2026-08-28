@@ -1,4 +1,6 @@
 .layer {
+  user-select: none;
+
   position: absolute;
   inset: 0;
 
@@ -6,11 +8,17 @@
   flex-direction: column;
   justify-content: space-between;
 
-  transition: opacity var(--dur-med) var(--ease);
+  transition:
+    opacity var(--dur-med) var(--ease),
+    visibility 0s var(--dur-med);
 }
 
+/* visibility (not just opacity) drops this layer out of compositing --
+   .dock::before's backdrop-filter blur would otherwise stay live over the
+   decoded video surface for the entire film even while invisible (#23) */
 .hidden {
   pointer-events: none;
+  visibility: hidden;
   opacity: 0;
 }
 
@@ -25,7 +33,7 @@
      `visible` state as this whole layer, see Player.tsx). */
   padding-block: var(--titlebar-clearance) 1.25rem;
   padding-inline: 1.5rem;
-  background: linear-gradient(to bottom, oklch(from black l c h / 65%), transparent);
+  background: linear-gradient(to bottom, oklch(from black l c h / 0.65), transparent);
 }
 
 .topBar {
@@ -52,7 +60,7 @@
   block-size: 2.5rem;
   border-radius: var(--radius-full);
 
-  color: oklch(from white l c h / 85%);
+  color: oklch(from white l c h / 0.85);
 
   transition:
     color var(--dur-fast) var(--ease),
@@ -63,7 +71,7 @@
 .iconBtn:hover {
   transform: scale(1.06);
   color: white;
-  background: oklch(from white l c h / 14%);
+  background: oklch(from white l c h / 0.14);
 }
 
 .iconBtn:active {
@@ -91,7 +99,7 @@
   font-weight: 600;
   color: white;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 8px oklch(from black l c h / 60%);
+  text-shadow: 0 1px 8px oklch(from black l c h / 0.6);
   white-space: nowrap;
 }
 
@@ -100,9 +108,9 @@
 
   font-family: var(--font-mono);
   font-size: 0.75rem;
-  color: oklch(from white l c h / 55%);
+  color: oklch(from white l c h / 0.55);
   text-overflow: ellipsis;
-  text-shadow: 0 1px 8px oklch(from black l c h / 60%);
+  text-shadow: 0 1px 8px oklch(from black l c h / 0.6);
   white-space: nowrap;
 }
 
@@ -140,19 +148,19 @@
 
 .methodDot[data-method='direct'] {
   background: var(--success);
-  box-shadow: 0 0 6px oklch(from var(--success) l c h / 70%);
+  box-shadow: 0 0 6px oklch(from var(--success) l c h / 0.7);
 }
 
 .methodDot[data-method='transcode'] {
   background: var(--warning);
-  box-shadow: 0 0 6px oklch(from var(--warning) l c h / 70%);
+  box-shadow: 0 0 6px oklch(from var(--warning) l c h / 0.7);
 }
 
 .clock {
   font-family: var(--font-mono);
   font-size: 1.05rem;
-  color: oklch(from white l c h / 75%);
-  text-shadow: 0 1px 8px oklch(from black l c h / 60%);
+  color: oklch(from white l c h / 0.75);
+  text-shadow: 0 1px 8px oklch(from black l c h / 0.6);
 }
 
 .spinner {
@@ -160,7 +168,7 @@
 
   inline-size: 0.9rem;
   block-size: 0.9rem;
-  border: 2px solid oklch(from white l c h / 25%);
+  border: 2px solid oklch(from white l c h / 0.25);
   border-block-start-color: var(--accent);
   border-radius: var(--radius-full);
 
@@ -194,7 +202,7 @@
 
   color: white;
 
-  background: oklch(from black l c h / 55%);
+  background: oklch(from black l c h / 0.55);
 
   animation: pulse-pop 560ms var(--ease) forwards;
 }
@@ -238,8 +246,8 @@
 
   background: linear-gradient(
     to top,
-    oklch(from black l c h / 78%),
-    oklch(from black l c h / 45%) 55%,
+    oklch(from black l c h / 0.78),
+    oklch(from black l c h / 0.45) 55%,
     transparent
   );
 
@@ -295,7 +303,7 @@
   align-items: center;
 
   padding: 0.4rem 0.75rem;
-  border: 1px solid oklch(from white l c h / 18%);
+  border: 1px solid oklch(from white l c h / 0.18);
   border-radius: var(--radius-s);
 
   font-family: var(--font-mono);
@@ -303,7 +311,7 @@
   color: white;
   white-space: nowrap;
 
-  background: oklch(from black l c h / 55%);
+  background: oklch(from black l c h / 0.55);
   backdrop-filter: blur(14px);
   box-shadow: var(--shadow-2);
 }
@@ -347,7 +355,7 @@
   block-size: 0.2rem;
   border-radius: var(--radius-full);
 
-  background: oklch(from white l c h / 65%);
+  background: oklch(from white l c h / 0.65);
 }
 
 /* signature: the timeline is a beam of light. Layered backgrounds — played
@@ -370,11 +378,11 @@
   background:
     var(--beam) 0 0 / var(--pct, 0%) 100% no-repeat,
     linear-gradient(
-        oklch(from white l c h / 22%),
-        oklch(from white l c h / 22%)
+        oklch(from white l c h / 0.22),
+        oklch(from white l c h / 0.22)
       )
       0 0 / var(--buf, 0%) 100% no-repeat,
-    oklch(from white l c h / 13%);
+    oklch(from white l c h / 0.13);
 
   transition: block-size var(--dur-fast) var(--ease);
 }
@@ -392,8 +400,8 @@
   appearance: none;
   background: white;
   box-shadow:
-    0 0 0 3px oklch(from var(--accent) l c h / 40%),
-    0 0 8px 1px oklch(from var(--accent) l c h / 75%);
+    0 0 0 3px oklch(from var(--accent) l c h / 0.4),
+    0 0 8px 1px oklch(from var(--accent) l c h / 0.75);
 
   transition: transform var(--dur-fast) var(--ease);
 }
@@ -438,15 +446,17 @@
   opacity: 0;
   background:
     linear-gradient(white, white) 0 0 / var(--vol, 100%) 100% no-repeat,
-    oklch(from white l c h / 15%);
+    oklch(from white l c h / 0.15);
 
   transition:
     inline-size var(--dur-med) var(--ease),
     opacity var(--dur-med) var(--ease);
 }
 
-.volumeGroup:hover .volume,
-.volumeGroup:focus-within .volume {
+/* revealed on hovering the whole controls row, not just the button (#19) --
+   you're already hovering the dock by the time you care what the level is */
+.controlsRow:hover .volume,
+.controlsRow:focus-within .volume {
   inline-size: 5rem;
   margin-inline-end: 0.5rem;
   opacity: 1;
@@ -464,7 +474,7 @@
 .time {
   font-family: var(--font-mono);
   font-size: 0.875rem;
-  color: oklch(from white l c h / 85%);
+  color: oklch(from white l c h / 0.85);
   white-space: nowrap;
 }
 
@@ -473,7 +483,7 @@
 
   font-family: var(--font-mono);
   font-size: 0.8125rem;
-  color: oklch(from white l c h / 50%);
+  color: oklch(from white l c h / 0.5);
   white-space: nowrap;
 }
 
@@ -533,13 +543,13 @@
 .menuItem:hover,
 .menuItem[data-highlighted] {
   color: var(--player-fg);
-  background: oklch(from white l c h / 10%);
+  background: oklch(from white l c h / 0.1);
 }
 
 .menuItemActive,
 .menuItem[data-selected] {
   color: var(--accent);
-  background: oklch(from var(--accent) l c h / 14%);
+  background: oklch(from var(--accent) l c h / 0.14);
 }
 
 /* subtitle sync popover — everything on one centered axis */
@@ -571,7 +581,7 @@
 .syncHint {
   font-family: var(--font-mono);
   font-size: 0.625rem;
-  color: oklch(from white l c h / 35%);
+  color: oklch(from white l c h / 0.35);
 }
 
 .stepperGroup {
@@ -593,13 +603,13 @@
   font-size: 1rem;
   color: var(--player-fg);
 
-  background: oklch(from white l c h / 6%);
+  background: oklch(from white l c h / 0.06);
 
   transition: background-color var(--dur-fast) var(--ease);
 }
 
 .stepBtn:hover {
-  background: oklch(from white l c h / 12%);
+  background: oklch(from white l c h / 0.12);
 }
 
 .stepBtn:disabled {
@@ -618,7 +628,7 @@
   color: var(--player-fg);
   text-align: center;
 
-  background: oklch(from white l c h / 6%);
+  background: oklch(from white l c h / 0.06);
 }
 
 .stepInput:disabled {
@@ -744,5 +754,5 @@
 }
 
 .nextUpDismiss:hover {
-  background: oklch(from white l c h / 10%);
+  background: oklch(from white l c h / 0.1);
 }

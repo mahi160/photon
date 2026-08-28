@@ -1,20 +1,12 @@
 import { useMemo, useState } from 'react'
 import { ticksToSeconds, trickplayTile, trickplayUrl, type BaseItem } from '../lib/jellyfin'
+import { hms as fmt } from '../lib/format'
+import { Tip } from './Tip'
 import styles from './PlayerControls.module.css'
 
 interface Chapter {
   start: number
   name: string | undefined
-}
-
-function fmt(s: number): string {
-  if (!isFinite(s) || s < 0) return '0:00'
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  const sec = Math.floor(s % 60)
-  return h > 0
-    ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
-    : `${m}:${String(sec).padStart(2, '0')}`
 }
 
 export interface TimelinePreviewProps {
@@ -34,6 +26,14 @@ export function TimelinePreview({
 }: TimelinePreviewProps): React.JSX.Element {
   const [preview, setPreview] = useState<{ x: number; t: number } | null>(null)
   const [showRemaining, setShowRemaining] = useState(false)
+  // local override while dragging/keying the thumb -- controlled value={currentTime} otherwise
+  // fights the drag: engine seek latency means the next render can still show the pre-seek
+  // time, snapping the thumb backward mid-drag (#10). Committed (onSeek) only on release.
+  const [scrub, setScrub] = useState<number | null>(null)
+  const commitScrub = (): void => {
+    if (scrub !== null) onSeek(scrub)
+    setScrub(null)
+  }
 
   // server trickplay thumbs (Jellyfin 10.9+), absent -> text-only bubble
   // ponytail: first media source, smallest width variant -- hover thumb doesn't need large tiles
@@ -102,10 +102,17 @@ export function TimelinePreview({
           min={0}
           max={duration || 0}
           step={1}
-          value={Math.min(currentTime, duration || 0)}
-          onChange={(e) => onSeek(Number(e.target.value))}
+          value={scrub ?? Math.min(currentTime, duration || 0)}
+          onChange={(e) => setScrub(Number(e.target.value))}
+          onPointerUp={commitScrub}
+          onKeyUp={commitScrub}
           className={styles.timeline}
-          style={{ '--pct': pct, '--buf': buf } as React.CSSProperties}
+          style={
+            {
+              '--pct': scrub !== null ? `${Math.min(100, (scrub / (duration || 1)) * 100)}%` : pct,
+              '--buf': buf
+            } as React.CSSProperties
+          }
           aria-label="Timeline"
           tabIndex={-1}
         />
@@ -117,16 +124,11 @@ export function TimelinePreview({
           />
         ))}
       </div>
-      <span
-        className={styles.time}
-        title="Right-click to toggle remaining"
-        onContextMenu={(e) => {
-          e.preventDefault()
-          setShowRemaining((v) => !v)
-        }}
-      >
-        {showRemaining ? `-${fmt(duration - currentTime)}` : fmt(duration)}
-      </span>
+      <Tip label="Toggle remaining">
+        <button className={styles.time} onClick={() => setShowRemaining((v) => !v)}>
+          {showRemaining ? `-${fmt(duration - currentTime)}` : fmt(duration)}
+        </button>
+      </Tip>
     </div>
   )
 }

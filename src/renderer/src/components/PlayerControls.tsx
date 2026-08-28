@@ -146,18 +146,17 @@ export function PlayerControls(p: Props): React.JSX.Element {
                 </span>
               ))}
               {p.playMethod !== 'DirectPlay' && (
-                <span className={styles.methodBadge} title="Converted by the server">
-                  <span className={styles.methodDot} data-method="transcode" />
-                  transcode
-                </span>
+                <Tip label="Converted by the server">
+                  <span className={styles.methodBadge}>
+                    <span className={styles.methodDot} data-method="transcode" />
+                    transcode
+                  </span>
+                </Tip>
               )}
               {p.cpuFallback && (
-                <span
-                  className={styles.methodBadge}
-                  title="GPU rendering unavailable on this machine -- playing back via the slower CPU path"
-                >
-                  CPU
-                </span>
+                <Tip label="GPU rendering unavailable on this machine -- playing back via the slower CPU path">
+                  <span className={styles.methodBadge}>CPU</span>
+                </Tip>
               )}
               <span className={styles.clock}>
                 {new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
@@ -166,7 +165,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
           </div>
         </div>
 
-        <div className={styles.dock} onWheel={(e) => p.onVolumeStep(e.deltaY < 0 ? 0.05 : -0.05)}>
+        <div className={styles.dock}>
           <div className={styles.dockInner}>
             <TimelinePreview
               item={p.item}

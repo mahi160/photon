@@ -19,12 +19,7 @@ export function SkipSegmentButton({
   onSkip: () => void
 }): React.JSX.Element {
   return (
-    <button
-      className={styles.skipSegment}
-      onClick={onSkip}
-      onMouseDown={noFocusOnClick}
-      tabIndex={-1}
-    >
+    <button className={styles.skipSegment} onClick={onSkip} onMouseDown={noFocusOnClick}>
       {labels[segment.Type]}
     </button>
   )

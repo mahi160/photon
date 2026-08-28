@@ -1,10 +1,6 @@
 /* fluid by default — grids size cards via their cells; horizontal rows pin
    a fixed basis on track children instead (Row.module.css) */
 .card {
-  /* skip layout/paint for off-screen cards — large libraries / long rows
-     mount hundreds of these; this is free for the ones already visible */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 280px;
   position: relative;
   flex-shrink: 0;
 }
@@ -78,6 +74,10 @@
   transition:
     box-shadow var(--dur-med) var(--ease),
     translate var(--dur-med) var(--ease);
+
+  /* shared-element morph into DetailsPoster on click (#34) -- @supports guard
+     not needed, engines without view-transition-name just ignore the property */
+  view-transition-name: var(--vt, none);
 }
 
 .poster.wide {
@@ -93,9 +93,9 @@
 .image {
   inline-size: 100%;
   block-size: 100%;
-  object-fit: cover;
 
   opacity: 0;
+  object-fit: cover;
 
   transition:
     opacity var(--dur-med) var(--ease),
@@ -134,6 +134,7 @@
   block-size: 1.75rem;
 
   color: var(--fg-faint);
+
   opacity: 0.7;
 }
 
@@ -219,7 +220,7 @@
 
   block-size: 0.2rem;
 
-  background: oklch(from black l c h / 45%);
+  background: oklch(from black l c h / 0.45);
 }
 
 /* signature: the beam marks how far the light got */
@@ -267,14 +268,14 @@
 .subtitleLink {
   overflow: hidden;
   display: block;
-  inline-size: 100%;
 
+  inline-size: 100%;
   margin-block-start: 0.15rem;
-  text-align: start;
 
   font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--fg-faint);
+  text-align: start;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

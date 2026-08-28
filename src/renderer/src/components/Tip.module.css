@@ -16,7 +16,7 @@
   color: white;
   white-space: nowrap;
 
-  background: oklch(from black l c h / 78%);
+  background: oklch(from black l c h / 0.78);
   backdrop-filter: blur(12px);
 
   animation: tip-in var(--dur-fast) var(--ease-out);
@@ -24,12 +24,12 @@
 
 .kbd {
   padding-inline: 0.3rem;
-  border: 1px solid oklch(from white l c h / 25%);
+  border: 1px solid oklch(from white l c h / 0.25);
   border-radius: 0.25rem;
 
   font-size: 0.625rem;
   line-height: 1.5;
-  color: oklch(from white l c h / 65%);
+  color: oklch(from white l c h / 0.65);
 }
 
 @keyframes tip-in {

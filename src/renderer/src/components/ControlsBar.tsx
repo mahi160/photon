@@ -305,13 +305,15 @@ export function ControlsBar({
   onPiP
 }: ControlsBarProps): React.JSX.Element {
   return (
-    <div className={styles.controlsRow}>
+    // wheel-to-volume scoped to the controls row, not the whole dock -- scrolling
+    // over the timeline (a sibling of this row, see PlayerControls.tsx) must scrub
+    // chapters/time, never volume (#2)
+    <div className={styles.controlsRow} onWheel={(e) => onVolumeStep(e.deltaY < 0 ? 0.05 : -0.05)}>
       <Tip label={state === 'playing' ? 'Pause' : 'Play'} kbd="Space">
         <button
           className={styles.playBtn}
           onClick={onTogglePlay}
           onMouseDown={noFocusOnClick}
-          tabIndex={-1}
           aria-label="Play or pause"
         >
           {state === 'playing' ? (
@@ -328,7 +330,6 @@ export function ControlsBar({
             className={styles.iconBtn}
             onClick={onPlayNext}
             onMouseDown={noFocusOnClick}
-            tabIndex={-1}
             aria-label="Next episode"
           >
             <ForwardStep weight="Filled" className={styles.icon} />
@@ -342,7 +343,6 @@ export function ControlsBar({
             className={styles.iconBtn}
             onClick={onMute}
             onMouseDown={noFocusOnClick}
-            tabIndex={-1}
             aria-label="Mute"
           >
             {muted || volume === 0 ? (
@@ -362,8 +362,6 @@ export function ControlsBar({
           className={styles.volume}
           style={{ '--vol': `${(muted ? 0 : volume) * 100}%` } as React.CSSProperties}
           aria-label="Volume"
-          tabIndex={-1}
-          onWheel={(e) => onVolumeStep(e.deltaY < 0 ? 0.05 : -0.05)}
         />
       </div>
 
