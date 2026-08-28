@@ -74,19 +74,6 @@
   color: var(--fg-faint);
 }
 
-.retry {
-  color: var(--accent);
-}
-
-.retry:hover {
-  text-decoration: underline;
-}
-
-.grid {
-  /* sizing/positioning only — the virtualizer absolutely positions each
-     .gridRow inside this, JS sets its total block-size */
-}
-
 /* loading only — unvirtualized, so it must mirror the real grid's own
    sizing (a plain minmax/auto-fill, not the virtualizer's per-row column
    count, which needs a measured container it doesn't have yet) */
@@ -99,6 +86,7 @@
 .gridRow {
   display: grid;
   gap: 1rem;
+
   /* row gap folded into padding, not CSS grid's row-gap: each row is its
      own absolutely-positioned element, so the virtualizer's measured
      height has to include the gap for its translateY math to stack right */
