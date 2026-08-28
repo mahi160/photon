@@ -47,6 +47,11 @@ export interface PlaybackApi {
   changeRate: (rate: number) => void
   playItem: (item: BaseItem) => Promise<void>
   retry: () => void
+  // film/last-episode ended with nothing to autoplay -- "Finished" beat (#44) instead of the
+  // hard cut to Home the app used to do (handleEnded's old unconditional navigate)
+  finished: boolean
+  watchAgain: () => void
+  goHome: () => void
 }
 
 export async function resolvePlayable(item: BaseItem): Promise<BaseItem> {
@@ -110,6 +115,8 @@ export function usePlayback(
   const [session, setSession] = useState<PlaybackSession | null>(null)
   const sessionRef = useRef<PlaybackSession | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [finished, setFinished] = useState(false)
+  const finishedItemRef = useRef<BaseItem | null>(null)
   const [audioIndex, setAudioIndex] = useState<number | undefined>(undefined)
   const [subtitleDelay, setSubtitleDelay] = useState(0)
   // display state only — persistence lives in selectSubtitle below
@@ -303,8 +310,25 @@ export function usePlayback(
         return
       }
     }
+    // nothing to autoplay into -- "Finished" beat (Player.tsx) owns the countdown/redirect from here
+    if (prev) {
+      finishedItemRef.current = prev
+      setFinished(true)
+      return
+    }
     navigate({ to: '/' })
   }
+
+  const watchAgain = useCallback((): void => {
+    const replay = finishedItemRef.current
+    setFinished(false)
+    if (replay) void loadFor(replay, { startSeconds: 0 })
+  }, [loadFor])
+
+  const goHome = useCallback((): void => {
+    setFinished(false)
+    navigate({ to: '/' })
+  }, [navigate])
 
   const { start, audio, sub } = params
   useEffect(() => {
@@ -491,6 +515,9 @@ export function usePlayback(
     changeDelay,
     changeRate,
     playItem,
-    retry
+    retry,
+    finished,
+    watchAgain,
+    goHome
   }
 }
