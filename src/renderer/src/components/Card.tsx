@@ -1,10 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { Play, Clapperboard } from 'reicon-react'
 import { imageUrl, type BaseItem } from '../lib/jellyfin'
 import { FavoriteButton } from './FavoriteButton'
 import { WatchedButton } from './WatchedButton'
 import styles from './Card.module.css'
+
+// tracks which mounted Card instance owns a given item's shared view-transition name (see below)
+const claimedVtIds = new Set<string>()
 
 // Card semantics (CONTEXT.md): click card/hover-play = play, click title = details; episodes: title -> series, subtitle -> episode
 export function Card({
@@ -38,8 +41,21 @@ export function Card({
   const subtitle = isEpisode
     ? `S${item.ParentIndexNumber ?? '?'}:E${item.IndexNumber ?? '?'} - ${item.Name}`
     : (item.ProductionYear ?? '')
-  // shared-element transition: matches DetailsPoster's own view-transition-name for this item (#34)
-  const vt = `poster-${item.Id}`
+  // shared-element transition: matches DetailsPoster's own view-transition-name for this item (#34).
+  // Same item can render in two Home rows at once (Continue Watching + Recently Added) --
+  // a duplicate view-transition-name aborts the whole transition, so only the first-mounted
+  // Card for a given id claims it; others fall back to CSS's `var(--vt, none)` (#52)
+  const [ownsVt] = useState(() => {
+    if (claimedVtIds.has(item.Id)) return false
+    claimedVtIds.add(item.Id)
+    return true
+  })
+  useEffect(() => {
+    return () => {
+      if (ownsVt) claimedVtIds.delete(item.Id)
+    }
+  }, [item.Id, ownsVt])
+  const vt = ownsVt ? `poster-${item.Id}` : undefined
 
   return (
     <div className={`${styles.card} ${wide ? styles.wide : ''}`}>
@@ -52,7 +68,7 @@ export function Card({
         }}
         aria-label={`Play ${item.Name}`}
         className={`${styles.poster} ${wide ? styles.wide : ''}`}
-        style={{ '--vt': vt } as React.CSSProperties}
+        style={vt ? ({ '--vt': vt } as React.CSSProperties) : undefined}
       >
         {img ? (
           <img

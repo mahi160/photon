@@ -339,7 +339,13 @@ export function Player(): React.JSX.Element {
         }
       }}
       onDoubleClick={(e) => {
-        if (!(e.target as HTMLElement).closest('button,input,[role="menu"]')) toggleFullscreen()
+        // exclude interactive controls plus non-interactive overlay chrome (top bar,
+        // dock, next-up card) explicitly marked data-no-fullscreen -- narrower than
+        // "any non-button" so double-clicking the video area itself still works even
+        // when controls are visible (old target===stage||target===videoRef check
+        // missed that case entirely, since PlayerControls' own layer div covers it)
+        if (!(e.target as HTMLElement).closest('button,input,[role="menu"],[data-no-fullscreen]'))
+          toggleFullscreen()
       }}
       style={{ cursor: visible ? 'default' : 'none' }}
     >

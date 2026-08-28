@@ -22,7 +22,7 @@ export function NextUpCard({
   const autoplayNext = useSettings((s) => s.autoplayNext)
 
   return (
-    <div className={styles.nextUp}>
+    <div className={styles.nextUp} data-no-fullscreen>
       {imageUrl(nextEpisode, 320) && (
         <img
           src={imageUrl(nextEpisode, 320)!}

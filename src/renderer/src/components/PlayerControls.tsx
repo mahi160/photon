@@ -114,7 +114,8 @@ export function PlayerControls(p: Props): React.JSX.Element {
         )}
 
         {/* overlay title bar: traffic lights float over scrim, drag region moves window; Back button/badges auto-excluded (see drag.js) */}
-        <div className={styles.topScrim} data-tauri-drag-region>
+        {/* data-no-fullscreen: non-interactive chrome, excluded from Player's dblclick-fullscreen (#52) */}
+        <div className={styles.topScrim} data-tauri-drag-region data-no-fullscreen>
           <div className={styles.topBar}>
             <Tip label="Back">
               <button
@@ -165,7 +166,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
           </div>
         </div>
 
-        <div className={styles.dock}>
+        <div className={styles.dock} data-no-fullscreen>
           <div className={styles.dockInner}>
             <TimelinePreview
               item={p.item}
