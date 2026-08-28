@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Theme } from '../lib/theme'
-import type { SettingsSectionKey } from '../lib/settingsSections'
 
 interface SettingsState {
   // playback
@@ -27,7 +26,6 @@ interface SettingsState {
   // general
   theme: Theme
   customColors: Record<string, string> // CSS var name -> hex, overrides the active theme (see lib/theme.ts)
-  settingsSection: SettingsSectionKey // last-viewed Settings sidebar section, restored on reopen
   set: (partial: Partial<Omit<SettingsState, 'set'>>) => void
   reset: () => void
 }
@@ -50,17 +48,15 @@ const defaults: Omit<SettingsState, 'set' | 'reset'> = {
   subtitleBackgroundBox: false,
   mpvConfig: '',
   theme: 'gruvbox',
-  customColors: {},
-  settingsSection: 'general'
+  customColors: {}
 }
 
 export const useSettings = create<SettingsState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       ...defaults,
       set: (partial) => set(partial),
-      // reset restores preferences, not Settings UI position -- Danger Zone reset shouldn't bounce to General
-      reset: () => set({ ...defaults, settingsSection: get().settingsSection })
+      reset: () => set(defaults)
     }),
     { name: 'photon.settings' }
   )
