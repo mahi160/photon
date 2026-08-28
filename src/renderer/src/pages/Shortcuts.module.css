@@ -1,19 +1,22 @@
 /* Backdrop and Popup are siblings (base-ui), not parent/child — this only
-   dims the screen, .card centers itself independently via fixed+translate. */
+   dims the screen, .card centers itself independently via fixed+translate.
+   data-starting-style/data-ending-style (not an unconditional @keyframes) --
+   same pattern as PlaybackInfo.module.css -- so close animates instead of
+   vanishing instantly (#41). */
 .overlay {
   position: fixed;
   z-index: var(--z-overlay);
   inset: 0;
 
+  opacity: 1;
   background: var(--scrim);
 
-  animation: overlay-in var(--dur-med) var(--ease);
+  transition: opacity var(--dur-med) var(--ease);
 }
 
-@keyframes overlay-in {
-  from {
-    opacity: 0;
-  }
+.overlay[data-starting-style],
+.overlay[data-ending-style] {
+  opacity: 0;
 }
 
 .card {
@@ -31,17 +34,19 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-l);
 
+  opacity: 1;
   background: var(--surface-1);
   box-shadow: var(--shadow-2);
 
-  animation: card-in var(--dur-med) var(--ease-out);
+  transition:
+    opacity var(--dur-med) var(--ease-out),
+    translate var(--dur-med) var(--ease-out);
 }
 
-@keyframes card-in {
-  from {
-    translate: -50% calc(-50% + 0.75rem);
-    opacity: 0;
-  }
+.card[data-starting-style],
+.card[data-ending-style] {
+  translate: -50% calc(-50% + 0.75rem);
+  opacity: 0;
 }
 
 .title {
@@ -104,6 +109,13 @@
   display: flex;
   flex-shrink: 0;
   gap: 0.3rem;
+  align-items: center;
+}
+
+.keysGroup {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.4rem;
   align-items: center;
 }
 

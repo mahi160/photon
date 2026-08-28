@@ -157,14 +157,17 @@ export function PlaybackInfoOverlay({
                 <div className={styles.list}>
                   <Row label="Codec" value={subtitleStream.Codec?.toUpperCase()} />
                   <Row label="Language" value={subtitleStream.Language} />
-                  <Row label="Delivery" value={formatDeliveryMethod(subtitleStream.DeliveryMethod)} />
+                  <Row
+                    label="Delivery"
+                    value={formatDeliveryMethod(subtitleStream.DeliveryMethod)}
+                  />
                   <Row label="Forced" value={subtitleStream.IsForced ? 'Yes' : undefined} />
                 </div>
               </section>
             )}
 
             {stats && (
-              <section className={styles.section}>
+              <section className={`${styles.section} ${styles.mpvSection}`}>
                 <h2 className={styles.sectionTitle}>mpv</h2>
                 <div className={styles.list}>
                   <Row label="Hardware decoding" value={formatHwdec(stats.hwdecCurrent)} />

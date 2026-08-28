@@ -22,7 +22,9 @@ function Group({ title, items }: { title: string; items: BaseItem[] }): React.JS
   if (!items.length) return null
   return (
     <section className={styles.group}>
-      <h2 className={styles.groupTitle}>{title}</h2>
+      <h2 className={styles.groupTitle}>
+        {title} <span className={styles.groupCount}>{items.length}</span>
+      </h2>
       <div className={styles.grid}>
         {items.map((item) => (
           <Card key={item.Id} item={item} />
@@ -41,7 +43,9 @@ function EpisodeRow({ ep }: { ep: BaseItem }): React.JSX.Element {
       className={styles.epRow}
       onClick={() => navigate({ to: '/player/$itemId', params: { itemId: ep.Id } })}
     >
-      <div className={styles.epThumb}>{img && <img src={img} alt="" loading="lazy" />}</div>
+      <div className={styles.epThumb}>
+        {img && <img src={img} alt="" loading="lazy" decoding="async" />}
+      </div>
       <div className={styles.epInfo}>
         <div className={styles.epTitle}>{ep.Name}</div>
         <div className={styles.epSub}>{sub}</div>
@@ -60,20 +64,26 @@ export function Search(): React.JSX.Element {
   const addHistory = useSearchHistory((s) => s.add)
   const removeHistory = useSearchHistory((s) => s.remove)
   const clearHistory = useSearchHistory((s) => s.clear)
-  // longer, separate debounce than live search -- save once user actually stopped, not just paused mid-word
+  // longer, separate debounce than live search -- save once user actually stopped, not just
+  // paused mid-word. Gated on the term actually having a local match -- otherwise every
+  // zero-result typo gets saved to history too.
   const settled = useDebounced(q, 1000)
-  useEffect(() => {
-    if (settled.length >= 2) addHistory(settled)
-  }, [settled, addHistory])
 
-  // instant: local index of movies + shows (ADR-0001)
+  // instant: local index of movies + shows (ADR-0001) -- filters on the raw term, not the
+  // debounced one. filterLocal is a single pass over a few thousand strings, sub-millisecond;
+  // the 250ms debounce belonged to the server-side episode path only, not this (#8)
   const index = useQuery(searchIndexQuery)
   const local = useMemo(
-    () => (debounced.length >= 2 && index.data ? filterLocal(index.data, debounced) : []),
-    [index.data, debounced]
+    () => (q.length >= 2 && index.data ? filterLocal(index.data, q) : []),
+    [index.data, q]
   )
   const movies = local.filter((i) => i.Type === 'Movie')
   const shows = local.filter((i) => i.Type === 'Series')
+
+  useEffect(() => {
+    if (settled.length < 2 || !index.data) return
+    if (filterLocal(index.data, settled).length > 0) addHistory(settled)
+  }, [settled, index.data, addHistory])
 
   // episodes: server-side, debounced (ADR-0001)
   const episodes = useQuery(episodeSearchQuery(debounced))
@@ -83,12 +93,20 @@ export function Search(): React.JSX.Element {
   const noResults =
     hasQuery && !movies.length && !shows.length && !episodeItems.length && !episodes.isFetching
 
+  const navigate = useNavigate()
+
   return (
     <div className={styles.page}>
       <input
+        type="search"
         autoFocus
         value={term}
         onChange={(e) => setTerm(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return
+          const first = movies[0] ?? shows[0] ?? episodeItems[0]
+          if (first) navigate({ to: '/player/$itemId', params: { itemId: first.Id } })
+        }}
         placeholder="Search movies, shows, episodes…"
         spellCheck={false}
         className={styles.input}
