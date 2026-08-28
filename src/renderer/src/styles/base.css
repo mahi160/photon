@@ -14,9 +14,10 @@ body,
   block-size: 100%;
 }
 
+/* selectable by default; .shell/.layer (chrome, controls) opt back out of
+   text selection below -- was inverted (body:none, opt-in) which blocked
+   copying a Quick Connect code, an error message, an item overview (#14) */
 body {
-  user-select: none;
-
   margin: 0;
 
   font-family: var(--font-sans);
@@ -88,8 +89,10 @@ kbd {
   background: var(--accent);
 }
 
+/* outline follows the focused element's own border-radius already -- setting
+   one here applied to the element itself, not the outline, and only stayed
+   harmless by accident of CSS Modules' injection order (#43) */
 :focus-visible {
-  border-radius: var(--radius-s);
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -131,4 +134,13 @@ kbd {
 ::view-transition-new(root) {
   animation-duration: var(--dur-med);
   animation-timing-function: var(--ease-out);
+}
+
+/* dock/menus/login panel/tooltips/PlaybackInfo all lean on backdrop-filter over live content --
+   killing the blur (not the panel's own translucent background color) is a free perf win on weak
+   GPUs and respects the OS setting (#44) */
+@media (prefers-reduced-transparency: reduce) {
+  * {
+    backdrop-filter: none !important;
+  }
 }
