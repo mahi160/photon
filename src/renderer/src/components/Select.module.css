@@ -1,0 +1,73 @@
+/* One themed select for the whole app (#13) -- native <select> renders in OS
+   chrome (light-grey list on Gruvbox, ignores every token); this is styled
+   the same as the old .select native element it replaces. */
+.trigger {
+  overflow: hidden;
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  justify-content: space-between;
+
+  max-inline-size: 16rem;
+  padding-block: 0.45rem;
+  padding-inline: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+
+  font-size: 0.825rem;
+  text-overflow: ellipsis;
+
+  background: var(--surface-1);
+  outline: none;
+}
+
+.trigger:hover {
+  background: var(--surface-2);
+}
+
+.trigger:focus-visible {
+  border-color: var(--accent-border);
+}
+
+.value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.caret {
+  flex-shrink: 0;
+  inline-size: 0.7rem;
+  block-size: 0.7rem;
+  color: var(--fg-faint);
+}
+
+.popup {
+  overflow-y: auto;
+
+  min-inline-size: var(--anchor-width);
+  max-block-size: 20rem;
+  padding: 0.3rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-s);
+
+  background: var(--surface-1);
+  box-shadow: var(--shadow-2);
+}
+
+.item {
+  overflow: hidden;
+
+  padding-block: 0.4rem;
+  padding-inline: 0.6rem;
+  border-radius: calc(var(--radius-s) - 2px);
+
+  font-size: 0.825rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.item[data-highlighted] {
+  color: var(--fg);
+  background: var(--surface-2);
+}
