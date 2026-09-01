@@ -5,15 +5,18 @@
   z-index: var(--z-overlay);
   inset: 0;
 
+  opacity: 1;
   background: var(--scrim);
 
-  animation: overlay-in var(--dur-med) var(--ease);
+  transition: opacity var(--dur-med) var(--ease);
 }
 
-@keyframes overlay-in {
-  from {
-    opacity: 0;
-  }
+/* Base UI toggles these while open changes -- animating off them (not an unconditional @keyframes)
+   is what makes it wait for the transition to finish before unmounting, so close actually fades
+   instead of vanishing instantly. */
+.overlay[data-starting-style],
+.overlay[data-ending-style] {
+  opacity: 0;
 }
 
 .card {
@@ -31,18 +34,20 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-l);
 
+  opacity: 1;
   background: oklch(from var(--surface-1) l c h / 0.75);
   backdrop-filter: blur(20px);
   box-shadow: var(--shadow-2);
 
-  animation: card-in var(--dur-med) var(--ease-out);
+  transition:
+    opacity var(--dur-med) var(--ease-out),
+    translate var(--dur-med) var(--ease-out);
 }
 
-@keyframes card-in {
-  from {
-    translate: -50% calc(-50% + 0.75rem);
-    opacity: 0;
-  }
+.card[data-starting-style],
+.card[data-ending-style] {
+  translate: -50% calc(-50% + 0.75rem);
+  opacity: 0;
 }
 
 .title {
@@ -58,6 +63,26 @@
 
 .section {
   min-inline-size: 0;
+
+  /* mpv section mounts up to 1s after open (first stats poll) -- without this it just pops into
+     an existing row with no transition. Runs on every section, not just the late one, so General/
+     Video/Audio entering with the dialog get the same subtle rise instead of only mpv standing out. */
+  animation: section-in var(--dur-med) var(--ease-out) backwards;
+}
+
+@keyframes section-in {
+  from {
+    transform: translateY(0.5rem);
+    opacity: 0;
+  }
+}
+
+/* mpv is the one section with async, variable-length content (dropped frames etc. only exist
+   once mpv is actually running) -- row-major auto-fit was pairing it with a shorter, unrelated
+   section in the same grid row and leaving a lopsided gap under the short one. Full-width keeps
+   it out of that pairing regardless of column count. */
+.mpvSection {
+  grid-column: 1 / -1;
 }
 
 .sectionTitle {

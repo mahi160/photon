@@ -15,38 +15,7 @@
   block-size: 100%;
 }
 
-/* glass pill above the dock — transient hotkey/track feedback */
-.toast {
-  pointer-events: none;
-
-  position: absolute;
-  z-index: var(--z-toast);
-  inset-block-end: 9rem;
-  inset-inline-start: 50%;
-  transform: translateX(-50%);
-
-  padding-block: 0.45rem;
-  padding-inline: 0.9rem;
-  border: 1px solid var(--player-border);
-  border-radius: var(--radius-full);
-
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: white;
-
-  background: var(--player-glass-strong);
-  backdrop-filter: blur(16px);
-  box-shadow: var(--shadow-2);
-
-  animation: toast-in var(--dur-fast) var(--ease-out);
-}
-
-@keyframes toast-in {
-  from {
-    transform: translate(-50%, 0.4rem);
-    opacity: 0;
-  }
-}
+/* toast pill above the dock now lives in ToastHost.module.css (@base-ui/react/toast) */
 
 .errorLayer {
   position: absolute;
@@ -61,10 +30,10 @@
   background:
     radial-gradient(
       42rem 42rem at 50% 42%,
-      oklch(from var(--info) l c h / 7%),
+      oklch(from var(--info) l c h / 0.07),
       transparent 70%
     ),
-    oklch(from black l c h / 82%);
+    oklch(from black l c h / 0.82);
 }
 
 .errorText {
@@ -83,7 +52,7 @@
   color: var(--accent-fg);
 
   background: var(--accent);
-  box-shadow: 0 6px 20px -6px oklch(from var(--accent) l c h / 60%);
+  box-shadow: 0 6px 20px -6px oklch(from var(--accent) l c h / 0.6);
 
   transition: transform var(--dur-fast) var(--ease);
 }
@@ -94,12 +63,84 @@
 
 .errorBack {
   font-size: 0.875rem;
-  color: oklch(from white l c h / 45%);
+  color: oklch(from white l c h / 0.45);
   transition: color var(--dur-fast) var(--ease);
 }
 
 .errorBack:hover {
-  color: oklch(from white l c h / 75%);
+  color: oklch(from white l c h / 0.75);
+}
+
+/* "Finished" beat (#44) -- film/last-episode ended, nothing to autoplay into. Same glass-over-video
+   shape as .errorLayer, sits over the last frame instead of a hard cut straight to Home. */
+.finishedLayer {
+  position: absolute;
+  inset: 0;
+
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: center;
+
+  background:
+    radial-gradient(42rem 42rem at 50% 42%, oklch(from var(--accent) l c h / 0.07), transparent 70%),
+    oklch(from black l c h / 0.82);
+}
+
+.finishedTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--player-fg);
+}
+
+.finishedHint {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--player-fg-muted);
+}
+
+.finishedActions {
+  display: flex;
+  gap: 0.75rem;
+  margin-block-start: 0.5rem;
+}
+
+.finishedPrimary {
+  padding-block: 0.6rem;
+  padding-inline: 1.5rem;
+  border-radius: var(--radius-full);
+
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--accent-fg);
+
+  background: var(--accent);
+  box-shadow: 0 6px 20px -6px oklch(from var(--accent) l c h / 0.6);
+
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.finishedPrimary:hover {
+  transform: scale(1.04);
+}
+
+.finishedSecondary {
+  padding-block: 0.6rem;
+  padding-inline: 1.5rem;
+  border-radius: var(--radius-full);
+
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--player-fg);
+
+  background: oklch(from white l c h / 0.1);
+
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.finishedSecondary:hover {
+  background: oklch(from white l c h / 0.18);
 }
 
 /* shown while the session resolves / mpv attaches (ADR-0005: .stage stays
@@ -124,7 +165,7 @@
 .loadingSpinner {
   inline-size: 2rem;
   block-size: 2rem;
-  border: 3px solid oklch(from white l c h / 20%);
+  border: 3px solid oklch(from white l c h / 0.2);
   border-block-start-color: var(--accent);
   border-radius: var(--radius-full);
 

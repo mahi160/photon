@@ -1,14 +1,9 @@
 import { useState } from 'react'
 import { useWatchStats, dayKey, type DayStats } from '../stores/watchStats'
+import { humanDuration as fmtDur } from '../lib/format'
 import styles from './Settings.module.css'
 
 // Photon-local watch stats (see stores/watchStats.ts for what counts) -- read-only, no server round trips, all localStorage.
-
-function fmtDur(secs: number): string {
-  const h = Math.floor(secs / 3600)
-  const m = Math.round((secs % 3600) / 60)
-  return h > 0 ? `${h}h ${m}m` : `${m}m`
-}
 
 function sum(days: DayStats[]): number {
   return days.reduce((t, d) => t + d.movieSecs + d.episodeSecs, 0)
@@ -37,10 +32,11 @@ export function StatsSettings(): React.JSX.Element {
 
   // last 30 days, oldest → newest, zero-filled for the bar strip
   const bars = Array.from({ length: 30 }, (_, i) => {
-    const d = days[dayKey(new Date(now - (29 - i) * 86_400_000))]
-    return d ? d.movieSecs + d.episodeSecs : 0
+    const date = new Date(now - (29 - i) * 86_400_000)
+    const d = days[dayKey(date)]
+    return { date, secs: d ? d.movieSecs + d.episodeSecs : 0 }
   })
-  const barMax = Math.max(...bars, 1)
+  const barMax = Math.max(...bars.map((b) => b.secs), 1)
 
   if (total === 0)
     return (
@@ -76,8 +72,9 @@ export function StatsSettings(): React.JSX.Element {
             <span
               key={i}
               className={styles.statBar}
-              style={{ blockSize: `${Math.max(4, (b / barMax) * 100)}%` }}
-              data-empty={b === 0 || undefined}
+              style={{ blockSize: `${Math.max(4, (b.secs / barMax) * 100)}%` }}
+              data-empty={b.secs === 0 || undefined}
+              title={`${b.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} · ${fmtDur(b.secs)}`}
             />
           ))}
         </div>

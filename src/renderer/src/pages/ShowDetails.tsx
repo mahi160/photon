@@ -30,7 +30,7 @@ function EpisodeRow({ ep, onPlay }: { ep: BaseItem; onPlay: () => void }): React
           aria-label={`Play ${ep.Name}`}
           className={styles.episodeThumb}
         >
-          {img && <img src={img} alt="" loading="lazy" />}
+          {img && <img src={img} alt="" loading="lazy" decoding="async" />}
           {pct !== undefined && pct > 0 && pct < 100 && (
             <div className={styles.episodeProgress}>
               <div className={styles.episodeProgressFill} style={{ inlineSize: `${pct}%` }} />
@@ -100,7 +100,7 @@ export function ShowDetails(): React.JSX.Element {
       <DetailsHero backdrop={backdrop} />
       <div className={styles.content}>
         <div className={styles.top}>
-          <DetailsPoster poster={poster} />
+          <DetailsPoster poster={poster} vt={`poster-${item.Id}`} />
           <div className={styles.info}>
             <DetailsTitleRow item={item} />
             <DetailsMeta item={item} meta={meta} />

@@ -6,6 +6,7 @@ import {
   latestShowsQuery
 } from '../lib/queries'
 import { Row } from '../components/Row'
+import { Status } from '../components/Status'
 import styles from './Home.module.css'
 
 export function Home(): React.JSX.Element {
@@ -22,15 +23,11 @@ export function Home(): React.JSX.Element {
   return (
     <div className={styles.page}>
       {isError && (
-        <div className={styles.status}>
-          Cannot reach server.{' '}
-          <button
-            onClick={() => queries.forEach((q) => q.isError && q.refetch())}
-            className={styles.retry}
-          >
-            Retry
-          </button>
-        </div>
+        <Status
+          message="Cannot reach server."
+          onRetry={() => queries.forEach((q) => q.isError && q.refetch())}
+          className={styles.status}
+        />
       )}
       <Row title="Continue Watching" items={resume.data} wide loading={resume.isPending} />
       <Row title="Next Up" items={nextUp.data} wide loading={nextUp.isPending} />
@@ -42,7 +39,7 @@ export function Home(): React.JSX.Element {
       />
       <Row title="Recently Added Shows" items={shows.data} to="/shows" loading={shows.isPending} />
       {empty && (
-        <div className={styles.empty}>Nothing here yet. Add media to your Jellyfin libraries.</div>
+        <div className={styles.empty}>Nothing here yet. Add media to your Jellyfin library.</div>
       )}
     </div>
   )

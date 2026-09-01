@@ -21,6 +21,12 @@ export function AppearanceSettings(): React.JSX.Element {
         <div className={styles.rows}>
           <SettingsRow label="Theme">
             <div className={styles.slabRow}>
+              <button
+                className={`${styles.slab} ${theme === 'auto' ? styles.slabActive : ''}`}
+                onClick={() => set({ theme: 'auto', customColors: {} })}
+              >
+                Auto
+              </button>
               {themes.map((t) => (
                 <button
                   key={t.key}

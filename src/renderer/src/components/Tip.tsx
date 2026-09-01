@@ -1,9 +1,10 @@
 import { Tooltip } from '@base-ui/react/tooltip'
 import styles from './Tip.module.css'
 
-const DELAY_MS = 1000
-
-// one tooltip for every icon-only control, wraps any element via render prop -- no extra DOM nodes
+// one tooltip for every icon-only control, wraps any element via render prop -- no extra DOM nodes.
+// Delay lives on <Tooltip.Provider> in main.tsx, not per-trigger -- sweeping across the dock's 8
+// icon buttons used to wait the full delay at each one; a shared provider makes adjacent tooltips
+// within the group's `timeout` instant after the first (#21).
 export function Tip({
   label,
   kbd,
@@ -15,7 +16,7 @@ export function Tip({
 }): React.JSX.Element {
   return (
     <Tooltip.Root>
-      <Tooltip.Trigger delay={DELAY_MS} render={children} />
+      <Tooltip.Trigger render={children} />
       <Tooltip.Portal>
         <Tooltip.Positioner sideOffset={8} className={styles.positioner}>
           <Tooltip.Popup className={styles.tip}>

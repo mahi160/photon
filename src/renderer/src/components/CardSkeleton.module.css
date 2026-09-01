@@ -1,10 +1,12 @@
+/* transform, not background-position -- GPU-composited, no main-thread repaint every frame
+   while the network request it's masking is in flight (#27) */
 @keyframes shimmer {
   from {
-    background-position: -150% 0;
+    transform: translateX(-100%);
   }
 
   to {
-    background-position: 150% 0;
+    transform: translateX(100%);
   }
 }
 
@@ -17,8 +19,20 @@
 
 .poster,
 .line {
-  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-3) 50%, var(--surface-2) 75%);
-  background-size: 200% 100%;
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.poster::after,
+.line::after {
+  content: '';
+
+  position: absolute;
+  inset: 0;
+
+  background: linear-gradient(90deg, transparent 25%, var(--surface-3) 50%, transparent 75%);
+
   animation: shimmer 1.6s ease-in-out infinite;
 }
 

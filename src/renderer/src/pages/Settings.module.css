@@ -48,6 +48,8 @@
 .navItem {
   position: relative;
 
+  display: block;
+
   padding-block: 0.4rem;
   padding-inline: 1rem;
 
@@ -83,12 +85,12 @@
   transition: opacity var(--dur-fast) var(--ease);
 }
 
-.navItemActive {
+.navItem:global([data-status='active']) {
   font-weight: 600;
   color: var(--fg);
 }
 
-.navItemActive::before {
+.navItem:global([data-status='active'])::before {
   opacity: 1;
 }
 
@@ -235,6 +237,7 @@
 
 .slabRow {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.25rem;
 
   padding: 0.2rem;
@@ -244,12 +247,15 @@
 }
 
 .slab {
+  flex-shrink: 0;
+
   padding-block: 0.4rem;
   padding-inline: 0.85rem;
   border-radius: var(--radius-full);
 
   font-size: 0.8125rem;
   color: var(--fg-faint);
+  white-space: nowrap;
 
   transition:
     background-color var(--dur-fast) var(--ease),
@@ -364,6 +370,26 @@
 
 .advancedBody {
   margin-block-start: 1.25rem;
+}
+
+/* animated open/close, Chromium-only (::details-content) -- degrades to the native instant
+   toggle everywhere else, so it's safe behind @supports (#42) */
+@supports selector(::details-content) {
+  :root {
+    interpolate-size: allow-keywords;
+  }
+
+  .advanced::details-content {
+    overflow: hidden;
+    block-size: 0;
+    transition:
+      block-size var(--dur-med) var(--ease),
+      content-visibility var(--dur-med) allow-discrete;
+  }
+
+  .advanced[open]::details-content {
+    block-size: auto;
+  }
 }
 
 /* watch stats dashboard */

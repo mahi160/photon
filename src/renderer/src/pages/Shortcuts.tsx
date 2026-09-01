@@ -19,12 +19,14 @@ function Item({
   label,
   hint,
   keys,
-  join
+  join,
+  alt
 }: {
   label: string
   hint?: string
   keys: string[]
   join?: string
+  alt?: string[] // alternate binding for the same action, e.g. '/' and ⌘F for Search
 }): React.JSX.Element {
   return (
     <div className={styles.item}>
@@ -32,12 +34,22 @@ function Item({
         <div className={styles.label}>{label}</div>
         {hint && <div className={styles.hint}>{hint}</div>}
       </div>
-      <Keys keys={keys} join={join} />
+      <div className={styles.keysGroup}>
+        <Keys keys={keys} join={join} />
+        {alt && (
+          <>
+            <span className={styles.plus}>or</span>
+            <Keys keys={alt} />
+          </>
+        )}
+      </div>
     </div>
   )
 }
 
-const mod = navigator.platform.toLowerCase().includes('mac') ? '⌘' : 'Ctrl'
+// navigator.platform is deprecated and reports 'MacIntel' under Rosetta -- userAgent still names
+// the real host OS there
+const mod = navigator.userAgent.includes('Mac') ? '⌘' : 'Ctrl'
 
 export function ShortcutsOverlay({
   open,
@@ -57,10 +69,8 @@ export function ShortcutsOverlay({
             <section className={styles.section}>
               <h2 className={styles.sectionTitle}>Global</h2>
               <div className={styles.list}>
-                <Item label="Search" keys={['/']} />
-                <Item label="Search" keys={[mod, 'F']} />
+                <Item label="Search" keys={['/']} alt={[mod, 'F']} />
                 <Item label="This overlay" keys={['?']} />
-                <Item label="Back / close" keys={['Esc']} />
               </div>
             </section>
 

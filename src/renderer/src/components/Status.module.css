@@ -1,0 +1,16 @@
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+
+  color: var(--fg-faint);
+}
+
+.retry {
+  color: var(--accent);
+}
+
+.retry:hover {
+  text-decoration: underline;
+}

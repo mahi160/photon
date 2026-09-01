@@ -1,25 +1,22 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { Play, Clapperboard } from 'reicon-react'
+import { Clapperboard } from 'reicon-react'
 import { useQuery } from '@tanstack/react-query'
 import { episodesQuery, itemQuery, seasonsQuery } from '../lib/queries'
 import { backdropUrl, imageUrl, mediaBadges, ticksToSeconds } from '../lib/jellyfin'
+import { humanDuration } from '../lib/format'
 import { pickMediaSource } from '../player/session'
-import { WatchedButton } from '../components/WatchedButton'
 import { Card } from '../components/Card'
 import {
+  DetailsActions,
   DetailsError,
   DetailsHero,
   DetailsLoading,
   DetailsMeta,
-  DetailsTitleRow
+  DetailsTitleRow,
+  DetailsTrackPickers
 } from './DetailsShell'
 import styles from './Details.module.css'
-
-function fmtRuntime(ticks?: number): string {
-  const min = Math.round(ticksToSeconds(ticks) / 60)
-  return min ? `${Math.floor(min / 60)}h ${min % 60}m` : ''
-}
 
 export function EpisodeDetails(): React.JSX.Element {
   const { itemId } = useParams({ from: '/app/shell/episode/$itemId' })
@@ -77,7 +74,7 @@ export function EpisodeDetails(): React.JSX.Element {
 
   const meta = [
     item.ProductionYear,
-    item.RunTimeTicks ? fmtRuntime(item.RunTimeTicks) : null,
+    item.RunTimeTicks ? humanDuration(ticksToSeconds(item.RunTimeTicks)) : null,
     item.OfficialRating
   ].filter(Boolean)
   const badges = mediaBadges(streams)
@@ -104,6 +101,7 @@ export function EpisodeDetails(): React.JSX.Element {
               <img
                 src={thumb}
                 alt=""
+                decoding="async"
                 className={`${styles.episodePosterImg} ${thumbLoaded ? styles.imageLoaded : ''}`}
                 onLoad={() => setThumbLoaded(true)}
               />
@@ -139,64 +137,15 @@ export function EpisodeDetails(): React.JSX.Element {
               </div>
             )}
             <p className={styles.overview}>{item.Overview}</p>
-            <div className={styles.actions}>
-              {position > 60 && (
-                <button onClick={() => play(position)} className={styles.playPrimary}>
-                  <Play weight="Filled" />
-                  Resume
-                </button>
-              )}
-              <button
-                onClick={() => play(0)}
-                className={position > 60 ? styles.playSecondary : styles.playPrimary}
-              >
-                {position <= 60 && <Play weight="Filled" />}
-                {position > 60 ? 'Play from start' : 'Play'}
-              </button>
-              <WatchedButton
-                item={item}
-                className={styles.iconToggle}
-                activeClassName={styles.iconToggleActive}
-              />
-            </div>
-            {(audioStreams.length > 1 || subtitleStreams.length > 0) && (
-              <div className={styles.tracks}>
-                {audioStreams.length > 1 && (
-                  <select
-                    className={styles.select}
-                    value={audio ?? ''}
-                    onChange={(e) =>
-                      setAudio(e.target.value === '' ? undefined : Number(e.target.value))
-                    }
-                    aria-label="Audio track"
-                  >
-                    <option value="">Audio: Default</option>
-                    {audioStreams.map((s) => (
-                      <option key={s.Index} value={s.Index}>
-                        {s.DisplayTitle ?? `Audio ${s.Index}`}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {subtitleStreams.length > 0 && (
-                  <select
-                    className={styles.select}
-                    value={sub ?? ''}
-                    onChange={(e) =>
-                      setSub(e.target.value === '' ? undefined : Number(e.target.value))
-                    }
-                    aria-label="Subtitles"
-                  >
-                    <option value="">Subtitles: Default</option>
-                    {subtitleStreams.map((s) => (
-                      <option key={s.Index} value={s.Index}>
-                        {s.DisplayTitle ?? `Subtitle ${s.Index}`}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            )}
+            <DetailsActions item={item} position={position} onPlay={play} />
+            <DetailsTrackPickers
+              audioStreams={audioStreams}
+              subtitleStreams={subtitleStreams}
+              audio={audio}
+              sub={sub}
+              onAudio={setAudio}
+              onSub={setSub}
+            />
           </div>
         </div>
         {nextEpisode && (

@@ -2,21 +2,12 @@
   padding-block: 1.5rem 3rem;
 }
 
-/* staggered reveal on load — rows rise into place, one after another */
+/* rise on load -- was staggered per nth-child, but the error banner renders
+   conditionally as child 1 and shifts every row's delay whenever it shows
+   (and again whenever a Row returns null for an empty list), see AUDIT.md
+   #5. A flat rise for the whole page is honest instead of guessing an index. */
 .page > * {
   animation: rise var(--dur-slow) var(--ease-out) backwards;
-}
-
-.page > :nth-child(2) {
-  animation-delay: 60ms;
-}
-
-.page > :nth-child(3) {
-  animation-delay: 120ms;
-}
-
-.page > :nth-child(4) {
-  animation-delay: 180ms;
 }
 
 @keyframes rise {
@@ -36,16 +27,8 @@
   color: var(--fg-faint);
 }
 
+/* color/retry styling now lives in Status.module.css -- only page-specific spacing here */
 .status {
   margin-block-end: 1.5rem;
   padding-inline: var(--gutter);
-  color: var(--fg-faint);
-}
-
-.retry {
-  color: var(--accent);
-}
-
-.retry:hover {
-  text-decoration: underline;
 }

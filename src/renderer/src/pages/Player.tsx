@@ -16,7 +16,8 @@ import { useSettings } from '../stores/settings'
 import { PlayerControls } from '../components/PlayerControls'
 import { speeds } from '../player/engine'
 import { useHotkeys } from '../lib/useHotkeys'
-import { useToast } from '../hooks/useToast'
+import { showToast } from '../lib/toast'
+import { ToastHost } from '../components/ToastHost'
 import { useMediaSession } from '../hooks/useMediaSession'
 import { useAutoHideControls } from '../hooks/useAutoHideControls'
 import { useWakeLock } from '../hooks/useWakeLock'
@@ -50,9 +51,33 @@ export function Player(): React.JSX.Element {
     playItem
   } = player
 
-  const { message: toast, show: showToast } = useToast(1200)
   const { visible, setPinned, poke } = useAutoHideControls(engine.state)
   useWakeLock(engine.state === 'playing')
+  // "Finished · back to Home in Ns / Watch again" beat (#44) -- was a hard cut straight to Home
+  const [finishedCountdown, setFinishedCountdown] = useState(5)
+  const { finished, watchAgain, goHome } = player
+  const wasFinished = useRef(false)
+  useEffect(() => {
+    // reset only on the false->true edge, same idiom as PlayerControls' play/pause pulse --
+    // an unconditional reset every effect run is what the set-state-in-effect lint flags
+    if (finished && !wasFinished.current) setFinishedCountdown(5)
+    wasFinished.current = finished
+  }, [finished])
+  useEffect(() => {
+    if (!finished) return
+    const id = setInterval(() => setFinishedCountdown((c) => c - 1), 1000)
+    return () => clearInterval(id)
+  }, [finished])
+  useEffect(() => {
+    if (finished && finishedCountdown <= 0) goHome()
+  }, [finished, finishedCountdown, goHome])
+  // window title tracks now-playing (alt-tab/dock/taskbar) -- restored on unmount, see below
+  useEffect(() => {
+    document.title = session?.item ? `${session.item.Name} — Photon` : 'Photon'
+    return () => {
+      document.title = 'Photon'
+    }
+  }, [session?.item])
   // native traffic-light dots (overlay title bar) are AppKit-drawn over the video, CSS opacity/pointer-events can't reach them -- this is the native-side echo of the same visible state
   useEffect(() => {
     void invoke('app_set_traffic_lights_visible', { visible })
@@ -93,12 +118,12 @@ export function Player(): React.JSX.Element {
       const v = adjustVolume(delta)
       showToast(`Volume ${Math.round(v * 100)}%`)
     },
-    [adjustVolume, showToast]
+    [adjustVolume]
   )
 
   const toggleMuteWithToast = useCallback((): void => {
     showToast(toggleMute() ? 'Muted' : 'Unmuted')
-  }, [toggleMute, showToast])
+  }, [toggleMute])
 
   // subtitle sync: shift delay by same step as the slider, text subs only
   const shiftSubtitleDelay = useCallback(
@@ -108,7 +133,7 @@ export function Player(): React.JSX.Element {
       changeDelay(d)
       showToast(`Subtitle delay: ${d > 0 ? '+' : ''}${d.toFixed(1)}s`)
     },
-    [subtitleIsText, subtitleDelay, changeDelay, showToast]
+    [subtitleIsText, subtitleDelay, changeDelay]
   )
 
   // burned-in pick reloads the stream (transcode start takes a few seconds) — say so, instead of picker looking unresponsive
@@ -125,7 +150,7 @@ export function Player(): React.JSX.Element {
         stream?.DeliveryMethod !== 'External' ? `Switching to ${label}…` : `Subtitles: ${label}`
       )
     },
-    [playerSelectSubtitle, session, showToast]
+    [playerSelectSubtitle, session]
   )
 
   // episode after the one playing (dock's next button); NextUp can't be used here — mid-episode it still points at current one
@@ -146,7 +171,7 @@ export function Player(): React.JSX.Element {
     autoSkipped.current.add(key)
     seek(ticksToSeconds(activeSegment.EndTicks))
     showToast(`Skipped ${segmentNoun(activeSegment.Type)}`)
-  }, [autoSkip, activeSegment, playing, seek, showToast])
+  }, [autoSkip, activeSegment, playing, seek])
 
   // one fetch serves both directions — adjacentTo response contains them
   const adjacent = useQuery({
@@ -217,6 +242,9 @@ export function Player(): React.JSX.Element {
       },
       'shift+arrowright': () => jumpChapter(1),
       'shift+arrowleft': () => jumpChapter(-1),
+      // both variants: '>' needs shift on a US layout but not every layout, see AGENTS.md's key table
+      '>': () => stepSpeed(1),
+      '<': () => stepSpeed(-1),
       'shift+>': () => stepSpeed(1),
       'shift+<': () => stepSpeed(-1),
       '[': () => shiftSubtitleDelay(-0.5),
@@ -311,8 +339,13 @@ export function Player(): React.JSX.Element {
         }
       }}
       onDoubleClick={(e) => {
-        const t = e.target as HTMLElement
-        if (t === e.currentTarget || t === videoRef.current) toggleFullscreen()
+        // exclude interactive controls plus non-interactive overlay chrome (top bar,
+        // dock, next-up card) explicitly marked data-no-fullscreen -- narrower than
+        // "any non-button" so double-clicking the video area itself still works even
+        // when controls are visible (old target===stage||target===videoRef check
+        // missed that case entirely, since PlayerControls' own layer div covers it)
+        if (!(e.target as HTMLElement).closest('button,input,[role="menu"],[data-no-fullscreen]'))
+          toggleFullscreen()
       }}
       style={{ cursor: visible ? 'default' : 'none' }}
     >
@@ -348,7 +381,21 @@ export function Player(): React.JSX.Element {
           onEndPiP={engine.togglePiP}
         />
       )}
-      {!player.error && session && !engine.pip && (
+      {!player.error && session && !engine.pip && finished && (
+        <div className={styles.finishedLayer}>
+          <h2 className={styles.finishedTitle}>Finished</h2>
+          <p className={styles.finishedHint}>Back to Home in {finishedCountdown}s</p>
+          <div className={styles.finishedActions}>
+            <button onClick={watchAgain} className={styles.finishedPrimary}>
+              Watch again
+            </button>
+            <button onClick={goHome} className={styles.finishedSecondary}>
+              Back to Home now
+            </button>
+          </div>
+        </div>
+      )}
+      {!player.error && session && !engine.pip && !finished && (
         <PlayerControls
           visible={visible}
           item={session.item}
@@ -392,7 +439,7 @@ export function Player(): React.JSX.Element {
           onPiP={engine.togglePiP}
         />
       )}
-      {toast && <div className={styles.toast}>{toast}</div>}
+      <ToastHost />
       <ShortcutsOverlay open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       {session && (
         <PlaybackInfoOverlay

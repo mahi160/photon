@@ -158,6 +158,10 @@
   letter-spacing: 0.1em;
 }
 
+.groupCount {
+  color: var(--fg-faint);
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));

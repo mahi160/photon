@@ -114,7 +114,8 @@ export function PlayerControls(p: Props): React.JSX.Element {
         )}
 
         {/* overlay title bar: traffic lights float over scrim, drag region moves window; Back button/badges auto-excluded (see drag.js) */}
-        <div className={styles.topScrim} data-tauri-drag-region>
+        {/* data-no-fullscreen: non-interactive chrome, excluded from Player's dblclick-fullscreen (#52) */}
+        <div className={styles.topScrim} data-tauri-drag-region data-no-fullscreen>
           <div className={styles.topBar}>
             <Tip label="Back">
               <button
@@ -146,18 +147,17 @@ export function PlayerControls(p: Props): React.JSX.Element {
                 </span>
               ))}
               {p.playMethod !== 'DirectPlay' && (
-                <span className={styles.methodBadge} title="Converted by the server">
-                  <span className={styles.methodDot} data-method="transcode" />
-                  transcode
-                </span>
+                <Tip label="Converted by the server">
+                  <span className={styles.methodBadge}>
+                    <span className={styles.methodDot} data-method="transcode" />
+                    transcode
+                  </span>
+                </Tip>
               )}
               {p.cpuFallback && (
-                <span
-                  className={styles.methodBadge}
-                  title="GPU rendering unavailable on this machine -- playing back via the slower CPU path"
-                >
-                  CPU
-                </span>
+                <Tip label="GPU rendering unavailable on this machine -- playing back via the slower CPU path">
+                  <span className={styles.methodBadge}>CPU</span>
+                </Tip>
               )}
               <span className={styles.clock}>
                 {new Date(now).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
@@ -166,7 +166,7 @@ export function PlayerControls(p: Props): React.JSX.Element {
           </div>
         </div>
 
-        <div className={styles.dock} onWheel={(e) => p.onVolumeStep(e.deltaY < 0 ? 0.05 : -0.05)}>
+        <div className={styles.dock} data-no-fullscreen>
           <div className={styles.dockInner}>
             <TimelinePreview
               item={p.item}

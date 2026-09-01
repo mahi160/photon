@@ -1,3 +1,4 @@
+import { Switch } from '@base-ui/react/switch'
 import styles from '../pages/Settings.module.css'
 
 export interface ToggleSwitchProps {
@@ -6,16 +7,17 @@ export interface ToggleSwitchProps {
   label: string
 }
 
+// @base-ui/react/switch (#32) -- same aria-checked switch semantics as the hand-rolled
+// version, plus keyboard/focus handling for free
 export function ToggleSwitch({ checked, onChange, label }: ToggleSwitchProps): React.JSX.Element {
   return (
-    <button
-      role="switch"
-      aria-checked={checked}
+    <Switch.Root
+      checked={checked}
+      onCheckedChange={onChange}
       aria-label={label}
-      onClick={() => onChange(!checked)}
       className={`${styles.toggle} ${checked ? styles.toggleOn : ''}`}
     >
-      <span className={styles.toggleThumb} />
-    </button>
+      <Switch.Thumb className={styles.toggleThumb} />
+    </Switch.Root>
   )
 }

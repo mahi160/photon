@@ -11,21 +11,25 @@ export interface NextUpCardProps {
   onDismiss: () => void
 }
 
+// PlayerControls already gates rendering on this same condition (showNextUp) -- this
+// component trusts that guard instead of re-checking it (#31)
 export function NextUpCard({
   nextEpisode,
   remaining,
-  duration,
   onPlay,
   onDismiss
-}: NextUpCardProps): React.JSX.Element | null {
+}: NextUpCardProps): React.JSX.Element {
   const autoplayNext = useSettings((s) => s.autoplayNext)
 
-  if (duration <= 0 || remaining > 30 || remaining <= 0) return null
-
   return (
-    <div className={styles.nextUp}>
+    <div className={styles.nextUp} data-no-fullscreen>
       {imageUrl(nextEpisode, 320) && (
-        <img src={imageUrl(nextEpisode, 320)!} alt="" className={styles.nextUpThumb} />
+        <img
+          src={imageUrl(nextEpisode, 320)!}
+          alt=""
+          decoding="async"
+          className={styles.nextUpThumb}
+        />
       )}
       <div className={styles.nextUpInfo}>
         <div className={styles.nextUpEyebrow}>
@@ -36,20 +40,10 @@ export function NextUpCard({
           {String(nextEpisode.IndexNumber ?? 0).padStart(2, '0')} · {nextEpisode.Name}
         </div>
         <div className={styles.nextUpActions}>
-          <button
-            className={styles.nextUpPlay}
-            onClick={onPlay}
-            onMouseDown={noFocusOnClick}
-            tabIndex={-1}
-          >
+          <button className={styles.nextUpPlay} onClick={onPlay} onMouseDown={noFocusOnClick}>
             Play now
           </button>
-          <button
-            className={styles.nextUpDismiss}
-            onClick={onDismiss}
-            onMouseDown={noFocusOnClick}
-            tabIndex={-1}
-          >
+          <button className={styles.nextUpDismiss} onClick={onDismiss} onMouseDown={noFocusOnClick}>
             Dismiss
           </button>
         </div>

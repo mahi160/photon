@@ -64,6 +64,7 @@ export function AppLayout(): React.JSX.Element {
               key={item.to}
               to={item.to}
               activeOptions={item.exact ? { exact: true } : undefined}
+              activeProps={{ 'aria-current': 'page' }}
               className={styles.navLink}
             >
               {item.label}
@@ -85,8 +86,12 @@ export function AppLayout(): React.JSX.Element {
       </header>
       {/* data-scroll-root: LibraryGrid's virtualizer needs a handle on the
           actual scrolling ancestor (this, not the window -- .main is the
-          overflow-y:auto element, see AppLayout.module.css) */}
-      <main className={styles.main} data-scroll-root>
+          overflow-y:auto element, see AppLayout.module.css).
+          data-scroll-restoration-id: stable selector for the router's
+          per-element scroll restoration (see router.tsx's scrollRestoration)
+          -- without an explicit id it falls back to an nth-child path, which
+          Home/Movies/Shows swapping children under the same node can shift (#4) */}
+      <main className={styles.main} data-scroll-root data-scroll-restoration-id="app-main">
         <Outlet />
       </main>
       <ShortcutsOverlay open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />

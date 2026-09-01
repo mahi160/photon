@@ -15,10 +15,10 @@
   background:
     radial-gradient(
       38rem 38rem at 100% 100%,
-      oklch(from var(--accent) l c h / 6%),
+      oklch(from var(--accent) l c h / 0.06),
       transparent 70%
     ),
-    oklch(from black l c h / 74%);
+    oklch(from black l c h / 0.74);
 }
 
 .card {
@@ -128,7 +128,7 @@
   border-radius: var(--radius-full);
   background:
     var(--beam) 0 0 / var(--pct, 0%) 100% no-repeat,
-    oklch(from white l c h / 13%);
+    oklch(from white l c h / 0.13);
 }
 
 .time {
@@ -178,5 +178,5 @@
 }
 
 .back:hover {
-  background: oklch(from white l c h / 10%);
+  background: oklch(from white l c h / 0.1);
 }

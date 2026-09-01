@@ -358,8 +358,12 @@ export function imageUrl(
 
 export function backdropUrl(item: BaseItem, width = 1280): string | null {
   if (!session) return null
-  if (item.BackdropImageTags?.length)
-    return `${session.server}/Items/${item.Id}/Images/Backdrop/0?fillWidth=${width}&quality=90`
+  if (item.BackdropImageTags?.length) {
+    // hero spans the full window -- a plain logical-px width leaves it visibly
+    // soft on any HiDPI display (2560 logical px @ DPR 2 upscaling a 1280px source 4x)
+    const dpr = Math.min(2, window.devicePixelRatio || 1)
+    return `${session.server}/Items/${item.Id}/Images/Backdrop/0?fillWidth=${Math.round(width * dpr)}&quality=90`
+  }
   return null
 }
 

@@ -1,10 +1,13 @@
-import { useState } from 'react'
-import { useNavigate } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { Play, Clapperboard } from 'reicon-react'
 import { imageUrl, type BaseItem } from '../lib/jellyfin'
 import { FavoriteButton } from './FavoriteButton'
 import { WatchedButton } from './WatchedButton'
 import styles from './Card.module.css'
+
+// tracks which mounted Card instance owns a given item's shared view-transition name (see below)
+const claimedVtIds = new Set<string>()
 
 // Card semantics (CONTEXT.md): click card/hover-play = play, click title = details; episodes: title -> series, subtitle -> episode
 export function Card({
@@ -15,6 +18,7 @@ export function Card({
   wide?: boolean
 }): React.JSX.Element {
   const navigate = useNavigate()
+  const router = useRouter()
   const img = imageUrl(item, wide ? 480 : 360)
   const pct = item.UserData?.PlayedPercentage
   const [now] = useState(() => Date.now()) // lazy init: "new" badge doesn't need per-render freshness
@@ -25,37 +29,53 @@ export function Card({
     navigate({ to: '/player/$itemId', params: { itemId: item.Id } })
   }
 
-  // episodes: title links to series (browsing context), subtitle links to episode itself
-  function openTitle(e: React.MouseEvent): void {
-    e.stopPropagation()
-    if (item.Type === 'Movie') navigate({ to: '/movies/$itemId', params: { itemId: item.Id } })
-    else if (item.Type === 'Series' || item.Type === 'Episode')
-      navigate({ to: '/shows/$seriesId', params: { seriesId: (item.SeriesId ?? item.Id)! } })
-  }
-
-  function openEpisode(e: React.MouseEvent): void {
-    e.stopPropagation()
-    navigate({ to: '/episode/$itemId', params: { itemId: item.Id } })
-  }
-
   const isEpisode = item.Type === 'Episode'
+  // episodes: title links to series (browsing context), subtitle links to episode itself
+  const titleTo =
+    item.Type === 'Movie'
+      ? { to: '/movies/$itemId' as const, params: { itemId: item.Id } }
+      : { to: '/shows/$seriesId' as const, params: { seriesId: (item.SeriesId ?? item.Id)! } }
+  const episodeTo = { to: '/episode/$itemId' as const, params: { itemId: item.Id } }
+
   const titleLabel = isEpisode ? (item.SeriesName ?? '') : item.Name
   const subtitle = isEpisode
     ? `S${item.ParentIndexNumber ?? '?'}:E${item.IndexNumber ?? '?'} - ${item.Name}`
     : (item.ProductionYear ?? '')
+  // shared-element transition: matches DetailsPoster's own view-transition-name for this item (#34).
+  // Same item can render in two Home rows at once (Continue Watching + Recently Added) --
+  // a duplicate view-transition-name aborts the whole transition, so only the first-mounted
+  // Card for a given id claims it; others fall back to CSS's `var(--vt, none)` (#52)
+  const [ownsVt] = useState(() => {
+    if (claimedVtIds.has(item.Id)) return false
+    claimedVtIds.add(item.Id)
+    return true
+  })
+  useEffect(() => {
+    return () => {
+      if (ownsVt) claimedVtIds.delete(item.Id)
+    }
+  }, [item.Id, ownsVt])
+  const vt = ownsVt ? `poster-${item.Id}` : undefined
 
   return (
     <div className={`${styles.card} ${wide ? styles.wide : ''}`}>
       <button
         onClick={play}
+        onPointerEnter={() => {
+          // details fetch starts on hover, not mousedown -- router only auto-preloads
+          // <Link>s (defaultPreload:'intent'), and this button plays rather than navigates
+          void router.preloadRoute(titleTo)
+        }}
         aria-label={`Play ${item.Name}`}
         className={`${styles.poster} ${wide ? styles.wide : ''}`}
+        style={vt ? ({ '--vt': vt } as React.CSSProperties) : undefined}
       >
         {img ? (
           <img
             src={img}
             alt=""
             loading="lazy"
+            decoding="async"
             className={`${styles.image} ${loaded ? styles.imageLoaded : ''}`}
             onLoad={() => setLoaded(true)}
           />
@@ -78,9 +98,14 @@ export function Card({
         {isNew && <span className={styles.newBadge}>NEW</span>}
       </button>
       <div className={styles.meta}>
-        <button onClick={openTitle} className={styles.title} title={titleLabel}>
+        <Link
+          {...titleTo}
+          className={styles.title}
+          title={titleLabel}
+          onClick={(e) => e.stopPropagation()}
+        >
           {titleLabel}
-        </button>
+        </Link>
         <div className={styles.quickActions}>
           <FavoriteButton
             item={item}
@@ -97,9 +122,14 @@ export function Card({
         </div>
       </div>
       {isEpisode ? (
-        <button onClick={openEpisode} className={styles.subtitleLink} title={item.Name}>
+        <Link
+          {...episodeTo}
+          className={styles.subtitleLink}
+          title={item.Name}
+          onClick={(e) => e.stopPropagation()}
+        >
           {subtitle}
-        </button>
+        </Link>
       ) : (
         <div className={styles.subtitle}>{subtitle}</div>
       )}

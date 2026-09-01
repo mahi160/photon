@@ -11,6 +11,9 @@ import {
 import { PhotonMark } from '../components/PhotonMark'
 import styles from './Login.module.css'
 
+// Jellyfin codes expire server-side too -- our own cap so "Waiting for approval…" doesn't wait forever (#44)
+const QC_TIMEOUT_MS = 5 * 60_000
+
 export function Login(): React.JSX.Element {
   const login = useSession((s) => s.login)
   const loginWith = useSession((s) => s.loginWith)
@@ -23,9 +26,11 @@ export function Login(): React.JSX.Element {
 
   // Quick Connect: show code, poll til approved from another signed-in Jellyfin session, sign in with secret
   const [qc, setQc] = useState<{ code: string; secret: string; server: string } | null>(null)
+  const [qcExpired, setQcExpired] = useState(false)
 
   async function startQuickConnect(): Promise<void> {
     setError(null)
+    setQcExpired(false)
     try {
       const base = normalizeServer(server)
       const { code, secret } = await quickConnectInitiate(base)
@@ -37,19 +42,27 @@ export function Login(): React.JSX.Element {
 
   useEffect(() => {
     if (!qc) return
-    const id = setInterval(async () => {
+    const pollId = setInterval(async () => {
       try {
         if (!(await quickConnectAuthenticated(qc.server, qc.secret))) return
-        clearInterval(id)
+        clearInterval(pollId)
         await loginWith(await authenticateWithQuickConnect(qc.server, qc.secret))
         navigate({ to: '/' })
       } catch (err) {
-        clearInterval(id)
+        clearInterval(pollId)
         setQc(null)
         setError(err instanceof JellyfinError ? err.message : 'Quick Connect failed.')
       }
     }, 2000)
-    return () => clearInterval(id)
+    const expiryId = setTimeout(() => {
+      clearInterval(pollId)
+      setQc(null)
+      setQcExpired(true)
+    }, QC_TIMEOUT_MS)
+    return () => {
+      clearInterval(pollId)
+      clearTimeout(expiryId)
+    }
   }, [qc, loginWith, navigate])
 
   async function submit(e: React.FormEvent): Promise<void> {
@@ -149,7 +162,7 @@ export function Login(): React.JSX.Element {
               className={styles.qcBtn}
               onClick={startQuickConnect}
             >
-              Use Quick Connect
+              {qcExpired ? 'Code expired, try again' : 'Use Quick Connect'}
             </button>
           )}
         </div>

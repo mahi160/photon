@@ -1,6 +1,7 @@
 import { Pip } from 'reicon-react'
 import { imageUrl, type BaseItem } from '../lib/jellyfin'
 import { noFocusOnClick } from '../lib/noFocusOnClick'
+import { hms as fmt } from '../lib/format'
 import styles from './PipOverlay.module.css'
 
 export interface PipOverlayProps {
@@ -9,16 +10,6 @@ export interface PipOverlayProps {
   duration: number
   onBack: () => void
   onEndPiP: () => void
-}
-
-function fmt(seconds: number): string {
-  const s = Math.max(0, Math.round(seconds))
-  const m = Math.floor(s / 60)
-  const h = Math.floor(m / 60)
-  const mm = m % 60
-  return h > 0
-    ? `${h}:${String(mm).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
-    : `${mm}:${String(s % 60).padStart(2, '0')}`
 }
 
 // shown over paused in-process player while PiP owns playback in spawned mpv window (ADR-0006), which has no Photon UI of its own
@@ -30,7 +21,7 @@ export function PipOverlay(p: PipOverlayProps): React.JSX.Element {
     <div className={styles.layer}>
       <div className={styles.card} style={{ '--pct': pct } as React.CSSProperties}>
         <div className={styles.rule} />
-        {poster && <img src={poster} alt="" className={styles.poster} />}
+        {poster && <img src={poster} alt="" decoding="async" className={styles.poster} />}
         <div className={styles.info}>
           <div className={styles.eyebrow}>
             <Pip className={styles.eyebrowIcon} />

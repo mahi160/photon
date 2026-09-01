@@ -24,11 +24,12 @@ export function setFavorite(itemId: string, favorite: boolean): Promise<void> {
 export const resumeItemsQuery = queryOptions({
   queryKey: queryKeys.resume(),
   queryFn: () =>
+    // no Fields override -- Card never renders Overview, the default field set already covers
+    // everything a Card needs (ImageTags/UserData) (#24)
     jf<ItemsResult>(`/Users/${userId()}/Items/Resume`, {
       query: {
         Limit: 20,
         Recursive: true,
-        Fields: 'Overview',
         MediaTypes: 'Video'
       }
     }).then((r) => r.Items)
@@ -96,7 +97,8 @@ export const searchIndexQuery = queryOptions({
         SortBy: 'SortName',
         // results render as Cards (poster + progress): UserData/ImageTags must stay, but only Primary image tag used
         ImageTypeLimit: 1,
-        EnableImageTypes: 'Primary'
+        EnableImageTypes: 'Primary',
+        Fields: 'PrimaryImageAspectRatio'
       }
     }).then((r) => r.Items)
 })

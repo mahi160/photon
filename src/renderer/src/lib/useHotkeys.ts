@@ -27,6 +27,11 @@ export function useHotkeys(map: HotkeyMap, options: UseHotkeysOptions = {}): voi
   useEffect(() => {
     function onKey(e: KeyboardEvent): void {
       const target = e.target as HTMLElement | null
+      // A focused, Tab-reachable button owns Space/Enter itself -- don't hijack its own
+      // activation into a hotkey (native click would double-fire against our handler).
+      // Every other key still reaches the hotkey map even while a button has focus --
+      // this is why player controls no longer need tabIndex={-1} to stay keyboard-safe (#11).
+      if (target?.matches('button:focus-visible') && (e.key === ' ' || e.key === 'Enter')) return
       // Deliberately focused control keeps native keys: Tab-focus/text-editing match :focus-visible, mouse-clicks don't -- preventDefault below also cancels the focused button's own Space activation (double-toggle bug)
       if (!ignoreFocusGuard && target?.matches(':focus-visible')) return
       // safety net: text entry always wins even when heuristic doesn't apply
