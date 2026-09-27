@@ -1,5 +1,12 @@
 # Photon
 
+> [!WARNING]
+> **Photon is deprecated and no longer maintained.** Its successor is
+> [tbis](https://github.com/mahi160/tbis), a native macOS Jellyfin client
+> with embedded mpv playback. Install it with
+> `brew install --cask mahi160/tbis/tbis`. This repository is archived and
+> kept read-only for reference.
+
 A calm, minimal desktop media player for Jellyfin, powered by real mpv
 playback.
 
